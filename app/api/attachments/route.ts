@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
   try {
     const form = await request.formData(); const entityType = String(form.get('entityType') || ''); const entityId = String(form.get('entityId') || ''); const file = form.get('file');
-    if (!['job', 'claim'].includes(entityType) || !entityId || !(file instanceof File)) return NextResponse.json({ error: 'Entity and file are required.' }, { status: 400 });
+    if (!['job', 'claim', 'expense'].includes(entityType) || !entityId || !(file instanceof File)) return NextResponse.json({ error: 'Entity and file are required.' }, { status: 400 });
     if (!allowedTypes.has(file.type)) return NextResponse.json({ error: 'Only JPG, PNG, WEBP, and PDF files are supported.' }, { status: 415 });
     if (file.size <= 0 || file.size > MAX_BYTES) return NextResponse.json({ error: 'Attachment must be smaller than 10 MB.' }, { status: 413 });
     const ext = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.')).toLowerCase() : '';

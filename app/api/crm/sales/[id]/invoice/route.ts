@@ -12,7 +12,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       if (!saleResult.rows[0]) throw Object.assign(new Error('Sale not found.'), { code: 'SALE_NOT_FOUND' });
       const existing = await client.query('SELECT id FROM invoices WHERE sale_id = $1', [params.id]); if (existing.rows[0]) throw Object.assign(new Error('Invoice already exists.'), { code: 'EXISTS' });
       const number = `INV-${new Date().getFullYear()}-${randomUUID().slice(0, 6).toUpperCase()}`;
-      const result = await client.query(`INSERT INTO invoices (organization_id, number, sale_id, client_id, total, created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, number, status, total, issued_at, due_at`, [session.user.organizationId, number, params.id, saleResult.rows[0].client_id, saleResult.rows[0].total, session.user.id]);
+      const result = await client.query(`INSERT INTO invoices (organization_id, number, sale_id, client_id, total, created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, number, status, total, paid_amount, issued_at, due_at`, [session.user.organizationId, number, params.id, saleResult.rows[0].client_id, saleResult.rows[0].total, session.user.id]);
       const items = await client.query('SELECT id, description, amount FROM sale_items WHERE sale_id = $1 AND returned = false', [params.id]); for (const item of items.rows) await client.query('INSERT INTO invoice_items (invoice_id, sale_item_id, description, amount) VALUES ($1, $2, $3, $4)', [result.rows[0].id, item.id, item.description, item.amount]);
       return result.rows[0];
     });
