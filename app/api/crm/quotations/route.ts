@@ -1,0 +1,51 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
+import { z } from 'zod';
+import { getSession } from '@/lib/auth';
+import { query, withTransaction } from '@/lib/db';
+
+const quotationSchema = z.object({
+  clientId: z.string().uuid(), opportunityId: z.string().uuid().optional(), validUntil: z.string().date().optional(),
+  items: z.array(z.object({ sku: z.string().trim().min(1).max(80), description: z.string().trim().min(1).max(200), quantity: z.number().int().positive().max(100000), unitPrice: z.number().nonnegative().max(100000000) })).min(1).max(200),
+});
+
+export async function GET(request: NextRequest) {
+  const session = await getSession(request);
+  if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+  const result = await query(
+    `SELECT q.id, q.number, q.status, q.currency, q.total, q.valid_until, q.created_at, c.id AS client_id, c.name AS client_name,
+            COALESCE(json_agg(json_build_object('id', qi.id, 'sku', qi.sku, 'description', qi.description, 'quantity', qi.quantity, 'unitPrice', qi.unit_price)
+              ORDER BY qi.created_at) FILTER (WHERE qi.id IS NOT NULL), '[]'::json) AS items
+     FROM quotations q JOIN clients c ON c.id = q.client_id LEFT JOIN quotation_items qi ON qi.quotation_id = q.id
+     WHERE q.organization_id = $1 GROUP BY q.id, c.id ORDER BY q.created_at DESC LIMIT 200`,
+    [session.user.organizationId],
+  );
+  return NextResponse.json({ quotations: result.rows });
+}
+
+export async function POST(request: Request) {
+  try {
+    const session = await getSession(request);
+    if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+    const body = quotationSchema.parse(await request.json());
+    const quotation = await withTransaction(async client => {
+      const clientResult = await client.query('SELECT id FROM clients WHERE id = $1 AND organization_id = $2', [body.clientId, session.user.organizationId]);
+      if (!clientResult.rows[0]) throw Object.assign(new Error('Client not found.'), { code: 'CLIENT_NOT_FOUND' });
+      const number = `QUO-${new Date().getFullYear()}-${randomUUID().slice(0, 6).toUpperCase()}`;
+      const total = body.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+      const header = await client.query(
+        `INSERT INTO quotations (organization_id, number, client_id, opportunity_id, total, valid_until, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, number, status, total, valid_until, created_at`,
+        [session.user.organizationId, number, body.clientId, body.opportunityId || null, total, body.validUntil || null, session.user.id],
+      );
+      for (const item of body.items) await client.query('INSERT INTO quotation_items (quotation_id, sku, description, quantity, unit_price) VALUES ($1, $2, $3, $4, $5)', [header.rows[0].id, item.sku, item.description, item.quantity, item.unitPrice]);
+      return header.rows[0];
+    });
+    return NextResponse.json({ quotation }, { status: 201 });
+  } catch (error) {
+    if (error instanceof z.ZodError) return NextResponse.json({ error: 'Client and at least one valid quotation line are required.' }, { status: 400 });
+    if ((error as { code?: string }).code === 'CLIENT_NOT_FOUND') return NextResponse.json({ error: 'Client not found.' }, { status: 404 });
+    console.error('Quotation create failed', error);
+    return NextResponse.json({ error: 'Unable to create quotation.' }, { status: 500 });
+  }
+}
