@@ -1,0 +1,133 @@
+'use client';
+
+import Link from 'next/link';
+import { FormEvent, useState } from 'react';
+import { Activity, ArrowRight, CheckCircle2, Eye, EyeOff, HelpCircle, KeyRound, LockKeyhole, ShieldCheck, Zap } from 'lucide-react';
+import styles from './login.module.css';
+
+export default function LoginPage() {
+  const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(true);
+  const [message, setMessage] = useState('');
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMessage('Sign-in service is not connected in this environment yet.');
+  }
+
+  return (
+    <main className={styles.page}>
+      <section className={styles.visualPanel} aria-label="iPayTech Ops overview">
+        <div className={styles.visualGlow} />
+        <div className={styles.visualGrid} />
+        <div className={styles.visualContent}>
+          <Link href="/" className={styles.brand} aria-label="iPayTech Ops home">
+            <span className={styles.brandMark}><Zap size={17} fill="currentColor" /></span>
+            <span>
+              <strong>iPayTech</strong>
+              <small>OPS CONSOLE</small>
+            </span>
+          </Link>
+
+          <div className={styles.visualCopy}>
+            <div className={styles.kicker}><span className={styles.liveDot} /> Operations control centre</div>
+            <h1>Move every operation forward.</h1>
+            <p>One secure workspace for inventory, sales, jobs, warranties and the teams behind them.</p>
+          </div>
+
+          <div className={styles.signalCard}>
+            <div className={styles.signalHeader}>
+              <span><Activity size={14} /> Live workspace signal</span>
+              <span className={styles.signalStatus}><i /> Operational</span>
+            </div>
+            <div className={styles.signalValue}>99.98<span>%</span></div>
+            <div className={styles.signalLabel}>fulfilment visibility across your operation</div>
+            <div className={styles.signalBars} aria-hidden="true">
+              <i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i />
+            </div>
+          </div>
+
+          <div className={styles.trustRow}>
+            <span><CheckCircle2 size={14} /> Role-based access</span>
+            <span><CheckCircle2 size={14} /> Audit-ready records</span>
+          </div>
+        </div>
+        <div className={styles.visualFooter}><span>Harare HQ</span><span>Production workspace</span></div>
+      </section>
+
+      <section className={styles.formPanel}>
+        <div className={styles.formWrap}>
+          <div className={styles.mobileBrand}>
+            <Link href="/" className={styles.brand} aria-label="iPayTech Ops home">
+              <span className={styles.brandMark}><Zap size={17} fill="currentColor" /></span>
+              <span><strong>iPayTech</strong><small>OPS CONSOLE</small></span>
+            </Link>
+          </div>
+
+          <div className={styles.formIntro}>
+            <span className={styles.eyebrow}><LockKeyhole size={14} /> Secure workspace access</span>
+            <h2>Welcome back</h2>
+            <p>Sign in to continue to your operations workspace.</p>
+          </div>
+
+          <form className={styles.form} onSubmit={handleSubmit} noValidate>
+            <div className={styles.field}>
+              <label htmlFor="email">Work email</label>
+              <div className={styles.inputShell}>
+                <KeyRound size={17} aria-hidden="true" />
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@company.com"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className={styles.field}>
+              <div className={styles.labelRow}>
+                <label htmlFor="password">Password</label>
+                <button type="button" className={styles.forgotLink} onClick={() => setMessage('Password recovery will be available when authentication is connected.')}>Forgot password?</button>
+              </div>
+              <div className={styles.inputShell}>
+                <LockKeyhole size={17} aria-hidden="true" />
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                />
+                <button type="button" className={styles.iconButton} onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'}>
+                  {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                </button>
+              </div>
+            </div>
+
+            <label className={styles.remember}>
+              <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
+              <span className={styles.checkbox} aria-hidden="true" />
+              <span>Keep me signed in on this device</span>
+            </label>
+
+            {message && <p className={styles.formMessage} role="status">{message}</p>}
+
+            <button type="submit" className={styles.submitButton}>Sign in <ArrowRight size={17} /></button>
+          </form>
+
+          <div className={styles.securityNote}><ShieldCheck size={16} /><span>Your access is protected with encrypted credentials and workspace-level permissions.</span></div>
+          <p className={styles.support}>Need help accessing your workspace? <button type="button" onClick={() => setMessage('Contact your workspace administrator for access support.')}>Contact your administrator</button> <HelpCircle size={14} /></p>
+        </div>
+      </section>
+    </main>
+  );
+}

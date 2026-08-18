@@ -1,0 +1,129 @@
+.page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(420px, 0.92fr) minmax(520px, 1.08fr);
+  background: #f6f8fb;
+}
+
+.visualPanel {
+  position: relative;
+  overflow: hidden;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 42px clamp(36px, 6vw, 90px) 30px;
+  color: #fff;
+  background: #0f1c31;
+}
+
+.visualGlow {
+  position: absolute;
+  width: 480px;
+  height: 480px;
+  top: -190px;
+  right: -190px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(47, 124, 246, 0.36), rgba(47, 124, 246, 0) 70%);
+  pointer-events: none;
+}
+
+.visualGrid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.15;
+  background-image: linear-gradient(rgba(174, 200, 244, 0.22) 1px, transparent 1px), linear-gradient(90deg, rgba(174, 200, 244, 0.22) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: linear-gradient(145deg, black, transparent 65%);
+  pointer-events: none;
+}
+
+.visualContent, .visualFooter { position: relative; z-index: 1; }
+
+.brand { display: inline-flex; align-items: center; gap: 10px; color: #fff; text-decoration: none; }
+.brandMark { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: #fff; background: #2f7cf6; box-shadow: 0 8px 18px rgba(47, 124, 246, 0.28); }
+.brand strong, .brand small { display: block; }
+.brand strong { font-size: 17px; line-height: 1; letter-spacing: -0.3px; }
+.brand small { margin-top: 4px; color: #7d8da8; font-size: 8px; letter-spacing: 1.65px; }
+
+.visualCopy { max-width: 520px; margin-top: clamp(90px, 18vh, 190px); }
+.kicker, .eyebrow { display: inline-flex; align-items: center; gap: 7px; color: #62d9b0; font-size: 10px; font-weight: 700; letter-spacing: 1.25px; text-transform: uppercase; }
+.liveDot { width: 6px; height: 6px; border-radius: 50%; background: #54d7ae; box-shadow: 0 0 0 4px rgba(84, 215, 174, 0.12); }
+.visualCopy h1 { max-width: 490px; margin: 14px 0 15px; color: #fff; font-size: clamp(35px, 4vw, 57px); line-height: 1.05; letter-spacing: -2.7px; }
+.visualCopy p { max-width: 420px; color: #a9b8ce; font-size: 14px; line-height: 1.7; }
+
+.signalCard { max-width: 420px; margin-top: 42px; padding: 18px 20px 17px; border: 1px solid rgba(165, 193, 238, 0.16); border-radius: 12px; background: rgba(20, 38, 68, 0.76); box-shadow: 0 18px 40px rgba(4, 12, 26, 0.2); backdrop-filter: blur(12px); }
+.signalHeader, .signalStatus, .trustRow, .visualFooter { display: flex; align-items: center; }
+.signalHeader { justify-content: space-between; color: #afbdd0; font-size: 10px; }
+.signalHeader > span:first-child { display: inline-flex; align-items: center; gap: 6px; }
+.signalStatus { gap: 5px; color: #63d8b1; font-size: 9px; }
+.signalStatus i { width: 5px; height: 5px; border-radius: 50%; background: #63d8b1; }
+.signalValue { margin-top: 18px; color: #fff; font-size: 34px; font-weight: 700; letter-spacing: -1.5px; }
+.signalValue span { margin-left: 2px; color: #67d8b2; font-size: 17px; }
+.signalLabel { margin-top: 3px; color: #7f91aa; font-size: 10px; }
+.signalBars { height: 46px; display: flex; align-items: flex-end; gap: 5px; margin-top: 16px; }
+.signalBars i { flex: 1; height: 32%; border-radius: 4px 4px 2px 2px; background: #317cf2; opacity: 0.75; }
+.signalBars i:nth-child(2) { height: 46%; }.signalBars i:nth-child(3) { height: 37%; }.signalBars i:nth-child(4) { height: 59%; }.signalBars i:nth-child(5) { height: 52%; }.signalBars i:nth-child(6) { height: 73%; }.signalBars i:nth-child(7) { height: 63%; }.signalBars i:nth-child(8) { height: 87%; }.signalBars i:nth-child(9) { height: 68%; }.signalBars i:nth-child(10) { height: 92%; }.signalBars i:nth-child(11) { height: 80%; }.signalBars i:nth-child(12) { height: 100%; background: #48cda5; }
+.trustRow { flex-wrap: wrap; gap: 18px; margin-top: 23px; color: #8191aa; font-size: 10px; }
+.trustRow span { display: inline-flex; align-items: center; gap: 6px; }
+.trustRow svg { color: #5ed6ae; }
+.visualFooter { justify-content: space-between; color: #687995; font-size: 9px; letter-spacing: 0.4px; }
+
+.formPanel { display: grid; place-items: center; padding: 48px clamp(32px, 8vw, 128px); background: #f9fbfd; }
+.formWrap { width: min(100%, 420px); }
+.mobileBrand { display: none; }
+.formIntro { margin-bottom: 30px; }
+.eyebrow { color: #2f70e8; letter-spacing: 0.8px; }
+.formIntro h2 { margin: 14px 0 7px; color: #16243a; font-size: 31px; line-height: 1.1; letter-spacing: -1.2px; }
+.formIntro p { color: #77859a; font-size: 13px; line-height: 1.6; }
+.form { display: grid; gap: 19px; }
+.field { display: grid; gap: 8px; }
+.field label, .labelRow label { color: #26364e; font-size: 11px; font-weight: 700; }
+.labelRow { display: flex; align-items: center; justify-content: space-between; }
+.forgotLink, .support button { padding: 0; color: #2f70e8; font-size: 10px; font-weight: 600; cursor: pointer; }
+.inputShell { min-height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 13px; border: 1px solid #dce4ee; border-radius: 8px; color: #8c9bad; background: #fff; transition: border-color 200ms ease, box-shadow 200ms ease, background 200ms ease; }
+.inputShell:focus-within { border-color: #2f7cf6; box-shadow: 0 0 0 4px rgba(47, 124, 246, 0.11); }
+.inputShell input { width: 100%; min-width: 0; border: 0; outline: 0; color: #1c2c44; background: transparent; font-size: 12px; }
+.inputShell input::placeholder { color: #a3afbd; }
+.iconButton { display: grid; place-items: center; padding: 5px; color: #8c9bad; cursor: pointer; }
+.iconButton:hover { color: #2f70e8; }
+.remember { position: relative; display: inline-flex; align-items: center; gap: 9px; width: fit-content; color: #748399; font-size: 10px; cursor: pointer; }
+.remember input { position: absolute; opacity: 0; pointer-events: none; }
+.checkbox { width: 16px; height: 16px; display: grid; place-items: center; border: 1px solid #cbd6e4; border-radius: 4px; background: #fff; transition: all 160ms ease; }
+.remember input:checked + .checkbox { border-color: #2f7cf6; background: #2f7cf6; box-shadow: inset 0 0 0 3px #fff; }
+.remember input:focus-visible + .checkbox { outline: 3px solid rgba(47, 124, 246, 0.22); outline-offset: 2px; }
+.formMessage { margin: -3px 0 -2px; padding: 10px 12px; border: 1px solid #f2d79b; border-radius: 7px; color: #9b6c09; background: #fff8e7; font-size: 10px; line-height: 1.5; }
+.submitButton { min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 8px; color: #fff; background: #2f7cf6; box-shadow: 0 8px 18px rgba(47, 124, 246, 0.2); font-size: 12px; font-weight: 700; cursor: pointer; transition: background 200ms ease, box-shadow 200ms ease, transform 200ms ease; }
+.submitButton:hover { background: #2369d8; box-shadow: 0 10px 22px rgba(47, 124, 246, 0.26); transform: translateY(-1px); }
+.submitButton:focus-visible, .forgotLink:focus-visible, .support button:focus-visible, .iconButton:focus-visible, .brand:focus-visible { outline: 3px solid rgba(47, 124, 246, 0.3); outline-offset: 3px; border-radius: 4px; }
+.securityNote { display: flex; align-items: flex-start; gap: 9px; margin-top: 27px; padding: 12px; border: 1px solid #e2eaf2; border-radius: 7px; color: #75849a; background: #f3f7fb; font-size: 10px; line-height: 1.55; }
+.securityNote svg { flex: 0 0 auto; color: #0b9971; }
+.support { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px; margin: 25px 0 0; color: #91a0b1; font-size: 10px; }
+.support svg { color: #9aa8b8; }
+
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; }
+  .visualPanel { min-height: auto; padding: 28px 28px 26px; }
+  .visualCopy { margin-top: 70px; }
+  .visualCopy h1 { font-size: clamp(35px, 8vw, 50px); }
+  .signalCard { margin-top: 28px; }
+  .visualFooter { margin-top: 28px; }
+  .formPanel { padding: 56px 28px 64px; }
+  .mobileBrand { display: block; margin-bottom: 42px; }
+  .mobileBrand .brand { color: #16243a; }
+  .mobileBrand .brand small { color: #7c8ca1; }
+}
+
+@media (max-width: 480px) {
+  .visualPanel { padding: 24px 20px 22px; }
+  .visualCopy { margin-top: 62px; }
+  .visualCopy h1 { letter-spacing: -1.8px; }
+  .trustRow { gap: 10px; }
+  .formPanel { padding: 42px 20px 50px; }
+  .mobileBrand { margin-bottom: 32px; }
+  .formIntro h2 { font-size: 28px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inputShell, .checkbox, .submitButton { transition: none; }
+}
