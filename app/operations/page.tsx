@@ -7,6 +7,7 @@ import ProcurementWorkflows from './procurement-workflows';
 import InventoryWorkspace from './inventory-workspace';
 import CrmWorkspace from './crm-workspace';
 import FinanceWorkspace from './finance-workspace';
+import ReportsWorkspace from './reports-workspace';
 import { JobsWorkspace, WarrantyWorkspace } from './service-workspace';
 import './ops.css';
 
@@ -40,7 +41,7 @@ function Warranty({notify}:{notify:(m:string)=>void; query?:string; match?: (v:u
 
 function FinanceHR({notify}:{query?:string;match?:(v:unknown[])=>boolean;notify:(m:string)=>void}) { return <FinanceWorkspace notify={notify}/> }
 
-function Reports({notify}:{notify:(m:string)=>void}) { return <><Kpis items={[['Revenue YTD','$684,290','+18.4% vs. prior year',CircleDollarSign,'blue'],['Gross profit','$214,880','31.4% margin',Zap,'green'],['Devices delivered','684','Across 4 locations',Boxes,'purple'],['Warranty cost','$42,680','6.2% of revenue',ShieldCheck,'amber']]}/><Panel title="Management reporting" subtitle="Server-side filters, drill-downs, and permission-aware exports" actions={<ExportActions notify={notify}/>}><div className="report-filters"><button className="filter-select">01 Aug 2026 — 18 Aug 2026 <ChevronDown size={14}/></button><button className="filter-select">All departments <ChevronDown size={14}/></button><button className="filter-select">All locations <ChevronDown size={14}/></button><button className="filter-select"><Filter size={14}/> More filters</button></div><div className="report-table"><TableHead labels={['Period','Revenue','COGS','Gross profit','Units','Jobs']}/>{reportRows.map(x=><div className="data-row" key={x.period}><strong>{x.period}</strong><span>{x.revenue}</span><span>{x.cost}</span><span className="green-text">{x.profit}</span><span>{x.units}</span><span>{x.jobs}</span></div>)}</div></Panel><div className="report-cards"><ReportCard title="Stock valuation" detail="By product, batch, supplier, location" icon={<Boxes size={17}/>} notify={notify}/><ReportCard title="Pipeline conversion" detail="Lead source, stage, consultant" icon={<BriefcaseBusiness size={17}/>} notify={notify}/><ReportCard title="Warranty performance" detail="Claims, cost, turnaround, coverage" icon={<ShieldCheck size={17}/>} notify={notify}/><ReportCard title="Installation turnaround" detail="Jobs, area, installer, sign-off" icon={<ClipboardCheck size={17}/>} notify={notify}/></div></> }
+function Reports({notify}:{notify:(m:string)=>void}) { return <ReportsWorkspace notify={notify}/> }
 
 function Kpis({items}:{items:[string,string,string,React.ElementType,string][]}) { return <div className="ops-kpis">{items.map(([label,value,note,Icon,tone])=><div className="ops-kpi" key={label}><span className={`kpi-icon ${tone}`}><Icon size={16}/></span><strong>{value}</strong><span>{label}</span><small>{note}</small></div>)}</div> }
 function Panel({title,subtitle,actions,children}:{title:string;subtitle:string;actions?:React.ReactNode;children:React.ReactNode}) { return <section className="ops-panel"><div className="ops-panel-head"><div><h2>{title}</h2><p>{subtitle}</p></div>{actions}</div>{children}</section> }

@@ -5,25 +5,32 @@ import { Check, CircleDollarSign, FileText, Paperclip, Plus, Upload, Users, X } 
 
 type Expense = { id: string; number: string; category: string; description: string; amount: string; currency: string; status: string; submitted_at: string; submitter_name?: string; attachment_count?: number };
 type Invoice = { id: string; number: string; status: string; total: string; paid_amount: string; outstanding: string; client_name: string; sale_number: string; due_at?: string };
+type Rule = { id: string; name: string; rate: string; trigger_status: string; is_active: boolean };
+type Target = { id: string; consultant_name: string; period_start: string; period_end: string; target_amount: string; achieved: string };
+type User = { id: string; full_name: string; role: string };
 
 export default function FinanceWorkspace({ notify }: { notify: (message: string) => void }) {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]); const [rules, setRules] = useState<Rule[]>([]); const [targets, setTargets] = useState<Target[]>([]); const [users, setUsers] = useState<User[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [dialog, setDialog] = useState<'expense' | 'payment' | null>(null);
+  const [dialog, setDialog] = useState<'expense' | 'payment' | 'rule' | 'target' | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [error, setError] = useState('');
 
   const load = async () => {
     setError('');
     try {
-      const [expenseResponse, invoiceResponse] = await Promise.all([
+      const [expenseResponse, invoiceResponse, rulesResponse, targetsResponse, usersResponse] = await Promise.all([
         fetch('/api/finance/expenses', { cache: 'no-store' }),
         fetch('/api/crm/invoices', { cache: 'no-store' }),
+        fetch('/api/finance/commission-rules', { cache: 'no-store' }),
+        fetch('/api/finance/targets', { cache: 'no-store' }),
+        fetch('/api/users', { cache: 'no-store' }),
       ]);
-      if (!expenseResponse.ok || !invoiceResponse.ok) throw new Error('Live finance data is unavailable.');
-      const [expenseData, invoiceData] = await Promise.all([expenseResponse.json(), invoiceResponse.json()]);
+      if ([expenseResponse, invoiceResponse, rulesResponse, targetsResponse, usersResponse].some(response => !response.ok)) throw new Error('Live finance data is unavailable.');
+      const [expenseData, invoiceData, rulesData, targetsData, usersData] = await Promise.all([expenseResponse.json(), invoiceResponse.json(), rulesResponse.json(), targetsResponse.json(), usersResponse.json()]);
       setExpenses(expenseData.expenses || []);
       setInvoices(invoiceData.invoices || []);
+      setRules(rulesData.rules || []); setTargets(targetsData.targets || []); setUsers(usersData.users || []);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Live finance data is unavailable.');
     }
@@ -68,9 +75,11 @@ export default function FinanceWorkspace({ notify }: { notify: (message: string)
         </div>
       </LivePanel>
     </div>
-    <LivePanel title="Finance controls" subtitle="Workflow rules are database-backed and ready for the next commission batch"><div className="workflow-summary"><div><Users size={14}/><strong>Commission rules</strong>Stored in PostgreSQL</div><div><Check size={14}/><strong>Payment integrity</strong>Overpayments blocked transactionally</div><div><Paperclip size={14}/><strong>Receipt storage</strong>Cloudflare R2 or local adapter</div></div><p className="workflow-help">Commission configuration and consultant target screens are the next finance/HR batch. Existing provisional commission entries remain compatible with the new payment lifecycle.</p></LivePanel>
+    <LivePanel title="Finance controls" subtitle="Commission rules and consultant targets are configured per organization"><div className="workflow-summary"><div><Users size={14}/><strong>{rules.length} commission rules</strong><button className="link-btn" onClick={() => setDialog('rule')}><Plus size={12}/> Add rule</button></div><div><Check size={14}/><strong>{targets.length} consultant targets</strong><button className="link-btn" onClick={() => setDialog('target')}><Plus size={12}/> Add target</button></div><div><Paperclip size={14}/><strong>Receipt storage</strong>Cloudflare R2 or local adapter</div></div>{rules.length > 0 && <div className="data-table"><TableHead labels={['Rule','Rate','Trigger','Status']}/>{rules.map(rule => <div className="data-row" key={rule.id}><strong>{rule.name}</strong><span>{Number(rule.rate).toFixed(2)}%</span><span>{rule.trigger_status}</span><Status value={rule.is_active ? 'Active' : 'Inactive'}/></div>)}</div>}{targets.length > 0 && <div className="data-table"><TableHead labels={['Consultant','Period','Target','Achieved']}/>{targets.map(target => <div className="data-row" key={target.id}><strong>{target.consultant_name}</strong><span>{target.period_start} → {target.period_end}</span><span>${Number(target.target_amount).toLocaleString()}</span><span className="green-text">${Number(target.achieved).toLocaleString()}</span></div>)}</div>}{!rules.length && !targets.length && <p className="workflow-help">Add the first commission rule or consultant target to make the finance controls visible.</p>}</LivePanel>
     {dialog === 'expense' && <ExpenseDialog close={() => setDialog(null)} saved={() => saved('Expense submitted')}/>} 
     {dialog === 'payment' && selectedInvoice && <PaymentDialog invoice={selectedInvoice} close={() => setDialog(null)} saved={() => saved('Payment recorded')}/>} 
+    {dialog === 'rule' && <RuleDialog close={() => setDialog(null)} saved={() => saved('Commission rule created')}/>} 
+    {dialog === 'target' && <TargetDialog users={users} close={() => setDialog(null)} saved={() => saved('Consultant target created')}/>} 
   </>;
 }
 
@@ -84,8 +93,11 @@ function ExpenseDialog({ close, saved }: { close: () => void; saved: () => void 
 function PaymentDialog({ invoice, close, saved }: { invoice: Invoice; close: () => void; saved: () => void }) {
   const [form, setForm] = useState({ amount: Number(invoice.outstanding).toFixed(2), method: 'Bank transfer', reference: '' }); const [error, setError] = useState('');
   const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch(`/api/crm/invoices/${invoice.id}/payments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, amount: Number(form.amount) }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to record payment.'); return; } saved(); };
-  return <Dialog title={`Record payment · ${invoice.number}`} close={close}><form className="workflow-form"><p className="workflow-help">Outstanding balance: <strong>${Number(invoice.outstanding).toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong></p><Field label="Amount (USD)"><input required type="number" min="0.01" max={invoice.outstanding} step="0.01" value={form.amount} onChange={event => setForm({ ...form, amount: event.target.value })}/></Field><Field label="Method"><select value={form.method} onChange={event => setForm({ ...form, method: event.target.value })}><option>Bank transfer</option><option>Cash</option><option>Card</option><option>Mobile money</option><option>Other</option></select></Field><Field label="Reference"><input value={form.reference} onChange={event => setForm({ ...form, reference: event.target.value })}/></Field>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Record payment"/></form></Dialog>;
+  return <Dialog title={`Record payment · ${invoice.number}`} close={close}><form className="workflow-form" onSubmit={submit}><p className="workflow-help">Outstanding balance: <strong>${Number(invoice.outstanding).toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong></p><Field label="Amount (USD)"><input required type="number" min="0.01" max={invoice.outstanding} step="0.01" value={form.amount} onChange={event => setForm({ ...form, amount: event.target.value })}/></Field><Field label="Method"><select value={form.method} onChange={event => setForm({ ...form, method: event.target.value })}><option>Bank transfer</option><option>Cash</option><option>Card</option><option>Mobile money</option><option>Other</option></select></Field><Field label="Reference"><input value={form.reference} onChange={event => setForm({ ...form, reference: event.target.value })}/></Field>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Record payment"/></form></Dialog>;
 }
+
+function RuleDialog({ close, saved }: { close: () => void; saved: () => void }) { const [form, setForm] = useState({ name: '', rate: '5', triggerStatus: 'Confirmed' }); const [error, setError] = useState(''); const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch('/api/finance/commission-rules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, rate: Number(form.rate) }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to create rule.'); return; } saved(); }; return <Dialog title="Add commission rule" close={close}><form className="workflow-form" onSubmit={submit}><Field label="Rule name"><input required value={form.name} onChange={event => setForm({ ...form, name: event.target.value })}/></Field><Field label="Rate (%)"><input required type="number" min="0" max="100" step="0.01" value={form.rate} onChange={event => setForm({ ...form, rate: event.target.value })}/></Field><Field label="Trigger"><select value={form.triggerStatus} onChange={event => setForm({ ...form, triggerStatus: event.target.value })}><option>Confirmed</option><option>Delivered</option><option>Paid</option></select></Field>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Save rule"/></form></Dialog>; }
+function TargetDialog({ users, close, saved }: { users: User[]; close: () => void; saved: () => void }) { const [form, setForm] = useState({ consultantId: users[0]?.id || '', periodStart: `${new Date().getFullYear()}-01-01`, periodEnd: `${new Date().getFullYear()}-12-31`, targetAmount: '' }); const [error, setError] = useState(''); const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch('/api/finance/targets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, targetAmount: Number(form.targetAmount) }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to create target.'); return; } saved(); }; return <Dialog title="Set consultant target" close={close}><form className="workflow-form" onSubmit={submit}><Field label="Consultant"><select required value={form.consultantId} onChange={event => setForm({ ...form, consultantId: event.target.value })}>{users.map(user => <option key={user.id} value={user.id}>{user.full_name} · {user.role}</option>)}</select></Field><div className="workflow-form-grid"><Field label="Start date"><input required type="date" value={form.periodStart} onChange={event => setForm({ ...form, periodStart: event.target.value })}/></Field><Field label="End date"><input required type="date" value={form.periodEnd} onChange={event => setForm({ ...form, periodEnd: event.target.value })}/></Field></div><Field label="Target amount (USD)"><input required type="number" min="0" step="0.01" value={form.targetAmount} onChange={event => setForm({ ...form, targetAmount: event.target.value })}/></Field>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Save target"/></form></Dialog>; }
 
 function Dialog({ title, children, close }: { title: string; children: React.ReactNode; close: () => void }) { return <div className="workflow-dialog-backdrop"><div className="workflow-dialog" role="dialog" aria-modal="true"><div className="workflow-dialog-head"><h3>{title}</h3><button onClick={close} aria-label="Close"><X size={16}/></button></div>{children}</div></div>; }
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="workflow-field"><span>{label}</span>{children}</label>; }
