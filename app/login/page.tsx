@@ -2,19 +2,37 @@
 
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Activity, ArrowRight, CheckCircle2, Eye, EyeOff, HelpCircle, KeyRound, LockKeyhole, ShieldCheck, Zap } from 'lucide-react';
 import styles from './login.module.css';
 
 export default function LoginPage() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(true);
   const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setMessage('Sign-in service is not connected in this environment yet.');
+    setMessage('');
+    setLoading(true);
+    try {
+      const response = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, remember }) });
+      const body = await response.json() as { error?: string };
+      if (!response.ok) {
+        setMessage(body.error || 'Unable to sign in.');
+        return;
+      }
+      const next = new URLSearchParams(window.location.search).get('next');
+      router.push(next?.startsWith('/') ? next : '/');
+    } catch {
+      setMessage('Unable to reach the authentication service.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -121,7 +139,7 @@ export default function LoginPage() {
 
             {message && <p className={styles.formMessage} role="status">{message}</p>}
 
-            <button type="submit" className={styles.submitButton}>Sign in <ArrowRight size={17} /></button>
+            <button type="submit" className={styles.submitButton} disabled={loading}>{loading ? 'Signing in…' : 'Sign in'} {!loading && <ArrowRight size={17} />}</button>
           </form>
 
           <div className={styles.securityNote}><ShieldCheck size={16} /><span>Your access is protected with encrypted credentials and workspace-level permissions.</span></div>

@@ -7,7 +7,12 @@ docker compose up --build
 curl http://localhost:3000/api/health
 ```
 
-The local stack starts the Next.js container and PostgreSQL with a named persistent volume. The current UI uses seeded in-memory records; PostgreSQL is provided so Prisma persistence can be enabled without changing the topology.
+The local stack starts the Next.js container and PostgreSQL with a named persistent volume. Apply the SQL migrations before creating the first user.
+
+```bash
+npm run db:migrate
+ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='use-a-strong-password' npm run db:create-user
+```
 
 ## Dokploy
 
@@ -15,9 +20,10 @@ The local stack starts the Next.js container and PostgreSQL with a named persist
 2. Create an Application from the repository and use the repository root as the build context.
 3. Set the application port to `3000` and health check path to `/api/health`.
 4. Configure the environment variables from `.env.example`; use a generated `AUTH_SECRET` of at least 32 characters.
-5. Set `STORAGE_DRIVER=s3` and configure the S3-compatible endpoint before enabling production uploads.
-6. Build and release with `docker build -t ipaytech-ops .`; do not run destructive database migrations automatically from every replica.
-7. Back up PostgreSQL before releases and test restore procedures separately.
+5. Apply migrations once per release using `npm run db:migrate`, then provision an administrator with `npm run db:create-user`.
+6. Set `STORAGE_DRIVER=s3` and configure the S3-compatible endpoint before enabling production uploads.
+7. Build and release with `docker build -t ipaytech-ops .`; do not run destructive database migrations automatically from every replica.
+8. Back up PostgreSQL before releases and test restore procedures separately.
 
 ## Dokku PostgreSQL topology
 
@@ -43,4 +49,4 @@ pg_restore --clean --if-exists --dbname="$DATABASE_URL" ipaytech-ops-YYYYMMDD.du
 
 ## Current limitation
 
-The repository is deployment-shaped, but it is not yet a full production ERP: Prisma schema/migrations, Auth.js, server-side RBAC, and persistent domain services still need to be added before handling real customer, inventory, or financial data.
+The repository now has the first PostgreSQL and session-authentication foundation. Domain tables, server-side RBAC enforcement, and persistent business workflows still need to be added before handling real customer, inventory, or financial data.

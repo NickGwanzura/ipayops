@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { getSession } from '@/lib/auth';
 
 const rows = [
   ['Reference','Client / Supplier','Status','Value'],
@@ -9,7 +10,9 @@ const rows = [
 ];
 
 export async function GET(request: NextRequest) {
+  if (!await getSession(request)) return new Response(JSON.stringify({ error: 'Unauthenticated.' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
   const type = request.nextUrl.searchParams.get('type') ?? 'csv';
+  if (!['csv', 'xlsx', 'pdf'].includes(type)) return new Response(JSON.stringify({ error: 'Unsupported export type.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
   if (type === 'csv') {
     const csv = rows.map(row => row.map(cell => `"${cell.replaceAll('"','""')}"`).join(',')).join('\n');
     return new Response(csv, { headers:{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="ipaytech-operations.csv"'} });

@@ -23,6 +23,7 @@ export default function Home() {
   const [active, setActive] = useState('Overview'); const [dark, setDark] = useState(false); const [menu, setMenu] = useState(false); const [query, setQuery] = useState(''); const [toast, setToast] = useState('');
   const filtered = useMemo(() => activity.filter(a => a.join(' ').toLowerCase().includes(query.toLowerCase())), [query]);
   const notify = (message:string) => { setToast(message); setTimeout(() => setToast(''), 2800); };
+  const logout = async () => { await fetch('/api/auth/logout', { method: 'POST' }); window.location.href = '/login'; };
   const goToModule = (label:string) => { if (label !== 'Overview') { window.location.href = `/operations?module=${encodeURIComponent(label)}`; return; } setActive(label); };
   return <div className={dark ? 'shell dark' : 'shell'}>
     <aside className={menu ? 'sidebar open' : 'sidebar'}>
@@ -30,7 +31,7 @@ export default function Home() {
       <div className="workspace-label">WORKSPACE</div><div className="workspace"><div className="workspace-dot">HZ</div><div><strong>Harare HQ</strong><span>All operations</span></div><ChevronDown size={15}/></div>
       <nav>{nav.map(({label,icon:Icon,count}) => <button key={label} className={active===label?'nav-item active':'nav-item'} onClick={()=>{goToModule(label);setMenu(false);}}><Icon size={17}/><span>{label}</span>{count && <b>{count}</b>}</button>)}</nav>
       <div className="sidebar-spacer"/><div className="sidebar-section"><button className="nav-item"><Users size={17}/><span>People & HR</span></button><button className="nav-item"><Settings size={17}/><span>Configuration</span></button></div>
-      <div className="user-card"><div className="avatar">AM</div><div><strong>Amara Moyo</strong><span>Chief Operating Officer</span></div><MoreDots/></div>
+      <button className="user-card" onClick={logout} title="Sign out"><div className="avatar">AM</div><div><strong>Amara Moyo</strong><span>Chief Operating Officer</span></div><MoreDots/></button>
     </aside>
     <main className="main"><header className="topbar"><button className="mobile-menu" onClick={()=>setMenu(true)}><Menu size={21}/></button><div className="crumb"><span>Operations</span><span>/</span><strong>{active}</strong></div><div className="top-actions"><div className="search"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search anything..."/><kbd>⌘ K</kbd></div><button className="icon-btn" aria-label="Toggle theme" onClick={()=>setDark(!dark)}>{dark ? <Zap size={18}/> : <Grid2X2 size={18}/>}</button><button className="icon-btn notification" onClick={()=>notify('You have 8 approvals waiting')}><Bell size={18}/><i/></button><div className="top-avatar">AM</div></div></header>
       <div className="content"><div className="page-heading"><div><div className="eyebrow"><span className="live-dot"/> Live operations</div><h1>Good morning, Amara</h1><p>Here’s what’s happening across iPayTech today.</p></div><div className="heading-actions"><button className="btn secondary" onClick={()=>notify('Report export queued')}><FileText size={16}/> Export report</button><button className="btn primary" onClick={()=>notify('New sale workflow opened')}><Plus size={17}/> New transaction</button></div></div>
