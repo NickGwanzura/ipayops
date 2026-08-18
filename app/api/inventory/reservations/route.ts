@@ -3,6 +3,19 @@ import { z } from 'zod';
 import { withTransaction } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 
+export async function GET(request: Request) {
+  const session = await getSession(request);
+  if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+  const result = await withTransaction(async client => client.query(
+    `SELECT r.id, r.inventory_item_id, r.reference_type, r.reference_id, r.expires_at, r.status, r.created_at,
+            i.serial_number, i.sku, i.description, i.location
+     FROM inventory_reservations r JOIN inventory_items i ON i.id = r.inventory_item_id
+     WHERE r.organization_id = $1 AND r.status = 'Active' ORDER BY r.created_at DESC LIMIT 200`,
+    [session.user.organizationId],
+  ));
+  return NextResponse.json({ reservations: result.rows });
+}
+
 const reservationSchema = z.object({
   inventoryItemId: z.string().uuid(),
   referenceType: z.string().trim().min(1).max(40),
