@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Activity, ArrowRight, CheckCircle2, Eye, EyeOff, HelpCircle, KeyRound, LockKeyhole, ShieldCheck, Zap } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, HelpCircle, KeyRound, LockKeyhole, ShieldCheck, Zap } from 'lucide-react';
 import styles from './login.module.css';
 
 export default function LoginPage() {
@@ -37,44 +37,6 @@ export default function LoginPage() {
 
   return (
     <main className={styles.page}>
-      <section className={styles.visualPanel} aria-label="iPayTech Ops overview">
-        <div className={styles.visualGlow} />
-        <div className={styles.visualGrid} />
-        <div className={styles.visualContent}>
-          <Link href="/" className={styles.brand} aria-label="iPayTech Ops home">
-            <span className={styles.brandMark}><Zap size={17} fill="currentColor" /></span>
-            <span>
-              <strong>iPayTech</strong>
-              <small>OPS CONSOLE</small>
-            </span>
-          </Link>
-
-          <div className={styles.visualCopy}>
-            <div className={styles.kicker}><span className={styles.liveDot} /> Operations control centre</div>
-            <h1>Move every operation forward.</h1>
-            <p>One secure workspace for inventory, sales, jobs, warranties and the teams behind them.</p>
-          </div>
-
-          <div className={styles.signalCard}>
-            <div className={styles.signalHeader}>
-              <span><Activity size={14} /> Live workspace signal</span>
-              <span className={styles.signalStatus}><i /> Operational</span>
-            </div>
-            <div className={styles.signalValue}>99.98<span>%</span></div>
-            <div className={styles.signalLabel}>fulfilment visibility across your operation</div>
-            <div className={styles.signalBars} aria-hidden="true">
-              <i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i />
-            </div>
-          </div>
-
-          <div className={styles.trustRow}>
-            <span><CheckCircle2 size={14} /> Role-based access</span>
-            <span><CheckCircle2 size={14} /> Audit-ready records</span>
-          </div>
-        </div>
-        <div className={styles.visualFooter}><span>Harare HQ</span><span>Production workspace</span></div>
-      </section>
-
       <section className={styles.formPanel}>
         <div className={styles.formWrap}>
           <div className={styles.mobileBrand}>

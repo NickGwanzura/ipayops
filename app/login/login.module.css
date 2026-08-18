@@ -1,7 +1,7 @@
 .page {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: minmax(420px, 0.92fr) minmax(520px, 1.08fr);
+  grid-template-columns: 1fr;
   background: #f6f8fb;
 }
 
@@ -69,9 +69,10 @@
 .trustRow svg { color: #5ed6ae; }
 .visualFooter { justify-content: space-between; color: #687995; font-size: 9px; letter-spacing: 0.4px; }
 
-.formPanel { display: grid; place-items: center; padding: 48px clamp(32px, 8vw, 128px); background: #f9fbfd; }
+.formPanel { min-height: 100vh; display: grid; place-items: center; padding: 48px clamp(32px, 8vw, 128px); background: #f9fbfd; }
 .formWrap { width: min(100%, 420px); }
-.mobileBrand { display: none; }
+.mobileBrand { display: block; margin-bottom: 42px; }
+.mobileBrand .brand { color: #16243a; }
 .formIntro { margin-bottom: 30px; }
 .eyebrow { color: #2f70e8; letter-spacing: 0.8px; }
 .formIntro h2 { margin: 14px 0 7px; color: #16243a; font-size: 31px; line-height: 1.1; letter-spacing: -1.2px; }
@@ -103,14 +104,7 @@
 .support svg { color: #9aa8b8; }
 
 @media (max-width: 900px) {
-  .page { grid-template-columns: 1fr; }
-  .visualPanel { min-height: auto; padding: 28px 28px 26px; }
-  .visualCopy { margin-top: 70px; }
-  .visualCopy h1 { font-size: clamp(35px, 8vw, 50px); }
-  .signalCard { margin-top: 28px; }
-  .visualFooter { margin-top: 28px; }
   .formPanel { padding: 56px 28px 64px; }
-  .mobileBrand { display: block; margin-bottom: 42px; }
   .mobileBrand .brand { color: #16243a; }
   .mobileBrand .brand small { color: #7c8ca1; }
 }
