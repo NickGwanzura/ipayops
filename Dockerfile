@@ -22,6 +22,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/db ./db
 COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/pg/esm ./node_modules/pg/esm
 USER nextjs
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD wget -qO- http://127.0.0.1:${PORT}/api/health || exit 1
