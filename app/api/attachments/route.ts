@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { query } from '@/lib/db';
+import { putStorageObject, usesS3 } from '@/lib/storage';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
@@ -25,8 +26,9 @@ export async function POST(request: NextRequest) {
     if (!allowedTypes.has(file.type)) return NextResponse.json({ error: 'Only JPG, PNG, WEBP, and PDF files are supported.' }, { status: 415 });
     if (file.size <= 0 || file.size > MAX_BYTES) return NextResponse.json({ error: 'Attachment must be smaller than 10 MB.' }, { status: 413 });
     const ext = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.')).toLowerCase() : '';
-    const storageKey = `${session.user.organizationId}/${entityType}/${entityId}/${randomUUID()}${ext}`; const root = process.env.UPLOAD_DIR || join(process.cwd(), 'uploads'); const fullPath = join(root, storageKey);
-    await mkdir(join(root, session.user.organizationId, entityType, entityId), { recursive: true }); await writeFile(fullPath, Buffer.from(await file.arrayBuffer()));
+    const storageKey = `${session.user.organizationId}/${entityType}/${entityId}/${randomUUID()}${ext}`; const bytes = Buffer.from(await file.arrayBuffer());
+    if (usesS3()) await putStorageObject(storageKey, bytes, file.type);
+    else { const root = process.env.UPLOAD_DIR || join(process.cwd(), 'uploads'); const fullPath = join(root, storageKey); await mkdir(join(root, session.user.organizationId, entityType, entityId), { recursive: true }); await writeFile(fullPath, bytes); }
     const result = await query('INSERT INTO attachments (organization_id, entity_type, entity_id, file_name, storage_key, mime_type, size_bytes, uploaded_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, entity_type, entity_id, file_name, mime_type, size_bytes, created_at', [session.user.organizationId, entityType, entityId, file.name, storageKey, file.type, file.size, session.user.id]);
     return NextResponse.json({ attachment: result.rows[0] }, { status: 201 });
   } catch (error) { console.error('Attachment upload failed', error); return NextResponse.json({ error: 'Unable to upload attachment.' }, { status: 500 }); }
