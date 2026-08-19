@@ -44,10 +44,10 @@
 .brandMark { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: #fff; background: #2f7cf6; box-shadow: 0 8px 18px rgba(47, 124, 246, 0.28); }
 .brand strong, .brand small { display: block; }
 .brand strong { font-size: 17px; line-height: 1; letter-spacing: -0.3px; }
-.brand small { margin-top: 4px; color: #7d8da8; font-size: 8px; letter-spacing: 1.65px; }
+.brand small { margin-top: 4px; color: #7d8da8; font-size: 10px; letter-spacing: 1.65px; }
 
 .visualCopy { max-width: 520px; margin-top: clamp(90px, 18vh, 190px); }
-.kicker, .eyebrow { display: inline-flex; align-items: center; gap: 7px; color: #62d9b0; font-size: 10px; font-weight: 700; letter-spacing: 1.25px; text-transform: uppercase; }
+.kicker, .eyebrow { display: inline-flex; align-items: center; gap: 7px; color: #62d9b0; font-size: 11px; font-weight: 700; letter-spacing: 1.25px; text-transform: uppercase; }
 .liveDot { width: 6px; height: 6px; border-radius: 50%; background: #54d7ae; box-shadow: 0 0 0 4px rgba(84, 215, 174, 0.12); }
 .visualCopy h1 { max-width: 490px; margin: 14px 0 15px; color: #fff; font-size: clamp(35px, 4vw, 57px); line-height: 1.05; letter-spacing: -2.7px; }
 .visualCopy p { max-width: 420px; color: #a9b8ce; font-size: 14px; line-height: 1.7; }
@@ -79,28 +79,28 @@
 .formIntro p { color: #77859a; font-size: 13px; line-height: 1.6; }
 .form { display: grid; gap: 19px; }
 .field { display: grid; gap: 8px; }
-.field label, .labelRow label { color: #26364e; font-size: 11px; font-weight: 700; }
+.field label, .labelRow label { color: #26364e; font-size: 13px; font-weight: 700; }
 .labelRow { display: flex; align-items: center; justify-content: space-between; }
-.forgotLink, .support button { padding: 0; color: #2f70e8; font-size: 10px; font-weight: 600; cursor: pointer; }
+.forgotLink, .support button { padding: 0; color: #2f70e8; font-size: 12px; font-weight: 600; cursor: pointer; }
 .inputShell { min-height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 13px; border: 1px solid #dce4ee; border-radius: 8px; color: #8c9bad; background: #fff; transition: border-color 200ms ease, box-shadow 200ms ease, background 200ms ease; }
 .inputShell:focus-within { border-color: #2f7cf6; box-shadow: 0 0 0 4px rgba(47, 124, 246, 0.11); }
-.inputShell input { width: 100%; min-width: 0; border: 0; outline: 0; color: #1c2c44; background: transparent; font-size: 12px; }
+.inputShell input { width: 100%; min-width: 0; border: 0; outline: 0; color: #1c2c44; background: transparent; font-size: 14px; }
 .inputShell input::placeholder { color: #a3afbd; }
 .iconButton { display: grid; place-items: center; padding: 5px; color: #8c9bad; cursor: pointer; }
 .iconButton:hover { color: #2f70e8; }
-.remember { position: relative; display: inline-flex; align-items: center; gap: 9px; width: fit-content; color: #748399; font-size: 10px; cursor: pointer; }
+.remember { position: relative; display: inline-flex; align-items: center; gap: 9px; width: fit-content; color: #748399; font-size: 12px; cursor: pointer; }
 .remember input { position: absolute; opacity: 0; pointer-events: none; }
 .checkbox { width: 16px; height: 16px; display: grid; place-items: center; border: 1px solid #cbd6e4; border-radius: 4px; background: #fff; transition: all 160ms ease; }
 .remember input:checked + .checkbox { border-color: #2f7cf6; background: #2f7cf6; box-shadow: inset 0 0 0 3px #fff; }
 .remember input:focus-visible + .checkbox { outline: 3px solid rgba(47, 124, 246, 0.22); outline-offset: 2px; }
-.formMessage { margin: -3px 0 -2px; padding: 10px 12px; border: 1px solid #f2d79b; border-radius: 7px; color: #9b6c09; background: #fff8e7; font-size: 10px; line-height: 1.5; }
-.submitButton { min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 8px; color: #fff; background: #2f7cf6; box-shadow: 0 8px 18px rgba(47, 124, 246, 0.2); font-size: 12px; font-weight: 700; cursor: pointer; transition: background 200ms ease, box-shadow 200ms ease, transform 200ms ease; }
+.formMessage { margin: -3px 0 -2px; padding: 10px 12px; border: 1px solid #f2d79b; border-radius: 7px; color: #9b6c09; background: #fff8e7; font-size: 12px; line-height: 1.5; }
+.submitButton { min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 8px; color: #fff; background: #2f7cf6; box-shadow: 0 8px 18px rgba(47, 124, 246, 0.2); font-size: 14px; font-weight: 700; cursor: pointer; transition: background 200ms ease, box-shadow 200ms ease, transform 200ms ease; }
 .submitButton:hover { background: #2369d8; box-shadow: 0 10px 22px rgba(47, 124, 246, 0.26); transform: translateY(-1px); }
 .submitButton:disabled { opacity: 0.7; cursor: wait; transform: none; }
 .submitButton:focus-visible, .forgotLink:focus-visible, .support button:focus-visible, .iconButton:focus-visible, .brand:focus-visible { outline: 3px solid rgba(47, 124, 246, 0.3); outline-offset: 3px; border-radius: 4px; }
-.securityNote { display: flex; align-items: flex-start; gap: 9px; margin-top: 27px; padding: 12px; border: 1px solid #e2eaf2; border-radius: 7px; color: #75849a; background: #f3f7fb; font-size: 10px; line-height: 1.55; }
+.securityNote { display: flex; align-items: flex-start; gap: 9px; margin-top: 27px; padding: 12px; border: 1px solid #e2eaf2; border-radius: 7px; color: #75849a; background: #f3f7fb; font-size: 12px; line-height: 1.55; }
 .securityNote svg { flex: 0 0 auto; color: #0b9971; }
-.support { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px; margin: 25px 0 0; color: #91a0b1; font-size: 10px; }
+.support { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px; margin: 25px 0 0; color: #91a0b1; font-size: 12px; }
 .support svg { color: #9aa8b8; }
 
 @media (max-width: 900px) {

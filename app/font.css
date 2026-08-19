@@ -1,4 +1,60 @@
 @font-face {
+  font-family: 'JUST Sans';
+  src: url('/fonts/JUST Sans ExLight.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 200;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JUST Sans';
+  src: url('/fonts/JUST Sans Light.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JUST Sans';
+  src: url('/fonts/JUST Sans Regular.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JUST Sans';
+  src: url('/fonts/JUST Sans Medium.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JUST Sans';
+  src: url('/fonts/JUST Sans SemiBold.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JUST Sans';
+  src: url('/fonts/JUST Sans Bold.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JUST Sans';
+  src: url('/fonts/JUST Sans ExBold.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+}
+
+@font-face {
   font-family: 'Hypodermic';
   src: url('/fonts/Hypodermic.ttf') format('truetype');
   font-style: normal;
@@ -7,5 +63,18 @@
 }
 
 body {
-  font-family: 'Hypodermic', 'Instrument Sans', sans-serif;
+  font-family: 'JUST Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+.font-data,
+.serial-field input,
+.serial-picker,
+.coverage-copy strong,
+.mono-data {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.font-data,
+.mono-data {
+  font-variant-numeric: tabular-nums;
 }

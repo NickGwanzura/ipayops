@@ -105,8 +105,12 @@ export async function getSession(request?: Request): Promise<AuthSession | null>
 export async function requireRole(request: Request, roles: readonly string[]) {
   const session = await getSession(request);
   if (!session) return { response: NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 }) } as const;
-  if (!roles.includes(session.user.role.toLowerCase())) return { response: NextResponse.json({ error: 'You do not have permission to perform this action.' }, { status: 403 }) } as const;
+  if (!hasRole(session.user.role, roles)) return { response: NextResponse.json({ error: 'You do not have permission to perform this action.' }, { status: 403 }) } as const;
   return { session } as const;
+}
+
+export function hasRole(role: string, roles: readonly string[]) {
+  return roles.includes(role.toLowerCase());
 }
 
 export async function deleteSession(request: Request) {

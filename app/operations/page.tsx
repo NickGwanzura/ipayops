@@ -10,6 +10,7 @@ import CrmWorkspace from './crm-workspace';
 import FinanceWorkspace from './finance-workspace';
 import ReportsWorkspace from './reports-workspace';
 import { JobsWorkspace, WarrantyWorkspace } from './service-workspace';
+import { useOrganizationSettings } from '../organization-settings';
 import './ops.css';
 
 const modules: OpsModule[] = ['Procurement', 'Inventory', 'Sales & CRM', 'Job cards', 'Warranty', 'Finance & HR', 'Reports'];
@@ -24,6 +25,7 @@ export default function OperationsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [newRecordSignal, setNewRecordSignal] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
+  const settings = useOrganizationSettings();
   const meta = moduleMeta[module];
 
   useEffect(() => {
@@ -44,7 +46,7 @@ export default function OperationsPage() {
   return <div className="ops-shell">
     <aside className="ops-rail"><a className="ops-brand" href="/"><Image className="ops-logo" src="/iPaytechLogo.jpg" alt="iPayTech" width={160} height={67} priority /></a><div className="ops-rail-title">OPERATIONS</div>{modules.map(item => <button key={item} className={module === item ? 'ops-nav active' : 'ops-nav'} onClick={() => setModuleAndReset(item)}>{iconFor(item)}<span>{item}</span></button>)}<div className="ops-rail-bottom"><button className="ops-nav" onClick={goToConfiguration}><Settings2 size={16}/><span>Configuration</span></button><a className="back-dashboard" href="/"><ArrowLeft size={15}/> Dashboard</a></div></aside>
     <main className="ops-main"><header className="ops-top"><div className="ops-breadcrumb"><a href="/">Overview</a><span>/</span><strong>{meta.title}</strong></div><div className="ops-top-actions"><div className="ops-search"><Search size={16}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search this module..."/><kbd>⌘ K</kbd></div><button className="ops-avatar" onClick={goToProfile} title="Open profile" aria-label="Open profile">{initials(user?.fullName || 'User')}</button></div></header><div className="ops-content"><div className="ops-heading"><div><span className="ops-kicker">Operations workspace</span><h1>{meta.title}</h1><p>{meta.description}</p></div><div className="ops-heading-actions"><button className="ops-btn ghost" onClick={() => setImportOpen(true)}><Upload size={15}/> Import</button><button className="ops-btn blue" onClick={handleNewRecord}><Plus size={16}/> New record</button></div></div><div className="module-strip">{modules.map(item => <button key={item} className={module === item ? 'module-chip selected' : 'module-chip'} onClick={() => setModuleAndReset(item)}>{iconFor(item)}{item}</button>)}</div>
-      {module === 'Procurement' && <ProcurementWorkflows notify={notify} newRecordSignal={newRecordSignal} query={searchableQuery}/>} {module === 'Inventory' && <InventoryWorkspace query={searchableQuery} notify={notify}/>} {module === 'Sales & CRM' && <CrmWorkspace notify={notify} newRecordSignal={newRecordSignal}/>} {module === 'Job cards' && <JobsWorkspace notify={notify} newRecordSignal={newRecordSignal}/>} {module === 'Warranty' && <WarrantyWorkspace notify={notify} newRecordSignal={newRecordSignal}/>} {module === 'Finance & HR' && <FinanceWorkspace notify={notify} newRecordSignal={newRecordSignal}/>} {module === 'Reports' && <ReportsWorkspace notify={notify}/>}<div className="ops-footer"><span><span className="status-dot"/> Database-sourced view · Last synced just now</span><span>Timezone: Africa/Harare · Currency: USD</span></div></div></main>
+      {module === 'Procurement' && <ProcurementWorkflows notify={notify} newRecordSignal={newRecordSignal} query={searchableQuery}/>} {module === 'Inventory' && <InventoryWorkspace query={searchableQuery} notify={notify}/>} {module === 'Sales & CRM' && <CrmWorkspace notify={notify} newRecordSignal={newRecordSignal}/>} {module === 'Job cards' && <JobsWorkspace notify={notify} newRecordSignal={newRecordSignal}/>} {module === 'Warranty' && <WarrantyWorkspace notify={notify} newRecordSignal={newRecordSignal}/>} {module === 'Finance & HR' && <FinanceWorkspace notify={notify} newRecordSignal={newRecordSignal}/>} {module === 'Reports' && <ReportsWorkspace notify={notify}/>}<div className="ops-footer"><span><span className="status-dot"/> Database-sourced view · Last synced just now</span><span>Timezone: {settings.timezone} · Currency: {settings.currency}</span></div></div></main>
     {importOpen && <ImportDialog module={module} close={() => setImportOpen(false)} imported={count => { setImportOpen(false); notify(`${count} record${count === 1 ? '' : 's'} imported`); window.setTimeout(() => window.location.reload(), 350); }} />}{toast && <div className="ops-toast"><span><Check size={13}/></span>{toast}</div>}
   </div>;
 }

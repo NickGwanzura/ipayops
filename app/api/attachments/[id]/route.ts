@@ -1,7 +1,7 @@
 import { readFile, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { ACCESS, getSession, hasRole } from '@/lib/auth';
 import { query } from '@/lib/db';
 import { deleteStorageObject, getStorageObject, usesS3 } from '@/lib/storage';
 
@@ -16,8 +16,10 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession(request);
   if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
-  const result = await query('SELECT storage_key FROM attachments WHERE id = $1 AND organization_id = $2', [params.id, session.user.organizationId]);
+  const result = await query('SELECT storage_key, entity_type FROM attachments WHERE id = $1 AND organization_id = $2', [params.id, session.user.organizationId]);
   if (!result.rows[0]) return NextResponse.json({ error: 'Attachment not found.' }, { status: 404 });
+  const canDelete = result.rows[0].entity_type === 'expense' ? hasRole(session.user.role, ACCESS.expenseSubmitter) : hasRole(session.user.role, ACCESS.field);
+  if (!canDelete) return NextResponse.json({ error: 'You do not have permission to delete this attachment.' }, { status: 403 });
   try {
     if (usesS3()) await deleteStorageObject(result.rows[0].storage_key);
     else await unlink(join(process.env.UPLOAD_DIR || join(process.cwd(), 'uploads'), result.rows[0].storage_key)).catch(error => { if ((error as { code?: string }).code !== 'ENOENT') throw error; });

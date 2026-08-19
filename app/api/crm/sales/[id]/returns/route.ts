@@ -1,10 +1,17 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { ACCESS, requireRole } from '@/lib/auth';
-import { withTransaction } from '@/lib/db';
+import { ACCESS, getSession, requireRole } from '@/lib/auth';
+import { query, withTransaction } from '@/lib/db';
 
-const returnSchema = z.object({ reason: z.string().trim().min(3).max(500), items: z.array(z.object({ saleItemId: z.string().uuid(), condition: z.enum(['Good', 'Damaged', 'Quarantined']).default('Good') })).min(1) });
+const returnSchema = z.object({ reason: z.string().trim().min(3).max(500), refundAmount: z.number().nonnegative().max(100000000).optional().default(0), refundMethod: z.enum(['Bank transfer', 'Cash', 'Card', 'Mobile money', 'Credit note']).optional(), items: z.array(z.object({ saleItemId: z.string().uuid(), condition: z.enum(['Good', 'Damaged', 'Quarantined']).default('Good') })).min(1) });
+
+export async function GET(request: Request, { params }: { params: { id: string } }) {
+  const session = await getSession(request);
+  if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+  const result = await query(`SELECT r.id, r.number, r.status, r.reason, r.refund_amount, r.refund_status, r.refund_method, r.refund_reference, r.credit_note_number, r.refunded_at, r.created_at, u.full_name AS created_by, COALESCE(json_agg(json_build_object('id', ri.id, 'serialNumber', si.serial_number, 'condition', ri.condition) ORDER BY si.serial_number) FILTER (WHERE ri.id IS NOT NULL), '[]'::json) AS items FROM returns r JOIN users u ON u.id = r.created_by LEFT JOIN return_items ri ON ri.return_id = r.id LEFT JOIN sale_items si ON si.id = ri.sale_item_id WHERE r.sale_id = $1 AND r.organization_id = $2 GROUP BY r.id, u.full_name ORDER BY r.created_at DESC`, [params.id, session.user.organizationId]);
+  return NextResponse.json({ returns: result.rows });
+}
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
@@ -23,8 +30,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
       if (saleItems.rows.some(item => item.returned)) throw Object.assign(new Error('Sale item already returned.'), { code: 'ALREADY_RETURNED' });
       const number = `RET-${new Date().getFullYear()}-${randomUUID().slice(0, 6).toUpperCase()}`;
       const returnResult = await client.query(
-        `INSERT INTO returns (organization_id, number, sale_id, reason, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING id, number, status, created_at`,
-        [session.user.organizationId, number, params.id, body.reason, session.user.id],
+        `INSERT INTO returns (organization_id, number, sale_id, reason, refund_amount, refund_method, refund_status, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, number, status, refund_amount, refund_status, created_at`,
+        [session.user.organizationId, number, params.id, body.reason, body.refundAmount, body.refundMethod || null, body.refundAmount > 0 ? 'Pending' : 'Not applicable', session.user.id],
       );
       const conditionByItem = new Map(body.items.map(item => [item.saleItemId, item.condition]));
       for (const item of saleItems.rows) {

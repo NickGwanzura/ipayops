@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     `SELECT t.id, t.consultant_id, u.full_name AS consultant_name, t.period_start, t.period_end, t.target_amount,
             COALESCE((SELECT SUM(s.total) FROM sales s WHERE s.organization_id = t.organization_id AND s.consultant_id = t.consultant_id AND s.confirmed_at::date BETWEEN t.period_start AND t.period_end), 0) AS achieved
      FROM consultant_targets t JOIN users u ON u.id = t.consultant_id
-     WHERE t.organization_id = $1 ORDER BY t.period_start DESC, u.full_name`,
+     WHERE t.organization_id = $1 AND t.is_active = true ORDER BY t.period_start DESC, u.full_name`,
     [session.user.organizationId],
   );
   return NextResponse.json({ targets: result.rows });

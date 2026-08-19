@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { ACCESS, requireRole } from '@/lib/auth';
+import { writeAuditLog } from '@/lib/audit';
 import { query, withTransaction } from '@/lib/db';
 
 const settingsSchema = z.object({
@@ -45,6 +46,7 @@ export async function PATCH(request: Request) {
       const result = await client.query('SELECT o.id, o.name, o.slug, s.timezone, s.currency, s.date_format, s.updated_at FROM organizations o JOIN organization_settings s ON s.organization_id = o.id WHERE o.id = $1', [session.user.organizationId]);
       return result.rows[0];
     });
+    await writeAuditLog({ organizationId: session.user.organizationId, actorUserId: session.user.id, action: 'configuration.updated', entityType: 'organization', entityId: session.user.organizationId, metadata: { currency: body.currency, timezone: body.timezone, dateFormat: body.dateFormat }, request });
     return NextResponse.json({ configuration: updated });
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: 'Enter a valid organization name, timezone, currency, and date format.' }, { status: 400 });

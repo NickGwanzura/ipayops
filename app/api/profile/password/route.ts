@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSession, hashPassword, verifyPassword } from '@/lib/auth';
+import { writeAuditLog } from '@/lib/audit';
 import { query } from '@/lib/db';
 
 const passwordSchema = z.object({
@@ -26,6 +27,7 @@ export async function POST(request: Request) {
     const passwordHash = await hashPassword(body.newPassword);
     await query('UPDATE users SET password_hash = $1, updated_at = now() WHERE id = $2 AND organization_id = $3', [passwordHash, session.user.id, session.user.organizationId]);
     await query('DELETE FROM sessions WHERE user_id = $1 AND id <> $2', [session.user.id, session.sessionId]);
+    await writeAuditLog({ organizationId: session.user.organizationId, actorUserId: session.user.id, action: 'auth.password_changed', entityType: 'user', entityId: session.user.id, request });
 
     return NextResponse.json({ ok: true, message: 'Password updated. Other sessions were signed out.' });
   } catch (error) {

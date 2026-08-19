@@ -2,12 +2,17 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { ACCESS, getSession, hasRole } from '@/lib/auth';
 import { query } from '@/lib/db';
 import { putStorageObject, usesS3 } from '@/lib/storage';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
+const parentTables = { job: 'job_cards', claim: 'warranty_claims', expense: 'expense_claims' } as const;
+
+function canManage(entityType: string, role: string) {
+  return entityType === 'expense' ? hasRole(role, ACCESS.expenseSubmitter) : hasRole(role, ACCESS.field);
+}
 
 export async function GET(request: NextRequest) {
   const session = await getSession(request);
@@ -23,6 +28,10 @@ export async function POST(request: NextRequest) {
   try {
     const form = await request.formData(); const entityType = String(form.get('entityType') || ''); const entityId = String(form.get('entityId') || ''); const file = form.get('file');
     if (!['job', 'claim', 'expense'].includes(entityType) || !entityId || !(file instanceof File)) return NextResponse.json({ error: 'Entity and file are required.' }, { status: 400 });
+    if (!canManage(entityType, session.user.role)) return NextResponse.json({ error: 'You do not have permission to upload this attachment.' }, { status: 403 });
+    const parentTable = parentTables[entityType as keyof typeof parentTables];
+    const parent = await query(`SELECT id FROM ${parentTable} WHERE id = $1 AND organization_id = $2`, [entityId, session.user.organizationId]);
+    if (!parent.rows[0]) return NextResponse.json({ error: 'Attachment target not found.' }, { status: 404 });
     if (!allowedTypes.has(file.type)) return NextResponse.json({ error: 'Only JPG, PNG, WEBP, and PDF files are supported.' }, { status: 415 });
     if (file.size <= 0 || file.size > MAX_BYTES) return NextResponse.json({ error: 'Attachment must be smaller than 10 MB.' }, { status: 413 });
     const ext = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.')).toLowerCase() : '';
