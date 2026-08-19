@@ -34,3 +34,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ error: 'Unable to update opportunity.' }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+  const auth = await requireRole(request, ACCESS.operations);
+  if ('response' in auth) return auth.response;
+  const result = await query(`UPDATE opportunities SET stage = 'Lost', updated_at = now() WHERE id = $1 AND organization_id = $2 RETURNING id, stage`, [params.id, auth.session.user.organizationId]);
+  if (!result.rows[0]) return NextResponse.json({ error: 'Opportunity not found.' }, { status: 404 });
+  return NextResponse.json({ opportunity: result.rows[0], archived: true });
+}

@@ -1,0 +1,11 @@
+@font-face {
+  font-family: 'Hypodermic';
+  src: url('/fonts/Hypodermic.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+body {
+  font-family: 'Hypodermic', 'Instrument Sans', sans-serif;
+}

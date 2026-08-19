@@ -1,4 +1,4 @@
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 let client: S3Client | undefined;
 
@@ -43,4 +43,10 @@ export async function getStorageObject(key: string) {
   const result = await getClient().send(new GetObjectCommand({ Bucket: values.bucket, Key: key }));
   if (!result.Body) return null;
   return Buffer.from(await result.Body.transformToByteArray());
+}
+
+export async function deleteStorageObject(key: string) {
+  if (!usesS3()) return;
+  const values = config();
+  await getClient().send(new DeleteObjectCommand({ Bucket: values.bucket, Key: key }));
 }

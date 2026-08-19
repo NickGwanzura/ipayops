@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import './font.css';
 
 export const metadata: Metadata = { title: 'iPayTech Ops', description: 'Business operations control centre' };
 

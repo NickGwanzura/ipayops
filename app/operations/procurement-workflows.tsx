@@ -3,25 +3,26 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Boxes, PackageCheck, Plus, RefreshCw, ShoppingCart, Users, X } from 'lucide-react';
 
-type Supplier = { id: string; code: string; name: string; contact_name?: string; status: string };
-type PurchaseOrder = { id: string; number: string; supplier_name: string; destination?: string; status: string; ordered_quantity: number; received_quantity: number };
+type Supplier = { id: string; code: string; name: string; contact_name?: string; phone?: string; payment_terms?: string; lead_time_days?: number; status: string };
+type PurchaseOrder = { id: string; number: string; supplier_name: string; destination?: string; status: string; total?: string | number; expected_at?: string; ordered_quantity: number; received_quantity: number };
 type PurchaseOrderItem = { id: string; sku: string; description: string; quantity: number; receivedQuantity: number };
 type PurchaseOrderDetail = PurchaseOrder & { items: PurchaseOrderItem[] };
 
-export default function ProcurementWorkflows({ notify }: { notify: (message: string) => void }) {
+export default function ProcurementWorkflows({ notify, newRecordSignal = 0, query = '' }: { notify: (message: string) => void; newRecordSignal?: number; query?: string }) {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
-  const [dialog, setDialog] = useState<'supplier' | 'order' | 'receive' | null>(null);
+  const [dialog, setDialog] = useState<'supplier' | 'supplierEdit' | 'order' | 'receive' | 'orderDetail' | 'supplierDetail' | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrderDetail | null>(null);
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
 
   const load = async () => {
     setBusy(true);
     setError('');
     try {
       const [supplierResponse, orderResponse] = await Promise.all([
-        fetch('/api/suppliers', { cache: 'no-store' }),
+        fetch(`/api/suppliers${query ? `?q=${encodeURIComponent(query)}` : ''}`, { cache: 'no-store' }),
         fetch('/api/purchase-orders', { cache: 'no-store' }),
       ]);
       if (!supplierResponse.ok || !orderResponse.ok) throw new Error('Live procurement data is unavailable.');
@@ -36,7 +37,8 @@ export default function ProcurementWorkflows({ notify }: { notify: (message: str
     }
   };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); }, [query]);
+  useEffect(() => { if (newRecordSignal > 0) setDialog('order'); }, [newRecordSignal]);
 
   const openReceive = async (orderId: string) => {
     setError('');
@@ -47,28 +49,39 @@ export default function ProcurementWorkflows({ notify }: { notify: (message: str
     setDialog('receive');
   };
 
-  return <section className="ops-panel workflow-panel">
-    <div className="ops-panel-head">
-      <div><h2>Connected procurement workflows</h2><p>These actions write to PostgreSQL and preserve receiving and reservation rules.</p></div>
-      <button className="link-btn" onClick={() => void load()} disabled={busy}><RefreshCw size={14} className={busy ? 'spin' : ''}/> Refresh</button>
-    </div>
-    <div className="workflow-summary">
-      <div><Users size={15}/><span><strong>{suppliers.length}</strong> live suppliers</span></div>
-      <div><ShoppingCart size={15}/><span><strong>{orders.length}</strong> live purchase orders</span></div>
-      <div><Boxes size={15}/><span>Serialized receipts enabled</span></div>
-    </div>
-    <div className="workflow-actions">
-      <button className="ops-btn ghost" onClick={() => setDialog('supplier')}><Plus size={15}/> Add supplier</button>
-      <button className="ops-btn blue" onClick={() => setDialog('order')} disabled={!suppliers.length}><Plus size={15}/> Create purchase order</button>
-    </div>
-    {error && <p className="workflow-error" role="alert">{error}</p>}
-    {orders.length > 0 && <div className="workflow-receiving"><strong>Receive a live purchase order</strong><div>{orders.filter(order => order.received_quantity < order.ordered_quantity).slice(0, 4).map(order => <button key={order.id} className="workflow-order" onClick={() => void openReceive(order.id)}><span>{order.number} · {order.supplier_name}</span><small>{order.received_quantity}/{order.ordered_quantity} received <PackageCheck size={13}/></small></button>)}</div></div>}
-    {dialog === 'supplier' && <SupplierDialog close={() => setDialog(null)} onSaved={() => { setDialog(null); notify('Supplier created'); void load(); }}/>} 
-    {dialog === 'order' && <OrderDialog suppliers={suppliers} close={() => setDialog(null)} onSaved={() => { setDialog(null); notify('Purchase order created'); void load(); }}/>} 
-    {dialog === 'receive' && selectedOrder && <ReceiveDialog order={selectedOrder} close={() => { setDialog(null); setSelectedOrder(null); }} onSaved={() => { setDialog(null); setSelectedOrder(null); notify('Goods receipt posted and serial inventory created'); void load(); }}/>} 
-  </section>;
+  const openOrder = async (orderId: string) => {
+    setError('');
+    const response = await fetch(`/api/purchase-orders/${orderId}`, { cache: 'no-store' });
+    if (!response.ok) { setError('Could not load purchase order details.'); return; }
+    const data = await response.json();
+    setSelectedOrder(data.purchaseOrder);
+    setDialog('orderDetail');
+  };
+
+  const archiveSupplier = async (supplier: Supplier) => { if (!window.confirm(`Archive ${supplier.name}? It will no longer be available for new purchase orders.`)) return; const response = await fetch(`/api/suppliers/${supplier.id}`, { method: 'DELETE' }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to archive supplier.'); return; } notify(`${supplier.name} archived`); void load(); };
+
+  const visibleOrders = orders.filter(order => !query || [order.number, order.supplier_name, order.destination, order.status].join(' ').toLowerCase().includes(query.toLowerCase()));
+  const outstandingUnits = visibleOrders.reduce((sum, order) => sum + Math.max(0, order.ordered_quantity - order.received_quantity), 0);
+  const averageLeadTime = suppliers.length ? Math.round(suppliers.reduce((sum, supplier) => sum + Number(supplier.lead_time_days || 0), 0) / suppliers.length) : 0;
+
+  return <>
+    <div className="ops-kpis"><LiveKpi label="Open purchase orders" value={String(visibleOrders.filter(order => !['Closed', 'Received'].includes(order.status)).length)} note={`${visibleOrders.filter(order => order.received_quantity < order.ordered_quantity).length} with outstanding units`} icon={<ShoppingCart size={16}/>} tone="blue"/><LiveKpi label="Units outstanding" value={String(outstandingUnits)} note="Partial receipts preserved" icon={<PackageCheck size={16}/>} tone="amber"/><LiveKpi label="Suppliers" value={String(suppliers.length)} note="Live supplier directory" icon={<Users size={16}/>} tone="purple"/><LiveKpi label="Avg. lead time" value={`${averageLeadTime} days`} note="From supplier records" icon={<Boxes size={16}/>} tone="green"/></div>
+    <section className="ops-panel workflow-panel"><div className="ops-panel-head"><div><h2>Connected procurement workflows</h2><p>These actions write to PostgreSQL and preserve receiving and reservation rules.</p></div><button className="link-btn" onClick={() => void load()} disabled={busy}><RefreshCw size={14} className={busy ? 'spin' : ''}/> Refresh</button></div><div className="workflow-actions"><button className="ops-btn ghost" onClick={() => setDialog('supplier')}><Plus size={15}/> Add supplier</button><button className="ops-btn blue" onClick={() => setDialog('order')} disabled={!suppliers.length}><Plus size={15}/> Create purchase order</button></div>{error && <p className="workflow-error" role="alert">{error}</p>}</section>
+    <div className="ops-grid-two"><section className="ops-panel"><div className="ops-panel-head"><div><h2>Purchase orders</h2><p>Live approvals, receiving, and delivery commitments.</p></div></div><div className="data-table"><div className="table-head ops-table-head"><span>Order</span><span>Supplier</span><span>Received</span><span>Status</span><span>Action</span></div>{visibleOrders.map(order => <div className="data-row" key={order.id}><button className="row-action" onClick={() => void openOrder(order.id)}>{order.number}</button><span>{order.supplier_name}</span><span>{order.received_quantity}/{order.ordered_quantity}</span><Status value={order.status}/><div className="transfer-card-actions"><button className="row-action" onClick={() => void openOrder(order.id)}>Details</button>{order.received_quantity < order.ordered_quantity && <button className="row-action" onClick={() => void openReceive(order.id)}><PackageCheck size={13}/> Receive</button>}</div></div>)}{!visibleOrders.length && <div className="empty-state"><ShoppingCart size={22}/><strong>No purchase orders</strong><span>Create a live purchase order to begin receiving.</span></div>}</div></section><section className="ops-panel"><div className="ops-panel-head"><div><h2>Supplier directory</h2><p>Live supplier relationships and delivery terms.</p></div></div><div className="data-table"><div className="table-head ops-table-head"><span>Supplier</span><span>Contact</span><span>Lead time</span><span>Status</span><span>Action</span></div>{suppliers.map(supplier => <div className="data-row" key={supplier.id}><strong>{supplier.name}<small>{supplier.code}</small></strong><span>{supplier.contact_name || supplier.phone || '—'}</span><span>{supplier.lead_time_days || 0} days</span><Status value={supplier.status}/><div className="transfer-card-actions"><button className="row-action" onClick={() => { setSelectedSupplier(supplier); setDialog('supplierDetail'); }}>Details</button><button className="row-action" onClick={() => { setSelectedSupplier(supplier); setDialog('supplierEdit'); }}>Edit</button>{supplier.status === 'Active' && <button className="row-action" onClick={() => void archiveSupplier(supplier)}>Archive</button>}</div></div>)}{!suppliers.length && <div className="empty-state"><Users size={22}/><strong>No suppliers</strong><span>Add a supplier to create purchase orders.</span></div>}</div></section></div>
+    <section className="ops-panel"><div className="ops-panel-head"><div><h2>Receiving queue</h2><p>Partial deliveries preserve the outstanding balance.</p></div></div><div className="workflow-receiving"><div>{visibleOrders.filter(order => order.received_quantity < order.ordered_quantity).slice(0, 8).map(order => <button key={order.id} className="workflow-order" onClick={() => void openReceive(order.id)}><span>{order.number} · {order.supplier_name}</span><small>{order.received_quantity}/{order.ordered_quantity} received <PackageCheck size={13}/></small></button>)}</div>{!visibleOrders.some(order => order.received_quantity < order.ordered_quantity) && <p className="workflow-help">No outstanding receipts.</p>}</div></section>
+    {dialog === 'supplier' && <SupplierDialog close={() => setDialog(null)} onSaved={() => { setDialog(null); notify('Supplier created'); void load(); }}/>} {dialog === 'supplierEdit' && selectedSupplier && <SupplierEditDialog supplier={selectedSupplier} close={() => { setDialog(null); setSelectedSupplier(null); }} onSaved={() => { setDialog(null); setSelectedSupplier(null); notify('Supplier updated'); void load(); }}/>} {dialog === 'order' && <OrderDialog suppliers={suppliers} close={() => setDialog(null)} onSaved={() => { setDialog(null); notify('Purchase order created'); void load(); }}/>} {dialog === 'receive' && selectedOrder && <ReceiveDialog order={selectedOrder} close={() => { setDialog(null); setSelectedOrder(null); }} onSaved={() => { setDialog(null); setSelectedOrder(null); notify('Goods receipt posted and serial inventory created'); void load(); }}/>} {dialog === 'orderDetail' && selectedOrder && <OrderDetailDialog order={selectedOrder} close={() => { setDialog(null); setSelectedOrder(null); }}/>} {dialog === 'supplierDetail' && selectedSupplier && <SupplierDetailDialog supplier={selectedSupplier} close={() => { setDialog(null); setSelectedSupplier(null); }}/>}
+  </>;
 }
 
+function LiveKpi({ label, value, note, icon, tone }: { label: string; value: string; note: string; icon: React.ReactNode; tone: string }) { return <div className="ops-kpi"><span className={`kpi-icon ${tone}`}>{icon}</span><strong>{value}</strong><span>{label}</span><small>{note}</small></div>; }
+function Status({ value }: { value: string }) { return <span className={`status ${value.toLowerCase().replaceAll(' ', '-')}`}>{value}</span>; }
+function OrderDetailDialog({ order, close }: { order: PurchaseOrderDetail; close: () => void }) { return <Dialog title={`${order.number} details`} close={close}><div className="workflow-form"><div className="workflow-summary"><div><ShoppingCart size={15}/><span><strong>{order.supplier_name}</strong> supplier</span></div><div><PackageCheck size={15}/><span><strong>{order.received_quantity}/{order.ordered_quantity}</strong> received</span></div></div><p className="workflow-help">Destination: {order.destination || '—'}</p><div className="serial-picker"><strong>Order lines</strong>{order.items.map(item => <div key={item.id} className="workflow-help">{item.sku} · {item.description} · {item.receivedQuantity}/{item.quantity} received</div>)}</div><div className="workflow-dialog-actions"><button type="button" className="ops-btn blue" onClick={close}>Close</button></div></div></Dialog>; }
+function SupplierDetailDialog({ supplier, close }: { supplier: Supplier; close: () => void }) { return <Dialog title={`${supplier.name} details`} close={close}><div className="workflow-form"><div className="workflow-summary"><div><Users size={15}/><span><strong>{supplier.code}</strong> supplier code</span></div><div><Boxes size={15}/><span><strong>{supplier.lead_time_days || 0} days</strong> lead time</span></div></div><p className="workflow-help">Contact: {supplier.contact_name || '—'} · {supplier.phone || 'No phone recorded'}</p><p className="workflow-help">Payment terms: {supplier.payment_terms || '—'}</p><div className="workflow-dialog-actions"><button type="button" className="ops-btn blue" onClick={close}>Close</button></div></div></Dialog>; }
+function SupplierEditDialog({ supplier, close, onSaved }: { supplier: Supplier; close: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState({ name: supplier.name, contactName: supplier.contact_name || '', phone: supplier.phone || '', paymentTerms: supplier.payment_terms || '', leadTimeDays: String(supplier.lead_time_days || 0), status: supplier.status }); const [error, setError] = useState(''); const [saving, setSaving] = useState(false);
+  const submit = async (event: FormEvent) => { event.preventDefault(); setSaving(true); const response = await fetch(`/api/suppliers/${supplier.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, leadTimeDays: Number(form.leadTimeDays) }) }); const data = await response.json(); setSaving(false); if (!response.ok) { setError(data.error || 'Unable to update supplier.'); return; } onSaved(); };
+  return <Dialog title={`Edit ${supplier.name}`} close={close}><form className="workflow-form" onSubmit={submit}><Field label="Supplier name"><input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}/></Field><Field label="Contact name"><input value={form.contactName} onChange={e => setForm({ ...form, contactName: e.target.value })}/></Field><Field label="Phone"><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })}/></Field><div className="workflow-form-grid"><Field label="Payment terms"><input value={form.paymentTerms} onChange={e => setForm({ ...form, paymentTerms: e.target.value })}/></Field><Field label="Lead time (days)"><input type="number" min="0" value={form.leadTimeDays} onChange={e => setForm({ ...form, leadTimeDays: e.target.value })}/></Field></div><Field label="Status"><select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}><option>Active</option><option>Inactive</option><option>Blocked</option></select></Field>{error && <p className="workflow-error" role="alert">{error}</p>}<div className="workflow-dialog-actions"><button type="button" className="ops-btn ghost" onClick={close}>Cancel</button><button className="ops-btn blue" disabled={saving}>{saving ? 'Saving…' : 'Save supplier'}</button></div></form></Dialog>;
+}
 function Dialog({ title, children, close }: { title: string; children: React.ReactNode; close: () => void }) {
   return <div className="workflow-dialog-backdrop" role="presentation"><div className="workflow-dialog" role="dialog" aria-modal="true" aria-label={title}><div className="workflow-dialog-head"><h3>{title}</h3><button onClick={close} aria-label="Close"><X size={16}/></button></div>{children}</div></div>;
 }
