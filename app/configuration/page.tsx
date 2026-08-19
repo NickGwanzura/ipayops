@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { FormEvent, useEffect, useState } from 'react';
-import { ArrowLeft, MapPin, Plus, Save, Settings2, Users, Zap } from 'lucide-react';
+import { ArrowLeft, MapPin, Plus, Save, Settings2, Users } from 'lucide-react';
 import styles from './page.module.css';
 
 type Location = { id: string; code: string; name: string; address: string | null; is_active: boolean };
@@ -62,7 +63,7 @@ export default function ConfigurationPage() {
   };
 
   return <div className={styles.shell}>
-    <header className={styles.header}><Link href="/" className={styles.brand}><span className={styles.mark}><Zap size={17} fill="currentColor"/></span><span><strong>iPayTech</strong><small>OPS CONSOLE</small></span></Link><div className={styles.links}><Link href="/profile" className={styles.link}>Profile</Link><Link href="/" className={styles.link}><ArrowLeft size={14}/> Dashboard</Link></div></header>
+    <header className={styles.header}><Link href="/" className={styles.brand}><Image className={styles.brandLogo} src="/iPaytechLogo.jpg" alt="iPayTech" width={170} height={71} priority /></Link><div className={styles.links}><Link href="/profile" className={styles.link}>Profile</Link><Link href="/" className={styles.link}><ArrowLeft size={14}/> Dashboard</Link></div></header>
     <main className={styles.main}><div className={styles.title}><span className={styles.eyebrow}>Workspace administration</span><h1>Configuration</h1><p>Manage organization defaults, operating locations, and access visibility.</p></div><p className={styles.status} aria-live="polite">{error || message ? <span className={error ? styles.error : styles.message}>{error || message}</span> : null}</p>
       {loading ? <section className={styles.card}><p>Loading configuration…</p></section> : <div className={styles.grid}>
         <section className={styles.card}><h2>Organization defaults</h2><p>These settings are used by reports, documents, and operational records.</p><form className={styles.form} onSubmit={saveSettings}><label className={styles.field}>Organization name<input required value={form.organizationName} onChange={event => setForm({ ...form, organizationName: event.target.value })}/></label><div className={styles.row}><label className={styles.field}>Timezone<select value={form.timezone} onChange={event => setForm({ ...form, timezone: event.target.value })}><option>Africa/Harare</option><option>Africa/Johannesburg</option><option>Europe/London</option><option>UTC</option></select></label><label className={styles.field}>Currency<select value={form.currency} onChange={event => setForm({ ...form, currency: event.target.value })}><option>USD</option><option>ZAR</option><option>GBP</option><option>EUR</option><option>BWP</option><option>ZWL</option></select></label></div><label className={styles.field}>Date format<select value={form.dateFormat} onChange={event => setForm({ ...form, dateFormat: event.target.value })}><option>DD/MM/YYYY</option><option>MM/DD/YYYY</option><option>YYYY-MM-DD</option></select></label><div className={styles.actions}><button className={styles.primary} disabled={saving}><Save size={14}/> {saving ? 'Saving…' : 'Save defaults'}</button></div></form><p className={styles.note}>Organization identity and settings are restricted to leadership roles.</p></section>

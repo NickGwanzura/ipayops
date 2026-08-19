@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
 import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, Bell, Boxes, BriefcaseBusiness, ChevronDown, CircleDollarSign, ClipboardCheck, FileText, Grid2X2, Laptop, LayoutDashboard, Menu, PackageCheck, Plus, Search, Settings, ShieldCheck, ShoppingCart, Truck, Users, X, Zap } from 'lucide-react';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
@@ -54,7 +55,7 @@ export default function Home() {
   const displayRole = user?.role || 'Authenticated user';
   return <div className={dark ? 'shell dark' : 'shell'}>
     <aside className={menu ? 'sidebar open' : 'sidebar'}>
-      <div className="brand"><div className="brand-mark"><Zap size={17} fill="currentColor"/></div><div><strong>iPayTech</strong><span>OPS CONSOLE</span></div><button className="mobile-close" onClick={()=>setMenu(false)}><X size={19}/></button></div>
+      <div className="brand"><Image className="brand-logo" src="/iPaytechLogo.jpg" alt="iPayTech" width={150} height={63} priority/><button className="mobile-close" onClick={()=>setMenu(false)}><X size={19}/></button></div>
       <div className="workspace-label">WORKSPACE</div><div className="workspace"><div className="workspace-dot">HZ</div><div><strong>Harare HQ</strong><span>All operations</span></div><ChevronDown size={15}/></div>
       <nav>{nav.map(({label,icon:Icon}) => <button key={label} className={active===label?'nav-item active':'nav-item'} onClick={()=>{goToModule(label);setMenu(false);}}><Icon size={17}/><span>{label}</span></button>)}</nav>
       <div className="sidebar-spacer"/><div className="sidebar-section"><button className="nav-item" onClick={()=>goToModule('Finance & HR')}><Users size={17}/><span>People & HR</span></button><button className="nav-item" onClick={goToConfiguration}><Settings size={17}/><span>Configuration</span></button></div>

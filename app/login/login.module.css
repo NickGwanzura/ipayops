@@ -122,3 +122,4 @@
 @media (prefers-reduced-motion: reduce) {
   .inputShell, .checkbox, .submitButton { transition: none; }
 }
+.brandLogo { width: 180px; height: 76px; object-fit: cover; object-position: center; border-radius: 8px; background: #f4f7fb; padding: 4px; }

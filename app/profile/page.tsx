@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { FormEvent, useEffect, useState } from 'react';
-import { ArrowLeft, LogOut, Save, Shield, Zap } from 'lucide-react';
+import { ArrowLeft, LogOut, Save, Shield } from 'lucide-react';
 import styles from './page.module.css';
 
 type User = { id: string; organizationId: string; email: string; fullName: string; role: string };
@@ -63,7 +64,7 @@ export default function ProfilePage() {
 
   return <div className={styles.shell}>
     <header className={styles.header}>
-      <Link href="/" className={styles.brand}><span className={styles.mark}><Zap size={17} fill="currentColor"/></span><span><strong>iPayTech</strong><small>OPS CONSOLE</small></span></Link>
+      <Link href="/" className={styles.brand}><Image className={styles.brandLogo} src="/iPaytechLogo.jpg" alt="iPayTech" width={170} height={71} priority /></Link>
       <Link href="/" className={styles.back}><ArrowLeft size={14}/> Dashboard</Link>
     </header>
     <main className={styles.main}>
@@ -88,7 +89,7 @@ export default function ProfilePage() {
             <p className={styles.note}>Use at least 8 characters. Choose a password you do not use elsewhere.</p>
             <div className={styles.actions}><button className={styles.primary} disabled={passwordSaving}><Shield size={14}/> {passwordSaving ? 'Updating…' : 'Update password'}</button></div>
           </form>
-          <div className={styles.actions}><button className={styles.danger} onClick={() => void logout}><LogOut size={14}/> Sign out</button></div>
+          <div className={styles.actions}><button className={styles.danger} onClick={() => void logout()}><LogOut size={14}/> Sign out</button></div>
         </section>
       </div>}
     </main>

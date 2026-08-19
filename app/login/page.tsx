@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Eye, EyeOff, HelpCircle, KeyRound, LockKeyhole, ShieldCheck, Zap } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, HelpCircle, KeyRound, LockKeyhole, ShieldCheck } from 'lucide-react';
 import styles from './login.module.css';
 
 export default function LoginPage() {
@@ -41,8 +42,7 @@ export default function LoginPage() {
         <div className={styles.formWrap}>
           <div className={styles.mobileBrand}>
             <Link href="/" className={styles.brand} aria-label="iPayTech Ops home">
-              <span className={styles.brandMark}><Zap size={17} fill="currentColor" /></span>
-              <span><strong>iPayTech</strong><small>OPS CONSOLE</small></span>
+              <Image className={styles.brandLogo} src="/iPaytechLogo.jpg" alt="iPayTech" width={180} height={76} priority />
             </Link>
           </div>
 

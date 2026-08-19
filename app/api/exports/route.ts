@@ -2,6 +2,9 @@ import { NextRequest } from 'next/server';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { getSession } from '@/lib/auth';
 import { query } from '@/lib/db';
+import { embedIpaytechLogo } from '@/lib/pdf-brand';
+
+export const runtime = 'nodejs';
 
 export async function GET(request: NextRequest) {
   const session = await getSession(request);
@@ -42,10 +45,10 @@ export async function GET(request: NextRequest) {
     const buffer = XLSX.write(workbook, { bookType:'xlsx', type:'buffer' });
     return new Response(buffer, { headers:{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':`attachment; filename="ipaytech-operations-${from}-to-${to}.xlsx"`} });
   }
-  const pdf = await PDFDocument.create(); const page = pdf.addPage([595,842]); const font = await pdf.embedFont(StandardFonts.Helvetica); const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  page.drawText('iPayTech Ops', {x:42,y:790,size:18,font:bold,color:rgb(.08,.18,.32)}); page.drawText('Operations summary export', {x:42,y:766,size:11,font,color:rgb(.35,.42,.52)});
-  page.drawText(`Generated ${new Date().toLocaleDateString('en-GB')}`, {x:42,y:744,size:9,font,color:rgb(.45,.5,.58)});
-  rows.forEach((row, index) => row.forEach((cell, col) => page.drawText(cell, {x:42 + col*130,y:700-index*28,size:index===0?9:10,font:index===0?bold:font,color:rgb(.1,.15,.22)})));
+  const pdf = await PDFDocument.create(); const page = pdf.addPage([595,842]); const logo = await embedIpaytechLogo(pdf); const font = await pdf.embedFont(StandardFonts.Helvetica); const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  page.drawImage(logo, {x:42,y:748,width:175,height:73}); page.drawText('Operations summary export', {x:42,y:730,size:11,font,color:rgb(.35,.42,.52)});
+  page.drawText(`Generated ${new Date().toLocaleDateString('en-GB')}`, {x:42,y:712,size:9,font,color:rgb(.45,.5,.58)});
+  rows.forEach((row, index) => row.forEach((cell, col) => page.drawText(cell, {x:42 + col*130,y:680-index*28,size:index===0?9:10,font:index===0?bold:font,color:rgb(.1,.15,.22)})));
   const bytes = await pdf.save();
   return new Response(Buffer.from(bytes), { headers:{'Content-Type':'application/pdf','Content-Disposition':`attachment; filename="ipaytech-operations-${from}-to-${to}.pdf"`} });
 }
