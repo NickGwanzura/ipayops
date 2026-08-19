@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getSession } from '@/lib/auth';
+import { ACCESS, requireRole } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/db';
 
 const runSchema = z.object({ ruleId: z.string().uuid().optional() });
 
 export async function POST(request: Request) {
   try {
-    const session = await getSession(request);
-    if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+    const auth = await requireRole(request, ACCESS.finance);
+    if ('response' in auth) return auth.response;
+    const { session } = auth;
     const body = runSchema.parse(await request.json().catch(() => ({})));
     const result = await withTransaction(async client => {
       const rule = await client.query(`SELECT id, name, rate, trigger_status FROM commission_rules WHERE organization_id = $1 AND is_active = true AND ($2::uuid IS NULL OR id = $2) ORDER BY created_at DESC LIMIT 1`, [session.user.organizationId, body.ruleId || null]);

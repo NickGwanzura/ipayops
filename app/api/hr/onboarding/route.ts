@@ -1,21 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getSession } from '@/lib/auth';
+import { ACCESS, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
 
 const taskSchema = z.object({ userId: z.string().uuid(), title: z.string().trim().min(2).max(160), category: z.string().trim().min(2).max(80).default('General'), dueAt: z.string().date().optional() });
 
 export async function GET(request: NextRequest) {
-  const session = await getSession(request);
-  if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+  const auth = await requireRole(request, ACCESS.hr);
+  if ('response' in auth) return auth.response;
+  const { session } = auth;
   const result = await query(`SELECT t.id, t.user_id, u.full_name AS user_name, t.title, t.category, t.due_at, t.status, t.completed_at FROM onboarding_tasks t JOIN users u ON u.id = t.user_id WHERE t.organization_id = $1 ORDER BY t.status, t.due_at NULLS LAST, t.created_at DESC`, [session.user.organizationId]);
   return NextResponse.json({ tasks: result.rows });
 }
 
 export async function POST(request: Request) {
   try {
-    const session = await getSession(request);
-    if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+    const auth = await requireRole(request, ACCESS.hr);
+    if ('response' in auth) return auth.response;
+    const { session } = auth;
     const body = taskSchema.parse(await request.json());
     const user = await query('SELECT id FROM users WHERE id = $1 AND organization_id = $2', [body.userId, session.user.organizationId]);
     if (!user.rows[0]) return NextResponse.json({ error: 'Employee not found.' }, { status: 404 });

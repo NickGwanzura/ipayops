@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getSession } from '@/lib/auth';
+import { ACCESS, getSession, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
 
 const expenseSchema = z.object({
@@ -10,8 +10,9 @@ const expenseSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const session = await getSession(request);
-  if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+  const auth = await requireRole(request, ACCESS.finance);
+  if ('response' in auth) return auth.response;
+  const { session } = auth;
   const status = request.nextUrl.searchParams.get('status');
   const result = await query(
     `SELECT e.id, e.number, e.category, e.description, e.amount, e.currency, e.status, e.submitted_at,
@@ -31,8 +32,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: Request) {
   try {
-    const session = await getSession(request);
-    if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+    const auth = await requireRole(request, ACCESS.expenseSubmitter);
+    if ('response' in auth) return auth.response;
+    const { session } = auth;
     const body = expenseSchema.parse(await request.json());
     const result = await query(
       `INSERT INTO expense_claims (organization_id, number, submitter_id, category, description, amount)

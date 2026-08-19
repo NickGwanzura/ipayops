@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getSession } from '@/lib/auth';
+import { ACCESS, getSession, requireRole } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/db';
 
 const paymentSchema = z.object({
@@ -23,8 +23,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
-    const session = await getSession(request);
-    if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+    const auth = await requireRole(request, ACCESS.finance);
+    if ('response' in auth) return auth.response;
+    const { session } = auth;
     const body = paymentSchema.parse(await request.json());
     const result = await withTransaction(async client => {
       const invoice = await client.query('SELECT id, total, paid_amount, status FROM invoices WHERE id = $1 AND organization_id = $2 FOR UPDATE', [params.id, session.user.organizationId]);

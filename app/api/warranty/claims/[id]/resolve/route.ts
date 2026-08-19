@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getSession } from '@/lib/auth';
+import { ACCESS, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
 
 const resolveSchema = z.object({ status: z.enum(['Resolved', 'Rejected']), resolution: z.string().trim().min(3).max(500) });
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
-    const session = await getSession(request);
-    if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+    const auth = await requireRole(request, ACCESS.field);
+    if ('response' in auth) return auth.response;
+    const { session } = auth;
     const body = resolveSchema.parse(await request.json());
     const result = await query(
       `UPDATE warranty_claims SET status = $1, resolution = $2, updated_at = now()

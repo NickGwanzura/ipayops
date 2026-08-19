@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { getSession } from '@/lib/auth';
+import { ACCESS, getSession, requireRole } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/db';
 
 const claimSchema = z.object({ inventoryItemId: z.string().uuid(), issue: z.string().trim().min(3).max(500) });
@@ -22,8 +22,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: Request) {
   try {
-    const session = await getSession(request);
-    if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+    const auth = await requireRole(request, ACCESS.field);
+    if ('response' in auth) return auth.response;
+    const { session } = auth;
     const body = claimSchema.parse(await request.json());
     const claim = await withTransaction(async client => {
       const item = await client.query(

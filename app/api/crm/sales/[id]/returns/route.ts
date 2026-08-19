@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { getSession } from '@/lib/auth';
+import { ACCESS, requireRole } from '@/lib/auth';
 import { withTransaction } from '@/lib/db';
 
 const returnSchema = z.object({ reason: z.string().trim().min(3).max(500), items: z.array(z.object({ saleItemId: z.string().uuid(), condition: z.enum(['Good', 'Damaged', 'Quarantined']).default('Good') })).min(1) });
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
-    const session = await getSession(request);
-    if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+    const auth = await requireRole(request, ACCESS.operations);
+    if ('response' in auth) return auth.response;
+    const { session } = auth;
     const body = returnSchema.parse(await request.json());
     const returned = await withTransaction(async client => {
       const saleResult = await client.query('SELECT id FROM sales WHERE id = $1 AND organization_id = $2 FOR UPDATE', [params.id, session.user.organizationId]);

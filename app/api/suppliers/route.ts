@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getSession } from '@/lib/auth';
+import { ACCESS, getSession, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
 
 const supplierSchema = z.object({
@@ -29,8 +29,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: Request) {
   try {
-    const session = await getSession(request);
-    if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+    const auth = await requireRole(request, ACCESS.operations);
+    if ('response' in auth) return auth.response;
+    const { session } = auth;
     const body = supplierSchema.parse(await request.json());
     const code = body.code || `SUP-${Date.now().toString().slice(-6)}`;
     const result = await query(

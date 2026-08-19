@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { getSession } from '@/lib/auth';
+import { ACCESS, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
 
 const requisitionSchema = z.object({ description: z.string().trim().min(3).max(300), estimatedCost: z.number().nonnegative().max(100000000) });
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
-    const session = await getSession(request);
-    if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+    const auth = await requireRole(request, ACCESS.field);
+    if ('response' in auth) return auth.response;
+    const { session } = auth;
     const body = requisitionSchema.parse(await request.json());
     const claim = await query('SELECT id FROM warranty_claims WHERE id = $1 AND organization_id = $2', [params.id, session.user.organizationId]);
     if (!claim.rows[0]) return NextResponse.json({ error: 'Warranty claim not found.' }, { status: 404 });

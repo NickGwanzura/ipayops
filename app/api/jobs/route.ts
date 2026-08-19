@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { getSession } from '@/lib/auth';
+import { ACCESS, getSession, requireRole } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/db';
 
 const jobSchema = z.object({
@@ -28,8 +28,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: Request) {
   try {
-    const session = await getSession(request);
-    if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+    const auth = await requireRole(request, ACCESS.field);
+    if ('response' in auth) return auth.response;
+    const { session } = auth;
     const body = jobSchema.parse(await request.json());
     const job = await withTransaction(async client => {
       const clientResult = await client.query('SELECT id FROM clients WHERE id = $1 AND organization_id = $2', [body.clientId, session.user.organizationId]);

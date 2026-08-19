@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getSession } from '@/lib/auth';
+import { ACCESS, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
 
 const statusSchema = z.object({ status: z.enum(['Approved', 'Paid', 'Voided']) });
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
-    const session = await getSession(request);
-    if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+    const auth = await requireRole(request, ACCESS.finance);
+    if ('response' in auth) return auth.response;
+    const { session } = auth;
     const body = statusSchema.parse(await request.json());
     const result = await query(`UPDATE commission_entries SET status = $1 WHERE id = $2 AND organization_id = $3 AND (($1 IN ('Approved', 'Voided') AND status = 'Provisional') OR ($1 = 'Paid' AND status = 'Approved')) RETURNING id, sale_id, amount, status`, [body.status, params.id, session.user.organizationId]);
     if (!result.rows[0]) return NextResponse.json({ error: 'Commission not found or transition is not allowed.' }, { status: 409 });

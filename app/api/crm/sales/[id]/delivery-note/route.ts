@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
-import { getSession } from '@/lib/auth';
+import { ACCESS, requireRole } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/db';
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
-  const session = await getSession(request);
-  if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+    const auth = await requireRole(request, ACCESS.operations);
+    if ('response' in auth) return auth.response;
+    const { session } = auth;
   try {
     const note = await withTransaction(async client => {
       const saleResult = await client.query('SELECT id, client_id FROM sales WHERE id = $1 AND organization_id = $2 FOR UPDATE', [params.id, session.user.organizationId]);

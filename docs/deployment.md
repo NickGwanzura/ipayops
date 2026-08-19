@@ -20,9 +20,9 @@ ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='use-a-strong-password' npm run db:
 2. Create an Application from the repository and use the repository root as the build context.
 3. Set the application port to `3000` and health check path to `/api/health`.
 4. Configure the environment variables from `.env.example`; use a generated `AUTH_SECRET` of at least 32 characters.
-5. Apply migrations once per release using `npm run db:migrate`, then provision an administrator with `npm run db:create-user`.
+5. The repository Dockerfile runs `node scripts/migrate.mjs` before `node server.js` on container startup. Ensure Dokploy uses the repository Dockerfile and has `DATABASE_URL` configured; for a non-Docker deployment, run `npm run db:migrate` once before starting the app, then provision an administrator with `npm run db:create-user`.
 6. Set `STORAGE_DRIVER=s3` and configure the S3-compatible endpoint before enabling production uploads.
-7. Build and release with `docker build -t ipaytech-ops .`; do not run destructive database migrations automatically from every replica.
+7. Build and release with `docker build -t ipaytech-ops .`. Run only one migration-enabled release container at a time when multiple replicas are configured.
 8. Back up PostgreSQL before releases and test restore procedures separately.
 
 ## Dokku PostgreSQL topology

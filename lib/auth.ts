@@ -17,6 +17,28 @@ export type AuthUser = {
   role: string;
 };
 
+export const ROLE = {
+  CEO: 'ceo',
+  ADMIN: 'admin',
+  MANAGER: 'manager',
+  OPERATOR: 'operator',
+  FINANCE: 'finance',
+  HR: 'hr',
+  INSTALLER: 'installer',
+  VIEWER: 'viewer',
+} as const;
+
+export const ACCESS = {
+  leadership: [ROLE.CEO, ROLE.ADMIN, ROLE.MANAGER] as const,
+  finance: [ROLE.CEO, ROLE.ADMIN, ROLE.MANAGER, ROLE.FINANCE] as const,
+  hr: [ROLE.CEO, ROLE.ADMIN, ROLE.MANAGER, ROLE.HR] as const,
+  operations: [ROLE.CEO, ROLE.ADMIN, ROLE.MANAGER, ROLE.OPERATOR] as const,
+  field: [ROLE.CEO, ROLE.ADMIN, ROLE.MANAGER, ROLE.OPERATOR, ROLE.INSTALLER] as const,
+  expenseSubmitter: [ROLE.CEO, ROLE.ADMIN, ROLE.MANAGER, ROLE.OPERATOR, ROLE.FINANCE, ROLE.HR, ROLE.INSTALLER] as const,
+} as const;
+
+export type AuthSession = { user: AuthUser; sessionId: string };
+
 function authSecret() {
   const secret = process.env.AUTH_SECRET;
   if (!secret || secret.length < 32) throw new Error('AUTH_SECRET must be at least 32 characters.');
@@ -75,9 +97,16 @@ async function readSessionToken(token: string | undefined) {
   }
 }
 
-export async function getSession(request?: Request) {
+export async function getSession(request?: Request): Promise<AuthSession | null> {
   const token = request?.headers.get('cookie')?.match(new RegExp(`${SESSION_COOKIE}=([^;]+)`))?.[1] ?? cookies().get(SESSION_COOKIE)?.value;
   return readSessionToken(token);
+}
+
+export async function requireRole(request: Request, roles: readonly string[]) {
+  const session = await getSession(request);
+  if (!session) return { response: NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 }) } as const;
+  if (!roles.includes(session.user.role.toLowerCase())) return { response: NextResponse.json({ error: 'You do not have permission to perform this action.' }, { status: 403 }) } as const;
+  return { session } as const;
 }
 
 export async function deleteSession(request: Request) {

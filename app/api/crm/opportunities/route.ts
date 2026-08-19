@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getSession } from '@/lib/auth';
+import { ACCESS, getSession, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
 
 const opportunitySchema = z.object({ name: z.string().trim().min(2).max(160), clientId: z.string().uuid().optional(), leadId: z.string().uuid().optional(), value: z.number().nonnegative().max(100000000).optional().default(0), expectedClose: z.string().date().optional(), notes: z.string().trim().max(500).optional().default('') });
@@ -19,8 +19,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: Request) {
   try {
-    const session = await getSession(request);
-    if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+    const auth = await requireRole(request, ACCESS.operations);
+    if ('response' in auth) return auth.response;
+    const { session } = auth;
     const body = opportunitySchema.parse(await request.json());
     const result = await query(
       `INSERT INTO opportunities (organization_id, name, client_id, lead_id, value, expected_close, notes, owner_id)

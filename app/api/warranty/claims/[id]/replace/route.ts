@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getSession } from '@/lib/auth';
+import { ACCESS, requireRole } from '@/lib/auth';
 import { withTransaction } from '@/lib/db';
 
 const replacementSchema = z.object({ replacementInventoryItemId: z.string().uuid(), reason: z.string().trim().min(3).max(500) });
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
-    const session = await getSession(request);
-    if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+    const auth = await requireRole(request, ACCESS.field);
+    if ('response' in auth) return auth.response;
+    const { session } = auth;
     const body = replacementSchema.parse(await request.json());
     const replacement = await withTransaction(async client => {
       const claimResult = await client.query(

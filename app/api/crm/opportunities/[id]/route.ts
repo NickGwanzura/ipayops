@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getSession } from '@/lib/auth';
+import { ACCESS, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
 
 const updateSchema = z.object({
@@ -14,8 +14,9 @@ const updateSchema = z.object({
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
-    const session = await getSession(request);
-    if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+    const auth = await requireRole(request, ACCESS.operations);
+    if ('response' in auth) return auth.response;
+    const { session } = auth;
     const body = updateSchema.parse(await request.json());
     const result = await query(
       `UPDATE opportunities SET

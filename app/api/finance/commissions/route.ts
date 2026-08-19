@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { ACCESS, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
-  const session = await getSession(request);
-  if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+  const auth = await requireRole(request, ACCESS.finance);
+  if ('response' in auth) return auth.response;
+  const { session } = auth;
   const result = await query(
     `SELECT ce.id, ce.sale_id, ce.consultant_id, ce.rate, ce.amount, ce.status, ce.created_at,
             s.number AS sale_number, s.total AS sale_total, c.name AS client_name, u.full_name AS consultant_name

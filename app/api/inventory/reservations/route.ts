@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { withTransaction } from '@/lib/db';
-import { getSession } from '@/lib/auth';
+import { ACCESS, getSession, requireRole } from '@/lib/auth';
 
 export async function GET(request: Request) {
   const session = await getSession(request);
@@ -25,8 +25,9 @@ const reservationSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const session = await getSession(request);
-    if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+    const auth = await requireRole(request, ACCESS.operations);
+    if ('response' in auth) return auth.response;
+    const { session } = auth;
     const body = reservationSchema.parse(await request.json());
     const reservation = await withTransaction(async client => {
       const itemResult = await client.query(

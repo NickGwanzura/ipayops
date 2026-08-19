@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { ACCESS, requireRole } from '@/lib/auth';
 import { withTransaction } from '@/lib/db';
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
-  const session = await getSession(request);
-  if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+  const auth = await requireRole(request, ACCESS.operations);
+  if ('response' in auth) return auth.response;
+  const { session } = auth;
   try {
     const released = await withTransaction(async client => {
       const result = await client.query(

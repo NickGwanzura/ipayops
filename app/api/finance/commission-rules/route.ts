@@ -1,21 +1,23 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getSession } from '@/lib/auth';
+import { ACCESS, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
 
 const ruleSchema = z.object({ name: z.string().trim().min(2).max(120), rate: z.number().min(0).max(100), triggerStatus: z.enum(['Confirmed', 'Delivered', 'Paid']).default('Confirmed') });
 
 export async function GET(request: Request) {
-  const session = await getSession(request);
-  if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+  const auth = await requireRole(request, ACCESS.finance);
+  if ('response' in auth) return auth.response;
+  const { session } = auth;
   const result = await query('SELECT id, name, rate, trigger_status, is_active, created_at FROM commission_rules WHERE organization_id = $1 ORDER BY is_active DESC, created_at DESC', [session.user.organizationId]);
   return NextResponse.json({ rules: result.rows });
 }
 
 export async function POST(request: Request) {
   try {
-    const session = await getSession(request);
-    if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+    const auth = await requireRole(request, ACCESS.finance);
+    if ('response' in auth) return auth.response;
+    const { session } = auth;
     const body = ruleSchema.parse(await request.json());
     const result = await query('INSERT INTO commission_rules (organization_id, name, rate, trigger_status, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, rate, trigger_status, is_active', [session.user.organizationId, body.name, body.rate, body.triggerStatus, session.user.id]);
     return NextResponse.json({ rule: result.rows[0] }, { status: 201 });

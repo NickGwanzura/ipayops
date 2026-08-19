@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getSession } from '@/lib/auth';
+import { ACCESS, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
 
 const targetSchema = z.object({ consultantId: z.string().uuid(), periodStart: z.string().date(), periodEnd: z.string().date(), targetAmount: z.number().nonnegative().max(100000000) });
 
 export async function GET(request: NextRequest) {
-  const session = await getSession(request);
-  if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+  const auth = await requireRole(request, ACCESS.finance);
+  if ('response' in auth) return auth.response;
+  const { session } = auth;
   const result = await query(
     `SELECT t.id, t.consultant_id, u.full_name AS consultant_name, t.period_start, t.period_end, t.target_amount,
             COALESCE((SELECT SUM(s.total) FROM sales s WHERE s.organization_id = t.organization_id AND s.consultant_id = t.consultant_id AND s.confirmed_at::date BETWEEN t.period_start AND t.period_end), 0) AS achieved
@@ -20,8 +21,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: Request) {
   try {
-    const session = await getSession(request);
-    if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+    const auth = await requireRole(request, ACCESS.finance);
+    if ('response' in auth) return auth.response;
+    const { session } = auth;
     const body = targetSchema.parse(await request.json());
     const consultant = await query('SELECT id FROM users WHERE id = $1 AND organization_id = $2 AND is_active = true', [body.consultantId, session.user.organizationId]);
     if (!consultant.rows[0]) return NextResponse.json({ error: 'Consultant not found.' }, { status: 404 });

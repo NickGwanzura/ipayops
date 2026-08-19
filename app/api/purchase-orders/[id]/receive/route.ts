@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
-import { getSession } from '@/lib/auth';
+import { ACCESS, requireRole } from '@/lib/auth';
 import { withTransaction } from '@/lib/db';
 
 const receiptSchema = z.object({
@@ -16,8 +16,9 @@ const receiptSchema = z.object({
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
-    const session = await getSession(request);
-    if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+    const auth = await requireRole(request, ACCESS.operations);
+    if ('response' in auth) return auth.response;
+    const { session } = auth;
     const body = receiptSchema.parse(await request.json());
     for (const item of body.items) {
       if (item.serialNumbers.length !== item.quantity) throw new Error('Each received unit requires one serial number.');

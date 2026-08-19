@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getSession } from '@/lib/auth';
+import { ACCESS, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
 
 const signoffSchema = z.object({ name: z.string().trim().min(2).max(160), notes: z.string().trim().max(500).optional().default('') });
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
-    const session = await getSession(request);
-    if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+    const auth = await requireRole(request, ACCESS.field);
+    if ('response' in auth) return auth.response;
+    const { session } = auth;
     const body = signoffSchema.parse(await request.json());
     const result = await query(
       `UPDATE job_cards SET status = 'Completed', signoff_name = $1, signoff_notes = $2, signed_at = now(), updated_at = now()
