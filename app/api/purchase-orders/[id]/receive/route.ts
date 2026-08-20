@@ -47,13 +47,26 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       );
       for (const item of body.items) {
         const itemResult = await client.query(
-          `SELECT poi.id, poi.supplier_product_id, poi.product_type, poi.serial_required, poi.sku, poi.description, poi.quantity, poi.received_quantity,
-                  COALESCE(sp.cost_price, poi.unit_cost) AS cost_price, COALESCE(sp.selling_price, 0) AS selling_price
-           FROM purchase_order_items poi LEFT JOIN supplier_products sp ON sp.id = poi.supplier_product_id
-           WHERE poi.id = $1 AND poi.purchase_order_id = $2 FOR UPDATE`,
+          `SELECT poi.id, poi.supplier_product_id, poi.product_type, poi.serial_required, poi.sku, poi.description, poi.quantity, poi.received_quantity, poi.unit_cost
+           FROM purchase_order_items poi
+           WHERE poi.id = $1 AND poi.purchase_order_id = $2
+           FOR UPDATE OF poi`,
           [item.purchaseOrderItemId, params.id],
         );
-        const orderItem = itemResult.rows[0];
+        const orderItemBase = itemResult.rows[0];
+        const supplierProduct = orderItemBase?.supplier_product_id
+          ? (await client.query(
+              `SELECT cost_price, selling_price
+               FROM supplier_products
+               WHERE id = $1 AND organization_id = $2`,
+              [orderItemBase.supplier_product_id, session.user.organizationId],
+            )).rows[0]
+          : null;
+        const orderItem = orderItemBase && {
+          ...orderItemBase,
+          cost_price: supplierProduct?.cost_price ?? orderItemBase.unit_cost,
+          selling_price: supplierProduct?.selling_price ?? 0,
+        };
         if (!orderItem) throw Object.assign(new Error('Purchase order line not found.'), { code: 'LINE_NOT_FOUND' });
         if (orderItem.received_quantity + item.quantity > orderItem.quantity) throw Object.assign(new Error('Receipt exceeds outstanding quantity.'), { code: 'OVER_RECEIPT' });
         await client.query(
