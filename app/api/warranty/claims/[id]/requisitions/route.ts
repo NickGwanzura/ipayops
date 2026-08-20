@@ -13,13 +13,13 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     if ('response' in auth) return auth.response;
     const { session } = auth;
     const body = requisitionSchema.parse(await request.json());
-    const claim = await query('SELECT id FROM warranty_claims WHERE id = $1 AND organization_id = $2', [params.id, session.user.organizationId]);
+    const claim = await query('SELECT id, inventory_item_id FROM warranty_claims WHERE id = $1 AND organization_id = $2', [params.id, session.user.organizationId]);
     if (!claim.rows[0]) return NextResponse.json({ error: 'Warranty claim not found.' }, { status: 404 });
     const number = `REQ-${new Date().getFullYear()}-${randomUUID().slice(0, 6).toUpperCase()}`;
     const result = await query(
-      `INSERT INTO repair_requisitions (organization_id, number, claim_id, description, estimated_cost, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, number, status, description, estimated_cost, created_at`,
-      [session.user.organizationId, number, params.id, body.description, body.estimatedCost, session.user.id],
+      `INSERT INTO repair_requisitions (organization_id, number, claim_id, inventory_item_id, description, estimated_cost, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, number, status, description, estimated_cost, inventory_item_id, created_at`,
+      [session.user.organizationId, number, params.id, claim.rows[0].inventory_item_id, body.description, body.estimatedCost, session.user.id],
     );
     await query(`UPDATE warranty_claims SET status = 'Repair', updated_at = now() WHERE id = $1`, [params.id]);
     return NextResponse.json({ requisition: result.rows[0] }, { status: 201 });
