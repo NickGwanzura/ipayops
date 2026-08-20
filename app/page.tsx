@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, Bell, Boxes, BriefcaseBusiness, ChevronDown, CircleDollarSign, ClipboardCheck, DatabaseBackup, FileText, Grid2X2, Laptop, LayoutDashboard, LockKeyhole, Menu, PackageCheck, Plus, RefreshCw, Search, Settings, ShieldCheck, ShoppingCart, Truck, Users, X, Zap } from 'lucide-react';
+import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, Bell, Boxes, BriefcaseBusiness, ChevronDown, CircleDollarSign, ClipboardCheck, DatabaseBackup, FileText, Grid2X2, Laptop, LayoutDashboard, LockKeyhole, LogOut, Menu, PackageCheck, Plus, RefreshCw, ScrollText, Search, Settings, ShieldCheck, ShoppingCart, Truck, UserRound, Users, X, Zap } from 'lucide-react';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { formatCurrency, formatOrganizationDate, useOrganizationSettings } from './organization-settings';
 import RoleDashboard from './role-dashboard';
@@ -10,7 +10,7 @@ import { canAccessConfiguration, canAccessModule, isLeadershipRole, modulesForRo
 import type { OpsModule } from '@/lib/ops-data';
 
 const moduleNav: Array<{ label: OpsModule; icon: React.ElementType }> = [
-  { label:'Sales & CRM', icon:BriefcaseBusiness }, { label:'Inventory', icon:Boxes }, { label:'Procurement', icon:ShoppingCart }, { label:'Job cards', icon:ClipboardCheck }, { label:'Warranty', icon:ShieldCheck }, { label:'Finance & HR', icon:Users }, { label:'Reports', icon:FileText },
+  { label:'Sales & CRM', icon:BriefcaseBusiness }, { label:'Inventory', icon:Boxes }, { label:'Procurement', icon:ShoppingCart }, { label:'Job cards', icon:ClipboardCheck }, { label:'Warranty', icon:ShieldCheck }, { label:'Finance & HR', icon:Users }, { label:'Reports', icon:FileText }, { label:'Audit Logs', icon:ScrollText },
 ];
 type User = { fullName: string; role: string };
 type DashboardData = {
@@ -63,7 +63,7 @@ export default function Home() {
       <div className="workspace-label">WORKSPACE</div><div className="workspace"><div className="workspace-dot">HZ</div><div><strong>Harare HQ</strong><span>All operations</span></div><ChevronDown size={15}/></div>
       <nav><button className={active==='Overview'?'nav-item active':'nav-item'} onClick={()=>{goToModule('Overview');setMenu(false);}}><LayoutDashboard size={17}/><span>Overview</span></button>{visibleNav.map(({label,icon:Icon}) => <button key={label} className={active===label?'nav-item active':'nav-item'} onClick={()=>{goToModule(label);setMenu(false);}}><Icon size={17}/><span>{label}</span></button>)}</nav>
       <div className="sidebar-spacer"/><div className="sidebar-section">{user && canAccessModule(user.role, 'Finance & HR') && <button className="nav-item" onClick={()=>goToModule('Finance & HR')}><Users size={17}/><span>People & HR</span></button>}{user && canAccessConfiguration(user.role) && <button className="nav-item" onClick={goToConfiguration}><Settings size={17}/><span>Configuration</span></button>}</div>
-      <div className="user-card"><button className="user-card-main" onClick={goToProfile} title="Open profile"><div className="avatar">{initials(displayName)}</div><div><strong>{displayName}</strong><span>{displayRole}</span></div></button><button className="user-signout" onClick={()=>void logout()} title="Sign out" aria-label="Sign out"><MoreDots/></button></div>
+      <div className="user-card"><button className="user-card-main" onClick={goToProfile} title="Open profile"><div className="avatar">{initials(displayName)}</div><div><strong>{displayName}</strong><span>{displayRole}</span></div></button><div className="user-card-actions"><button className="user-card-action" onClick={goToProfile}><UserRound size={14}/><span>Profile</span></button><button className="user-card-action danger" onClick={()=>void logout()}><LogOut size={14}/><span>Sign out</span></button></div></div>
     </aside>
     <main className="main"><header className="topbar"><button className="mobile-menu" onClick={()=>setMenu(true)} aria-label="Open navigation"><Menu size={21}/></button><div className="crumb"><span>Operations</span><span>/</span><strong>{active}</strong></div><div className="top-actions"><div className="search"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search anything..."/><kbd>⌘ K</kbd></div><button className="icon-btn" aria-label="Toggle theme" onClick={()=>setDark(!dark)}>{dark ? <Zap size={18}/> : <Grid2X2 size={18}/>}</button><button className="icon-btn notification" aria-label="Open approvals" onClick={()=>goToModule(approvalTarget)}><Bell size={18}/><i/></button><button className="top-avatar" onClick={goToProfile} aria-label="Open profile">{initials(displayName)}</button></div></header>
       <div className="content">{user && !isLeadershipRole(user.role) ? <RoleDashboard role={user.role} settings={settings} query={query} onNavigate={module => goToModule(module)}/> : <><div className="page-heading"><div><div className="eyebrow"><span className="live-dot"/> Live operations</div><h1>Good morning, {displayName.split(' ')[0]}</h1><p>Here’s what’s happening across iPayTech today.</p></div><div className="heading-actions"><button className="btn secondary" onClick={()=>goToModule('Reports')}><FileText size={16}/> Open reports</button>{canSell && <button className="btn primary" onClick={()=>goToModule('Sales & CRM')}><Plus size={17}/> New transaction</button>}</div></div>
@@ -74,8 +74,6 @@ export default function Home() {
   </div>
 }
 function Approval({icon:Icon,label,count,tone,onOpen}:{icon:React.ElementType;label:string;count:string;tone:string;onOpen:()=>void}) { return <button className="approval-row" onClick={onOpen}><span className={`approval-icon ${tone}`}><Icon size={15}/></span><span>{label}</span><b>{count}</b><ArrowUpRight size={14}/></button> }
-function MoreDots(){ return <span className="more-dots">•••</span> }
-
 type AuditLog = { id: string; action: string; entity_type?: string; entity_id?: string; metadata?: Record<string, unknown>; ip_address?: string; user_agent?: string; created_at: string; actor_id?: string; actor_name?: string; actor_email?: string };
 
 function CeoAuditOversight() {

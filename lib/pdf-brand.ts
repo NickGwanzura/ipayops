@@ -17,7 +17,7 @@ export async function embedIpaytechFonts(pdf: PDFDocument) {
   return { regular, semibold };
 }
 
-type VerifiableDocument = 'invoice' | 'delivery-note';
+export type VerifiableDocument = 'invoice' | 'delivery-note' | 'client-statement' | 'payment-receipt';
 
 function verificationSignature(type: VerifiableDocument, id: string, documentTimestamp: string, generatedAt: string) {
   const secret = process.env.AUTH_SECRET;

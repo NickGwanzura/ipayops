@@ -65,7 +65,7 @@ export default function ProfilePage() {
   return <div className={styles.shell}>
     <header className={styles.header}>
       <Link href="/" className={styles.brand}><Image className={styles.brandLogo} src="/iPaytechLogo.jpg" alt="iPayTech" width={170} height={71} priority /></Link>
-      <Link href="/" className={styles.back}><ArrowLeft size={14}/> Dashboard</Link>
+      <div className={styles.headerActions}><Link href="/" className={styles.back}><ArrowLeft size={14}/> Dashboard</Link><button className={styles.headerLogout} onClick={() => void logout()}><LogOut size={14}/> Sign out</button></div>
     </header>
     <main className={styles.main}>
       <div className={styles.title}><span className={styles.eyebrow}>Account settings</span><h1>Your profile</h1><p>Manage your workspace identity and account security.</p></div>

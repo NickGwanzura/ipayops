@@ -1,6 +1,7 @@
 import type { OpsModule } from './ops-data';
 
 export const ALL_OPS_MODULES: OpsModule[] = ['Procurement', 'Inventory', 'Sales & CRM', 'Job cards', 'Warranty', 'Finance & HR', 'Reports'];
+export const CEO_ONLY_MODULES: OpsModule[] = ['Audit Logs'];
 
 export const ROLE_LABELS = {
   ceo: 'CEO',
@@ -12,7 +13,7 @@ export const ROLE_LABELS = {
 export type BusinessRole = keyof typeof ROLE_LABELS;
 
 export const ROLE_MODULES: Record<BusinessRole, OpsModule[]> = {
-  ceo: ALL_OPS_MODULES,
+  ceo: [...ALL_OPS_MODULES, ...CEO_ONLY_MODULES],
   manager: ALL_OPS_MODULES,
   finance: ['Finance & HR', 'Reports'],
   sales_consultant: ['Sales & CRM', 'Job cards', 'Reports'],
