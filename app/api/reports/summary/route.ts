@@ -12,7 +12,32 @@ export async function GET(request: NextRequest) {
   const product = request.nextUrl.searchParams.get('product') || null;
   const [summary, periods] = await Promise.all([
     query(`SELECT COALESCE((SELECT SUM(s.total) FROM sales s WHERE s.organization_id = $1 AND s.confirmed_at::date BETWEEN $2::date AND $3::date AND ($4::text IS NULL OR EXISTS (SELECT 1 FROM sale_items si JOIN inventory_items ii ON ii.id = si.inventory_item_id WHERE si.sale_id = s.id AND ii.location = $4)) AND ($5::text IS NULL OR EXISTS (SELECT 1 FROM sale_items si WHERE si.sale_id = s.id AND si.sku = $5)), 0) AS revenue, COALESCE((SELECT COUNT(*) FROM inventory_items ii WHERE ii.organization_id = $1 AND ii.status IN ('Sold', 'Installed') AND ($4::text IS NULL OR ii.location = $4) AND ($5::text IS NULL OR ii.sku = $5)), 0)::int AS devices_delivered, COALESCE((SELECT COUNT(*) FROM job_cards j WHERE j.organization_id = $1 AND j.status = 'Completed' AND j.created_at::date BETWEEN $2::date AND $3::date AND ($4::text IS NULL OR EXISTS (SELECT 1 FROM job_card_items jci JOIN inventory_items ii ON ii.id = jci.inventory_item_id WHERE jci.job_card_id = j.id AND ii.location = $4)) AND ($5::text IS NULL OR EXISTS (SELECT 1 FROM job_card_items jci WHERE jci.job_card_id = j.id AND jci.inventory_item_id IN (SELECT id FROM inventory_items WHERE sku = $5)))), 0)::int AS jobs_completed, COALESCE((SELECT COUNT(*) FROM warranty_claims wc JOIN inventory_items ii ON ii.id = wc.inventory_item_id WHERE wc.organization_id = $1 AND wc.created_at::date BETWEEN $2::date AND $3::date AND ($4::text IS NULL OR ii.location = $4) AND ($5::text IS NULL OR ii.sku = $5)), 0)::int AS warranty_claims`, [session.user.organizationId, from, to, region, product]),
-    query(`SELECT to_char(date_trunc('week', s.confirmed_at), 'DD Mon') || '–' || to_char(date_trunc('week', s.confirmed_at) + interval '6 days', 'DD Mon') AS period, COALESCE(SUM(s.total), 0) AS revenue, COUNT(si.id)::int AS units, COALESCE((SELECT COUNT(*) FROM job_cards j WHERE j.organization_id = s.organization_id AND j.created_at::date BETWEEN date_trunc('week', s.confirmed_at)::date AND (date_trunc('week', s.confirmed_at) + interval '6 days')::date AND ($4::text IS NULL OR EXISTS (SELECT 1 FROM job_card_items jci JOIN inventory_items ii ON ii.id = jci.inventory_item_id WHERE jci.job_card_id = j.id AND ii.location = $4)) AND ($5::text IS NULL OR EXISTS (SELECT 1 FROM job_card_items jci JOIN inventory_items ii ON ii.id = jci.inventory_item_id WHERE jci.job_card_id = j.id AND ii.sku = $5))), 0)::int AS jobs FROM sales s LEFT JOIN sale_items si ON si.sale_id = s.id LEFT JOIN inventory_items ii ON ii.id = si.inventory_item_id WHERE s.organization_id = $1 AND s.confirmed_at::date BETWEEN $2::date AND $3::date AND ($4::text IS NULL OR ii.location = $4) AND ($5::text IS NULL OR si.sku = $5) GROUP BY s.organization_id, date_trunc('week', s.confirmed_at) ORDER BY date_trunc('week', s.confirmed_at) DESC LIMIT 20`, [session.user.organizationId, from, to, region, product]),
+    query(`WITH sales_periods AS (
+             SELECT s.organization_id,
+                    date_trunc('week', s.confirmed_at) AS week_start,
+                    COALESCE(SUM(s.total), 0) AS revenue,
+                    COUNT(si.id)::int AS units
+             FROM sales s
+             LEFT JOIN sale_items si ON si.sale_id = s.id
+             LEFT JOIN inventory_items ii ON ii.id = si.inventory_item_id
+             WHERE s.organization_id = $1
+               AND s.confirmed_at::date BETWEEN $2::date AND $3::date
+               AND ($4::text IS NULL OR ii.location = $4)
+               AND ($5::text IS NULL OR si.sku = $5)
+             GROUP BY s.organization_id, date_trunc('week', s.confirmed_at)
+           )
+           SELECT to_char(week_start, 'DD Mon') || '–' || to_char(week_start + interval '6 days', 'DD Mon') AS period,
+                  revenue,
+                  units,
+                  COALESCE((SELECT COUNT(*)
+                            FROM job_cards j
+                            WHERE j.organization_id = sales_periods.organization_id
+                              AND j.created_at::date BETWEEN week_start::date AND (week_start + interval '6 days')::date
+                              AND ($4::text IS NULL OR EXISTS (SELECT 1 FROM job_card_items jci JOIN inventory_items job_ii ON job_ii.id = jci.inventory_item_id WHERE jci.job_card_id = j.id AND job_ii.location = $4))
+                              AND ($5::text IS NULL OR EXISTS (SELECT 1 FROM job_card_items jci JOIN inventory_items job_ii ON job_ii.id = jci.inventory_item_id WHERE jci.job_card_id = j.id AND job_ii.sku = $5))), 0)::int AS jobs
+           FROM sales_periods
+           ORDER BY week_start DESC
+           LIMIT 20`, [session.user.organizationId, from, to, region, product]),
   ]);
   return NextResponse.json({ from, to, region, product, summary: summary.rows[0], periods: periods.rows });
 }
