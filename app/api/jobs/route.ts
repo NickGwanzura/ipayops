@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { ACCESS, requireRole } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/db';
+import { notifyOrganizationRoles, sendNotification } from '@/lib/notifications';
 
 const jobSchema = z.object({
   clientId: z.string().uuid(), saleId: z.string().uuid().optional(), title: z.string().trim().min(2).max(180),
@@ -65,6 +66,11 @@ export async function POST(request: Request) {
       }
       return result.rows[0];
     });
+    const installer = body.installerId ? await query<{ email: string; full_name: string }>('SELECT email, full_name FROM users WHERE id = $1 AND organization_id = $2', [body.installerId, session.user.organizationId]) : { rows: [] as Array<{ email: string; full_name: string }> };
+    void Promise.all([
+      installer.rows[0] ? sendNotification({ organizationId: session.user.organizationId, eventType: 'job.assigned', recipientEmail: installer.rows[0].email, recipientName: installer.rows[0].full_name, subject: `Job ${job.number} assigned`, eyebrow: 'Job cards', title: 'New job card assigned', summary: 'A new installation job card has been assigned to you.', fields: [{ label: 'Job', value: job.number }, { label: 'Title', value: job.title }, { label: 'Scheduled', value: job.scheduled_for ? new Date(job.scheduled_for).toLocaleString('en-GB') : 'Not scheduled' }], action: { label: 'Open job cards', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Job%20cards` } }) : Promise.resolve(),
+      notifyOrganizationRoles({ organizationId: session.user.organizationId, roles: ['ceo', 'manager'], excludeUserId: session.user.id, eventType: 'job.assigned', subject: `New job card ${job.number}`, eyebrow: 'Job-card oversight', title: 'New job card created', summary: `${session.user.fullName} created a new job card for installation tracking.`, fields: [{ label: 'Job', value: job.number }, { label: 'Title', value: job.title }, { label: 'Scheduled', value: job.scheduled_for ? new Date(job.scheduled_for).toLocaleString('en-GB') : 'Not scheduled' }], action: { label: 'Open job cards', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Job%20cards` } }),
+    ]);
     return NextResponse.json({ job }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: 'Client, title, and valid job details are required.' }, { status: 400 });

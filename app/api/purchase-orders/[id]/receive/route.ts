@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { ACCESS, requireRole } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/db';
-import { sendNotification } from '@/lib/notifications';
+import { notifyOrganizationRoles, sendNotification } from '@/lib/notifications';
 import { writeAuditLog } from '@/lib/audit';
 
 const receiptSchema = z.object({
@@ -101,6 +101,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       const creator = await query<{ email: string; full_name: string }>('SELECT email, full_name FROM users WHERE id = $1 AND organization_id = $2', [receipt.createdBy, session.user.organizationId]);
       if (creator.rows[0]) void sendNotification({ organizationId: session.user.organizationId, eventType: 'goods_receipt.posted', recipientEmail: creator.rows[0].email, recipientName: creator.rows[0].full_name, subject: `Goods receipt ${receipt.number} posted`, eyebrow: 'Serialized receiving', title: 'Goods receipt posted', summary: 'Serialized inventory has been received against your purchase order.', fields: [{ label: 'Receipt', value: receipt.number }, { label: 'Purchase order', value: receipt.orderNumber }, { label: 'Serial units', value: String(serials.length) }], action: { label: 'Open inventory', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Inventory` } });
     }
+    void notifyOrganizationRoles({ organizationId: session.user.organizationId, roles: ['ceo', 'manager', 'finance'], excludeUserId: session.user.id, eventType: 'goods_receipt.posted', subject: `Goods receipt ${receipt.number} posted`, eyebrow: 'Inventory oversight', title: 'Serialized stock received', summary: 'A goods receipt has added serialized stock to the organization inventory.', fields: [{ label: 'Receipt', value: receipt.number }, { label: 'Purchase order', value: receipt.orderNumber }, { label: 'Serial units', value: String(serials.length) }], action: { label: 'Open inventory', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Inventory` } });
     return NextResponse.json({ receipt }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError || ['Each received unit requires one serial number.', 'Serial numbers must be unique within a receipt.'].includes((error as Error).message)) return NextResponse.json({ error: 'Receipt lines and one unique serial number per unit are required.' }, { status: 400 });

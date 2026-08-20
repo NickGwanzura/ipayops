@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { ACCESS, requireRole } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/db';
+import { notifyOrganizationRoles, sendNotification } from '@/lib/notifications';
 
 const quotationSchema = z.object({
   clientId: z.string().uuid(), opportunityId: z.string().uuid().optional(), validUntil: z.string().date().optional(),
@@ -57,6 +58,10 @@ export async function POST(request: Request) {
       for (const item of resolvedItems) await client.query('INSERT INTO quotation_items (quotation_id, supplier_product_id, product_type, sku, description, quantity, unit_price) VALUES ($1, $2, $3, $4, $5, $6, $7)', [header.rows[0].id, item.productId, item.productType, item.sku, item.description, item.quantity, item.unitPrice]);
       return header.rows[0];
     });
+    void Promise.all([
+      sendNotification({ organizationId: session.user.organizationId, eventType: 'quotation.created', recipientEmail: session.user.email, recipientName: session.user.fullName, subject: `Pre-sale quotation ${quotation.number} created`, eyebrow: 'Sales & CRM', title: 'New pre-sale quotation', summary: 'A quotation has been created and is ready for customer follow-up.', fields: [{ label: 'Quotation', value: quotation.number }, { label: 'Total', value: String(quotation.total) }, { label: 'Status', value: quotation.status }], action: { label: 'Open Sales & CRM', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Sales%20%26%20CRM` } }),
+      notifyOrganizationRoles({ organizationId: session.user.organizationId, roles: ['ceo', 'manager'], excludeUserId: session.user.id, eventType: 'quotation.created', subject: `Pre-sale quotation ${quotation.number} created`, eyebrow: 'Pre-sales oversight', title: 'New quotation requires follow-up', summary: `${session.user.fullName} created a new customer quotation.`, fields: [{ label: 'Quotation', value: quotation.number }, { label: 'Total', value: String(quotation.total) }], action: { label: 'Open Sales & CRM', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Sales%20%26%20CRM` } }),
+    ]);
     return NextResponse.json({ quotation }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: 'Client and at least one valid quotation line are required.' }, { status: 400 });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { ACCESS, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
+import { notifyOrganizationRoles, sendNotification } from '@/lib/notifications';
 
 const leadSchema = z.object({ name: z.string().trim().min(2).max(160), clientId: z.string().uuid().optional(), source: z.string().trim().max(100).optional().default(''), notes: z.string().trim().max(500).optional().default('') });
 
@@ -35,6 +36,11 @@ export async function POST(request: Request) {
        RETURNING id, name, client_id, source, status, notes, created_at`,
       [session.user.organizationId, body.name, body.clientId || null, body.source, body.notes, session.user.id],
     );
+    const lead = result.rows[0];
+    void Promise.all([
+      sendNotification({ organizationId: session.user.organizationId, eventType: 'lead.created', recipientEmail: session.user.email, recipientName: session.user.fullName, subject: `New pre-sale lead: ${lead.name}`, eyebrow: 'Sales & CRM', title: 'New pre-sale lead', summary: 'A new lead has been added to the pre-sales workflow.', fields: [{ label: 'Lead', value: lead.name }, { label: 'Source', value: lead.source || 'Not specified' }, { label: 'Owner', value: session.user.fullName }], action: { label: 'Open Sales & CRM', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Sales%20%26%20CRM` } }),
+      notifyOrganizationRoles({ organizationId: session.user.organizationId, roles: ['ceo', 'manager'], excludeUserId: session.user.id, eventType: 'lead.created', subject: `New pre-sale lead: ${lead.name}`, eyebrow: 'Pre-sales oversight', title: 'New lead requires follow-up', summary: `${session.user.fullName} added a new lead to the pre-sales pipeline.`, fields: [{ label: 'Lead', value: lead.name }, { label: 'Source', value: lead.source || 'Not specified' }], action: { label: 'Open Sales & CRM', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Sales%20%26%20CRM` } }),
+    ]);
     return NextResponse.json({ lead: result.rows[0] }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: 'Lead name and valid details are required.' }, { status: 400 });

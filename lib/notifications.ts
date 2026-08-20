@@ -10,6 +10,9 @@ export type NotificationEvent =
   | 'invoice.overdue'
   | 'quotation.created'
   | 'quotation.converted'
+  | 'lead.created'
+  | 'opportunity.created'
+  | 'inventory.received'
   | 'shipment.status_changed'
   | 'job.assigned'
   | 'job.completed'
@@ -22,6 +25,8 @@ export type NotificationEvent =
   | 'purchase_order.submitted'
   | 'purchase_order.approved'
   | 'goods_receipt.posted'
+  | 'commission.created'
+  | 'commission.run'
   | 'repair_requisition.submitted'
   | 'expense.asset_linked';
 
