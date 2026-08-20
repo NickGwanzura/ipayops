@@ -8,3 +8,9 @@ README.md
 !.env.example
 coverage
 tmp
+uploads
+Reacher.S04E04.720p.x264-FENiX
+.DS_Store
+*.mp4
+*.mkv
+*.avi

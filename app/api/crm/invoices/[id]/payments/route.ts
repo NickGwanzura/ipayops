@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { ACCESS, getSession, requireRole } from '@/lib/auth';
+import { ACCESS, requireRole } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/db';
 
 const paymentSchema = z.object({
@@ -9,9 +9,11 @@ const paymentSchema = z.object({
   reference: z.string().trim().max(120).optional().default(''),
 });
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getSession(request);
-  if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const auth = await requireRole(request, ACCESS.financeRead);
+  if ('response' in auth) return auth.response;
+  const { session } = auth;
   const result = await query(
     `SELECT p.id, p.amount, p.method, p.reference, p.paid_at, u.full_name AS recorded_by
      FROM invoice_payments p LEFT JOIN users u ON u.id = p.created_by
@@ -21,7 +23,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   return NextResponse.json({ payments: result.rows });
 }
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const auth = await requireRole(request, ACCESS.finance);
     if ('response' in auth) return auth.response;

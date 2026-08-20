@@ -5,9 +5,10 @@ import { query } from '@/lib/db';
 
 const signoffSchema = z.object({ name: z.string().trim().min(2).max(160), notes: z.string().trim().max(500).optional().default('') });
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
-    const auth = await requireRole(request, ACCESS.field);
+    const auth = await requireRole(request, ACCESS.jobWrite);
     if ('response' in auth) return auth.response;
     const { session } = auth;
     const body = signoffSchema.parse(await request.json());

@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { ACCESS, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    const session = await getSession(request);
-    if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+    const auth = await requireRole(request, ACCESS.leadership);
+    if ('response' in auth) return auth.response;
+    const { session } = auth;
 
     const organizationId = session.user.organizationId;
     const [summary, performance, activity, stockByCategory, approvals] = await Promise.all([

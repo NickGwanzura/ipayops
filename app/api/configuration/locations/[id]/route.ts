@@ -5,7 +5,8 @@ import { query } from '@/lib/db';
 
 const locationSchema = z.object({ name: z.string().trim().min(2).max(120), address: z.string().trim().max(240).optional().default(''), isActive: z.boolean() });
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const auth = await requireRole(request, ACCESS.leadership);
   if ('response' in auth) return auth.response;
   const { session } = auth;

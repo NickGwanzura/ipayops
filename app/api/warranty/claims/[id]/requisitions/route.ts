@@ -6,9 +6,10 @@ import { query } from '@/lib/db';
 
 const requisitionSchema = z.object({ description: z.string().trim().min(3).max(300), estimatedCost: z.number().nonnegative().max(100000000) });
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
-    const auth = await requireRole(request, ACCESS.field);
+    const auth = await requireRole(request, ACCESS.serviceRead);
     if ('response' in auth) return auth.response;
     const { session } = auth;
     const body = requisitionSchema.parse(await request.json());

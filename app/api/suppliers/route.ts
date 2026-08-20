@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { ACCESS, getSession, requireRole } from '@/lib/auth';
+import { ACCESS, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
 
 const supplierSchema = z.object({
@@ -13,8 +13,9 @@ const supplierSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const session = await getSession(request);
-  if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+  const auth = await requireRole(request, ACCESS.operations);
+  if ('response' in auth) return auth.response;
+  const { session } = auth;
   const search = request.nextUrl.searchParams.get('q')?.trim().toLowerCase() || '';
   const result = await query(
     `SELECT id, code, name, contact_name, phone, payment_terms, lead_time_days, status, created_at, updated_at

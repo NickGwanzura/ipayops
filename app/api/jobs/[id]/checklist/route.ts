@@ -5,9 +5,10 @@ import { query } from '@/lib/db';
 
 const checklistSchema = z.object({ items: z.array(z.object({ inventoryItemId: z.string().uuid(), checklist: z.array(z.object({ label: z.string().trim().min(1).max(200), done: z.boolean() })).max(50) })).min(1) });
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
-    const auth = await requireRole(request, ACCESS.field);
+    const auth = await requireRole(request, ACCESS.jobWrite);
     if ('response' in auth) return auth.response;
     const { session } = auth;
     const body = checklistSchema.parse(await request.json());

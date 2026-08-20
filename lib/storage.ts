@@ -1,3 +1,4 @@
+import { createReadStream } from 'node:fs';
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 let client: S3Client | undefined;
@@ -35,6 +36,18 @@ export async function putStorageObject(key: string, body: Uint8Array, contentTyp
   if (!usesS3()) return;
   const values = config();
   await getClient().send(new PutObjectCommand({ Bucket: values.bucket, Key: key, Body: body, ContentType: contentType }));
+}
+
+export async function putStorageFile(key: string, filePath: string, contentType: string, metadata: Record<string, string> = {}) {
+  if (!usesS3()) return;
+  const values = config();
+  await getClient().send(new PutObjectCommand({
+    Bucket: values.bucket,
+    Key: key,
+    Body: createReadStream(filePath),
+    ContentType: contentType,
+    Metadata: metadata,
+  }));
 }
 
 export async function getStorageObject(key: string) {

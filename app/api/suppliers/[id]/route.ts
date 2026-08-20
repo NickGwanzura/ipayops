@@ -12,7 +12,8 @@ const updateSchema = z.object({
   status: z.enum(['Active', 'Inactive', 'Blocked']).optional(),
 });
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const auth = await requireRole(request, ACCESS.operations);
     if ('response' in auth) return auth.response;
@@ -33,7 +34,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const auth = await requireRole(request, ACCESS.operations);
   if ('response' in auth) return auth.response;
   const result = await query(`UPDATE suppliers SET status = 'Inactive', updated_at = now() WHERE id = $1 AND organization_id = $2 RETURNING id, status`, [params.id, auth.session.user.organizationId]);

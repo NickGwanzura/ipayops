@@ -6,7 +6,7 @@ import { query } from '@/lib/db';
 const targetSchema = z.object({ consultantId: z.string().uuid(), periodStart: z.string().date(), periodEnd: z.string().date(), targetAmount: z.number().nonnegative().max(100000000) });
 
 export async function GET(request: NextRequest) {
-  const auth = await requireRole(request, ACCESS.finance);
+  const auth = await requireRole(request, ACCESS.financeSettings);
   if ('response' in auth) return auth.response;
   const { session } = auth;
   const result = await query(
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireRole(request, ACCESS.finance);
+    const auth = await requireRole(request, ACCESS.financeSettings);
     if ('response' in auth) return auth.response;
     const { session } = auth;
     const body = targetSchema.parse(await request.json());

@@ -2,12 +2,15 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, Bell, Boxes, BriefcaseBusiness, ChevronDown, CircleDollarSign, ClipboardCheck, FileText, Grid2X2, Laptop, LayoutDashboard, Menu, PackageCheck, Plus, Search, Settings, ShieldCheck, ShoppingCart, Truck, Users, X, Zap } from 'lucide-react';
+import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, Bell, Boxes, BriefcaseBusiness, ChevronDown, CircleDollarSign, ClipboardCheck, DatabaseBackup, FileText, Grid2X2, Laptop, LayoutDashboard, LockKeyhole, Menu, PackageCheck, Plus, RefreshCw, Search, Settings, ShieldCheck, ShoppingCart, Truck, Users, X, Zap } from 'lucide-react';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { formatCurrency, formatOrganizationDate, useOrganizationSettings } from './organization-settings';
+import RoleDashboard from './role-dashboard';
+import { canAccessConfiguration, canAccessModule, isLeadershipRole, modulesForRole, roleLabel } from '@/lib/rbac';
+import type { OpsModule } from '@/lib/ops-data';
 
-const nav = [
-  { label:'Overview', icon:LayoutDashboard }, { label:'Sales & CRM', icon:BriefcaseBusiness }, { label:'Inventory', icon:Boxes }, { label:'Procurement', icon:ShoppingCart }, { label:'Job cards', icon:ClipboardCheck }, { label:'Warranty', icon:ShieldCheck }, { label:'Reports', icon:FileText },
+const moduleNav: Array<{ label: OpsModule; icon: React.ElementType }> = [
+  { label:'Sales & CRM', icon:BriefcaseBusiness }, { label:'Inventory', icon:Boxes }, { label:'Procurement', icon:ShoppingCart }, { label:'Job cards', icon:ClipboardCheck }, { label:'Warranty', icon:ShieldCheck }, { label:'Finance & HR', icon:Users }, { label:'Reports', icon:FileText },
 ];
 type User = { fullName: string; role: string };
 type DashboardData = {
@@ -41,31 +44,117 @@ export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [dashboard, setDashboard] = useState<DashboardData>(emptyDashboard);
   const settings = useOrganizationSettings();
+  const visibleNav = useMemo(() => user ? moduleNav.filter(item => modulesForRole(user.role).includes(item.label)) : [], [user]);
   const filtered = useMemo(() => dashboard.activity.filter(a => `${a.event} ${a.detail} ${a.status}`.toLowerCase().includes(query.toLowerCase())), [dashboard.activity, query]);
   const notify = (message:string) => { setToast(message); setTimeout(() => setToast(''), 2800); };
   useEffect(() => { void fetch('/api/auth/me', { cache: 'no-store' }).then(async response => { if (!response.ok) { window.location.href = '/login'; return; } const data = await response.json(); setUser(data.user); }).catch(() => { window.location.href = '/login'; }); }, []);
-  useEffect(() => { void fetch('/api/dashboard/summary', { cache: 'no-store' }).then(async response => { const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Live dashboard data is unavailable.'); setDashboard(data); }).catch(error => notify(error instanceof Error ? error.message : 'Live dashboard data is unavailable.')); }, []);
+  useEffect(() => { if (!user || !isLeadershipRole(user.role)) return; void fetch('/api/dashboard/summary', { cache: 'no-store' }).then(async response => { const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Live dashboard data is unavailable.'); setDashboard(data); }).catch(error => notify(error instanceof Error ? error.message : 'Live dashboard data is unavailable.')); }, [user]);
   const logout = async () => { try { await fetch('/api/auth/logout', { method: 'POST' }); } finally { window.location.href = '/login'; } };
-  const goToModule = (label:string) => { if (label !== 'Overview') { window.location.href = `/operations?module=${encodeURIComponent(label)}`; return; } setActive(label); };
+  const goToModule = (label:string) => { if (label !== 'Overview' && user && !canAccessModule(user.role, label as OpsModule)) return; if (label !== 'Overview') { window.location.href = `/operations?module=${encodeURIComponent(label)}`; return; } setActive(label); };
   const goToProfile = () => { window.location.href = '/profile'; };
   const goToConfiguration = () => { window.location.href = '/configuration'; };
   const displayName = user?.fullName || 'Loading workspace';
-  const displayRole = user?.role || 'Authenticated user';
+  const displayRole = user ? roleLabel(user.role) : 'Authenticated user';
+  const canSell = Boolean(user && canAccessModule(user.role, 'Sales & CRM'));
+  const approvalTarget = user && canAccessModule(user.role, 'Finance & HR') ? 'Finance & HR' : 'Reports';
   return <div className={dark ? 'shell dark' : 'shell'}>
     <aside className={menu ? 'sidebar open' : 'sidebar'}>
       <div className="brand"><Image className="brand-logo" src="/iPaytechLogo.jpg" alt="iPayTech" width={150} height={63} priority/><button className="mobile-close" onClick={()=>setMenu(false)}><X size={19}/></button></div>
       <div className="workspace-label">WORKSPACE</div><div className="workspace"><div className="workspace-dot">HZ</div><div><strong>Harare HQ</strong><span>All operations</span></div><ChevronDown size={15}/></div>
-      <nav>{nav.map(({label,icon:Icon}) => <button key={label} className={active===label?'nav-item active':'nav-item'} onClick={()=>{goToModule(label);setMenu(false);}}><Icon size={17}/><span>{label}</span></button>)}</nav>
-      <div className="sidebar-spacer"/><div className="sidebar-section"><button className="nav-item" onClick={()=>goToModule('Finance & HR')}><Users size={17}/><span>People & HR</span></button><button className="nav-item" onClick={goToConfiguration}><Settings size={17}/><span>Configuration</span></button></div>
+      <nav><button className={active==='Overview'?'nav-item active':'nav-item'} onClick={()=>{goToModule('Overview');setMenu(false);}}><LayoutDashboard size={17}/><span>Overview</span></button>{visibleNav.map(({label,icon:Icon}) => <button key={label} className={active===label?'nav-item active':'nav-item'} onClick={()=>{goToModule(label);setMenu(false);}}><Icon size={17}/><span>{label}</span></button>)}</nav>
+      <div className="sidebar-spacer"/><div className="sidebar-section">{user && canAccessModule(user.role, 'Finance & HR') && <button className="nav-item" onClick={()=>goToModule('Finance & HR')}><Users size={17}/><span>People & HR</span></button>}{user && canAccessConfiguration(user.role) && <button className="nav-item" onClick={goToConfiguration}><Settings size={17}/><span>Configuration</span></button>}</div>
       <div className="user-card"><button className="user-card-main" onClick={goToProfile} title="Open profile"><div className="avatar">{initials(displayName)}</div><div><strong>{displayName}</strong><span>{displayRole}</span></div></button><button className="user-signout" onClick={()=>void logout()} title="Sign out" aria-label="Sign out"><MoreDots/></button></div>
     </aside>
-    <main className="main"><header className="topbar"><button className="mobile-menu" onClick={()=>setMenu(true)} aria-label="Open navigation"><Menu size={21}/></button><div className="crumb"><span>Operations</span><span>/</span><strong>{active}</strong></div><div className="top-actions"><div className="search"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search anything..."/><kbd>⌘ K</kbd></div><button className="icon-btn" aria-label="Toggle theme" onClick={()=>setDark(!dark)}>{dark ? <Zap size={18}/> : <Grid2X2 size={18}/>}</button><button className="icon-btn notification" aria-label="Open approvals" onClick={()=>goToModule('Finance & HR')}><Bell size={18}/><i/></button><button className="top-avatar" onClick={goToProfile} aria-label="Open profile">{initials(displayName)}</button></div></header>
-      <div className="content"><div className="page-heading"><div><div className="eyebrow"><span className="live-dot"/> Live operations</div><h1>Good morning, {displayName.split(' ')[0]}</h1><p>Here’s what’s happening across iPayTech today.</p></div><div className="heading-actions"><button className="btn secondary" onClick={()=>goToModule('Reports')}><FileText size={16}/> Open reports</button><button className="btn primary" onClick={()=>goToModule('Sales & CRM')}><Plus size={17}/> New transaction</button></div></div>
+    <main className="main"><header className="topbar"><button className="mobile-menu" onClick={()=>setMenu(true)} aria-label="Open navigation"><Menu size={21}/></button><div className="crumb"><span>Operations</span><span>/</span><strong>{active}</strong></div><div className="top-actions"><div className="search"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search anything..."/><kbd>⌘ K</kbd></div><button className="icon-btn" aria-label="Toggle theme" onClick={()=>setDark(!dark)}>{dark ? <Zap size={18}/> : <Grid2X2 size={18}/>}</button><button className="icon-btn notification" aria-label="Open approvals" onClick={()=>goToModule(approvalTarget)}><Bell size={18}/><i/></button><button className="top-avatar" onClick={goToProfile} aria-label="Open profile">{initials(displayName)}</button></div></header>
+      <div className="content">{user && !isLeadershipRole(user.role) ? <RoleDashboard role={user.role} settings={settings} query={query} onNavigate={module => goToModule(module)}/> : <><div className="page-heading"><div><div className="eyebrow"><span className="live-dot"/> Live operations</div><h1>Good morning, {displayName.split(' ')[0]}</h1><p>Here’s what’s happening across iPayTech today.</p></div><div className="heading-actions"><button className="btn secondary" onClick={()=>goToModule('Reports')}><FileText size={16}/> Open reports</button>{canSell && <button className="btn primary" onClick={()=>goToModule('Sales & CRM')}><Plus size={17}/> New transaction</button>}</div></div>
         <div className="stats-grid"><StatCard label="Revenue this month" value={formatCurrency(dashboard.summary.revenue, settings.currency, 0)} change="Live" note="Confirmed sales · current month" icon={CircleDollarSign}/><StatCard label="Confirmed sales" value={String(dashboard.summary.confirmed_sales)} change="Live" note="Database-backed transactions" icon={Activity} tone="green"/><StatCard label="Units in stock" value={String(dashboard.summary.units_in_stock)} change="Live" note="Available and reserved inventory" icon={Boxes} tone="amber"/><StatCard label="Open job cards" value={String(dashboard.summary.open_jobs)} change="Live" note="Scheduled and in progress" icon={ClipboardCheck} tone="purple"/></div>
         <div className="grid-main"><section className="panel performance"><div className="panel-header"><div><h2>Performance overview</h2><p>Live revenue and stock receipts over the last 30 days</p></div><button className="select" onClick={()=>goToModule('Reports')}>Open reports <ChevronDown size={14}/></button></div><div className="legend"><span><i className="legend-blue"/>Revenue</span><span><i className="legend-slate"/>Stock receipts</span></div><div className="chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={dashboard.performance}><defs><linearGradient id="blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2f7cf6" stopOpacity={.22}/><stop offset="100%" stopColor="#2f7cf6" stopOpacity={0}/></linearGradient></defs><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8edf5"/><XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fontSize:11,fill:'#8a97aa'}}/><YAxis axisLine={false} tickLine={false} tick={{fontSize:11,fill:'#8a97aa'}}/><Tooltip/><Area type="monotone" dataKey="sales" stroke="#2f7cf6" strokeWidth={2.5} fill="url(#blue)"/><Area type="monotone" dataKey="stock" stroke="#9aa8bd" strokeWidth={1.5} fill="transparent"/></AreaChart></ResponsiveContainer></div></section><section className="panel approvals"><div className="panel-header"><div><h2>Approval inbox</h2><p>Live items requiring attention</p></div><button className="text-btn" onClick={()=>goToModule('Finance & HR')}>Open finance <ArrowUpRight size={14}/></button></div><div className="approval-total"><strong>{String(dashboard.approvals.total).padStart(2, '0')}</strong><span>pending approvals</span><div className="approval-bars"><i/><i/><i/><i/><i/><i/></div></div><div className="approval-list"><Approval icon={ShoppingCart} label="Purchase orders" count={String(dashboard.approvals.purchase_orders).padStart(2, '0')} tone="blue" onOpen={()=>goToModule('Procurement')}/><Approval icon={CircleDollarSign} label="Expenses" count={String(dashboard.approvals.expenses).padStart(2, '0')} tone="amber" onOpen={()=>goToModule('Finance & HR')}/><Approval icon={ShieldCheck} label="Warranty exceptions" count={String(dashboard.approvals.warranty_exceptions).padStart(2, '0')} tone="red" onOpen={()=>goToModule('Warranty')}/><Approval icon={PackageCheck} label="Active reservations" count={String(dashboard.approvals.stock_adjustments).padStart(2, '0')} tone="green" onOpen={()=>goToModule('Inventory')}/></div></section></div>
-        <div className="grid-bottom"><section className="panel table-panel"><div className="panel-header"><div><h2>Recent activity</h2><p>Latest events from the database</p></div><button className="text-btn" onClick={()=>goToModule('Reports')}>Open reports <ArrowUpRight size={14}/></button></div><div className="activity-table"><div className="table-head"><span>EVENT</span><span>DETAIL</span><span>STATUS</span><span>WHEN</span></div>{filtered.length ? filtered.map((a,i)=><div className="table-row" key={`${a.event}-${a.occurred_at}`}><span className="event-cell"><span className={`event-icon e${i % 4}`}><Activity size={14}/></span><strong>{a.event}</strong></span><span>{a.detail}</span><span><em className={`pill p${i % 4}`}>{a.status}</em></span><span className="muted">{formatWhen(a.occurred_at, settings)}</span></div>) : <div className="empty">No matching activity found.</div>}</div></section><section className="panel stock-panel"><div className="panel-header"><div><h2>Stock by category</h2><p>Current available inventory</p></div><button className="text-btn" onClick={()=>goToModule('Inventory')}>View stock <ArrowUpRight size={14}/></button></div><div className="stock-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={dashboard.stockByCategory} layout="vertical" margin={{left:0,right:20}}><XAxis type="number" hide/><YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{fontSize:12,fill:'#68768c'}} width={58}/><Tooltip cursor={{fill:'transparent'}}/><Bar dataKey="value" fill="#2f7cf6" radius={[0,4,4,0]} barSize={14}/></BarChart></ResponsiveContainer></div><div className="stock-foot"><span><i className="dot blue"/> Available <strong>{dashboard.summary.units_in_stock}</strong></span><span><i className="dot amber"/> Reserved <strong>{dashboard.approvals.stock_adjustments}</strong></span></div></section></div>
-      </div></main>{toast && <div className="toast"><span className="toast-check">✓</span>{toast}</div>}
+        <div className="grid-bottom"><section className="panel table-panel"><div className="panel-header"><div><h2>Recent activity</h2><p>Latest events from the database</p></div><button className="text-btn" onClick={()=>goToModule('Reports')}>Open reports <ArrowUpRight size={14}/></button></div><div className="activity-table"><div className="table-head"><span>EVENT</span><span>DETAIL</span><span>STATUS</span><span>WHEN</span></div>{filtered.length ? filtered.map((a,i)=><div className="table-row" key={`${a.event}-${a.occurred_at}`}><span className="event-cell"><span className={`event-icon e${i % 4}`}><Activity size={14}/></span><strong>{a.event}</strong></span><span>{a.detail}</span><span><em className={`pill p${i % 4}`}>{a.status}</em></span><span className="muted">{formatWhen(a.occurred_at, settings)}</span></div>) : <div className="empty">No matching activity found.</div>}</div></section><section className="panel stock-panel"><div className="panel-header"><div><h2>Stock by category</h2><p>Current available inventory</p></div><button className="text-btn" onClick={()=>goToModule('Inventory')}>View stock <ArrowUpRight size={14}/></button></div><div className="stock-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={dashboard.stockByCategory} layout="vertical" margin={{left:0,right:20}}><XAxis type="number" hide/><YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{fontSize:12,fill:'#68768c'}} width={58}/><Tooltip cursor={{fill:'transparent'}}/><Bar dataKey="value" fill="#2f7cf6" radius={[0,4,4,0]} barSize={14}/></BarChart></ResponsiveContainer></div><div className="stock-foot"><span><i className="dot blue"/> Available <strong>{dashboard.summary.units_in_stock}</strong></span><span><i className="dot amber"/> Reserved <strong>{dashboard.approvals.stock_adjustments}</strong></span></div></section></div><CeoAuditOversight />
+        <CeoBackupOversight /></>}</div></main>{toast && <div className="toast"><span className="toast-check">✓</span>{toast}</div>}
   </div>
 }
 function Approval({icon:Icon,label,count,tone,onOpen}:{icon:React.ElementType;label:string;count:string;tone:string;onOpen:()=>void}) { return <button className="approval-row" onClick={onOpen}><span className={`approval-icon ${tone}`}><Icon size={15}/></span><span>{label}</span><b>{count}</b><ArrowUpRight size={14}/></button> }
 function MoreDots(){ return <span className="more-dots">•••</span> }
+
+type AuditLog = { id: string; action: string; entity_type?: string; entity_id?: string; metadata?: Record<string, unknown>; ip_address?: string; user_agent?: string; created_at: string; actor_id?: string; actor_name?: string; actor_email?: string };
+
+function CeoAuditOversight() {
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [search, setSearch] = useState('');
+  const [action, setAction] = useState('');
+  const [entityType, setEntityType] = useState('');
+  const [selected, setSelected] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const actions = useMemo(() => Array.from(new Set(logs.map(log => log.action))).sort(), [logs]);
+  const entityTypes = useMemo(() => Array.from(new Set(logs.map(log => log.entity_type).filter(Boolean))).sort() as string[], [logs]);
+
+  useEffect(() => {
+    let active = true;
+    const params = new URLSearchParams({ limit: '100' });
+    if (search.trim()) params.set('search', search.trim());
+    if (action) params.set('action', action);
+    if (entityType) params.set('entityType', entityType);
+    setLoading(true); setError('');
+    void fetch(`/api/audit-logs?${params.toString()}`, { cache: 'no-store' }).then(async response => { const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Unable to load audit oversight.'); if (active) setLogs(data.auditLogs || []); }).catch(loadError => { if (active) setError(loadError instanceof Error ? loadError.message : 'Unable to load audit oversight.'); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [action, entityType, search]);
+
+  return <section className="panel audit-oversight"><div className="panel-header"><div><h2><ShieldCheck size={16}/> CEO audit oversight</h2><p>Drill into organization-wide actions, actors, metadata, and access context.</p></div><span className="audit-scope">CEO only</span></div><div className="audit-filters"><label><span>Search</span><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Action, actor, entity, or metadata"/></label><label><span>Action</span><select value={action} onChange={event => setAction(event.target.value)}><option value="">All actions</option>{actions.map(item => <option key={item}>{item}</option>)}</select></label><label><span>Entity</span><select value={entityType} onChange={event => setEntityType(event.target.value)}><option value="">All entities</option>{entityTypes.map(item => <option key={item}>{item}</option>)}</select></label><button className="btn secondary audit-refresh" onClick={() => { setAction(''); setEntityType(''); setSearch(''); }}>Clear filters</button></div>{error && <p className="workflow-error" role="alert">{error}</p>}{loading ? <div className="empty">Loading audit records…</div> : <div className="audit-list">{logs.map(log => <div className={selected === log.id ? 'audit-record selected' : 'audit-record'} key={log.id}><button className="audit-record-main" onClick={() => setSelected(selected === log.id ? null : log.id)}><span className="audit-action"><ShieldCheck size={14}/><strong>{log.action}</strong></span><span>{log.actor_name || 'System'}<small>{log.actor_email || 'System event'}</small></span><span>{log.entity_type || 'system'}<small>{log.entity_id || 'No entity ID'}</small></span><span>{new Date(log.created_at).toLocaleString('en-GB')}</span><ArrowDownRight size={14}/></button>{selected === log.id && <div className="audit-detail"><div><strong>Actor</strong><span>{log.actor_name || 'System'} · {log.actor_email || '—'}</span></div><div><strong>IP address</strong><span>{log.ip_address || 'Not recorded'}</span></div><div><strong>User agent</strong><span>{log.user_agent || 'Not recorded'}</span></div><div><strong>Metadata</strong><pre>{JSON.stringify(log.metadata || {}, null, 2)}</pre></div></div>}</div>)}{!logs.length && <div className="empty">No audit records match these filters.</div>}</div>}</section>;
+}
+
+type BackupRun = { id: string; status: 'pending' | 'running' | 'completed' | 'failed'; sizeBytes: number | null; checksumSha256: string | null; errorMessage: string | null; startedAt: string | null; completedAt: string | null; createdAt: string };
+
+function backupSize(bytes: number | null) {
+  if (bytes === null) return '—';
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
+
+function backupDate(value: string | null) {
+  return value ? new Date(value).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : 'Queued';
+}
+
+function CeoBackupOversight() {
+  const [backups, setBackups] = useState<BackupRun[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [starting, setStarting] = useState(false);
+  const [error, setError] = useState('');
+  const activeBackup = backups.some(backup => backup.status === 'pending' || backup.status === 'running');
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const response = await fetch('/api/backups', { cache: 'no-store' });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Unable to load backup status.');
+        if (active) { setBackups(data.backups || []); setError(''); }
+      } catch (loadError) {
+        if (active) setError(loadError instanceof Error ? loadError.message : 'Unable to load backup status.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    void load();
+    const timer = window.setInterval(() => void load(), activeBackup ? 4000 : 30000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [activeBackup]);
+
+  const startBackup = async () => {
+    setStarting(true); setError('');
+    try {
+      const response = await fetch('/api/backups', { method: 'POST' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Unable to start backup.');
+      setBackups(current => [{ id: data.backup.id, status: 'pending' as const, sizeBytes: null, checksumSha256: null, errorMessage: null, startedAt: null, completedAt: null, createdAt: new Date().toISOString() }, ...current].slice(0, 20));
+    } catch (startError) {
+      setError(startError instanceof Error ? startError.message : 'Unable to start backup.');
+    } finally {
+      setStarting(false);
+    }
+  };
+
+  return <section className="panel backup-oversight"><div className="panel-header"><div><h2><DatabaseBackup size={16}/> Encrypted R2 backups</h2><p>CEO-only control for encrypted system backups and platform restore readiness.</p></div><div className="backup-header-actions"><span className="backup-scope"><LockKeyhole size={12}/> R2 · AES-256-GCM</span><button className="btn primary" onClick={() => void startBackup()} disabled={starting || activeBackup}><DatabaseBackup size={15}/>{starting ? 'Starting…' : activeBackup ? 'Backup running' : 'Run backup'}</button></div></div><div className="backup-notice"><LockKeyhole size={15}/><span>The encrypted full-database artifact stays private in R2. This dashboard shows status, checksum, and timestamps; restore access remains with platform operations.</span></div>{error && <p className="workflow-error" role="alert">{error}</p>}{loading ? <div className="empty">Loading backup status…</div> : backups.length ? <div className="backup-list">{backups.map(backup => <div className="backup-row" key={backup.id}><div className="backup-row-main"><span className={`backup-status ${backup.status}`}><span/>{backup.status}</span><strong>{backup.id}</strong><small>Created {backupDate(backup.createdAt)}</small></div><div className="backup-meta"><span><b>Size</b>{backupSize(backup.sizeBytes)}</span><span><b>Finished</b>{backupDate(backup.completedAt)}</span>{backup.checksumSha256 && <span className="backup-checksum"><b>SHA-256</b>{backup.checksumSha256}</span>}</div>{backup.errorMessage && <p className="backup-error">{backup.errorMessage}</p>}</div>)}</div> : <div className="empty">No encrypted backups have been requested.</div>}</section>;
+}

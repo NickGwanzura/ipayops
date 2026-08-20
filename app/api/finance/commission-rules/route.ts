@@ -6,7 +6,7 @@ import { query } from '@/lib/db';
 const ruleSchema = z.object({ name: z.string().trim().min(2).max(120), rate: z.number().min(0).max(100), triggerStatus: z.enum(['Confirmed', 'Delivered', 'Paid']).default('Confirmed') });
 
 export async function GET(request: Request) {
-  const auth = await requireRole(request, ACCESS.finance);
+  const auth = await requireRole(request, ACCESS.financeSettings);
   if ('response' in auth) return auth.response;
   const { session } = auth;
   const result = await query('SELECT id, name, rate, trigger_status, is_active, created_at FROM commission_rules WHERE organization_id = $1 ORDER BY is_active DESC, created_at DESC', [session.user.organizationId]);
@@ -15,7 +15,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireRole(request, ACCESS.finance);
+    const auth = await requireRole(request, ACCESS.financeSettings);
     if ('response' in auth) return auth.response;
     const { session } = auth;
     const body = ruleSchema.parse(await request.json());

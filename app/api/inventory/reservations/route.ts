@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { withTransaction } from '@/lib/db';
-import { ACCESS, getSession, requireRole } from '@/lib/auth';
+import { ACCESS, requireRole } from '@/lib/auth';
 
 export async function GET(request: Request) {
-  const session = await getSession(request);
-  if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+  const auth = await requireRole(request, ACCESS.operations);
+  if ('response' in auth) return auth.response;
+  const { session } = auth;
   const result = await withTransaction(async client => client.query(
     `SELECT r.id, r.inventory_item_id, r.reference_type, r.reference_id, r.expires_at, r.status, r.created_at,
             i.serial_number, i.sku, i.description, i.location

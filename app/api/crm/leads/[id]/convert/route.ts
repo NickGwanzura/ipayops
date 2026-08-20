@@ -3,13 +3,16 @@ import { randomUUID } from 'node:crypto';
 import { ACCESS, requireRole } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/db';
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
-    const auth = await requireRole(request, ACCESS.operations);
-    if ('response' in auth) return auth.response;
-    const { session } = auth;
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const auth = await requireRole(request, ACCESS.sales);
+  if ('response' in auth) return auth.response;
+  const { session } = auth;
   try {
     const result = await withTransaction(async client => {
-      const lead = await client.query('SELECT id, name, client_id, owner_id, status FROM leads WHERE id = $1 AND organization_id = $2 FOR UPDATE', [params.id, session.user.organizationId]);
+      const scope = session.user.role === 'sales_consultant' ? ' AND owner_id = $3' : '';
+      const values = session.user.role === 'sales_consultant' ? [params.id, session.user.organizationId, session.user.id] : [params.id, session.user.organizationId];
+      const lead = await client.query(`SELECT id, name, client_id, owner_id, status FROM leads WHERE id = $1 AND organization_id = $2${scope} FOR UPDATE`, values);
       if (!lead.rows[0]) throw Object.assign(new Error('Lead not found.'), { code: 'NOT_FOUND' });
       if (lead.rows[0].status === 'Converted') throw Object.assign(new Error('Lead already converted.'), { code: 'CONVERTED' });
       const opportunity = await client.query(

@@ -4,6 +4,7 @@ import { createSession, publicUser, setSessionCookie, verifyPassword } from '@/l
 import { writeAuditLog } from '@/lib/audit';
 import { query } from '@/lib/db';
 import { consumeRateLimit, requestAddress, resetRateLimit } from '@/lib/rate-limit';
+import { sendNotification } from '@/lib/notifications';
 
 export const runtime = 'nodejs';
 
@@ -14,7 +15,7 @@ const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 export async function POST(request: Request) {
   try {
     const address = requestAddress(request);
-    const limit = consumeRateLimit(`login:${address}`, LOGIN_LIMIT, LOGIN_WINDOW_MS);
+    const limit = await consumeRateLimit(`login:${address}`, LOGIN_LIMIT, LOGIN_WINDOW_MS);
     if (!limit.allowed) return NextResponse.json({ error: 'Too many login attempts. Try again later.' }, { status: 429, headers: { 'Retry-After': String(limit.retryAfter), 'X-RateLimit-Remaining': '0' } });
     const body = loginSchema.parse(await request.json());
     const result = await query<{ id: string; organization_id: string; email: string; full_name: string; role: string; password_hash: string }>(
@@ -26,8 +27,9 @@ export async function POST(request: Request) {
     const authUser = publicUser(user);
     const session = await createSession(authUser, body.remember);
     await query('UPDATE users SET last_login_at = now() WHERE id = $1', [user.id]);
-    resetRateLimit(`login:${address}`);
+    await resetRateLimit(`login:${address}`);
     await writeAuditLog({ organizationId: authUser.organizationId, actorUserId: authUser.id, action: 'auth.login', entityType: 'user', entityId: authUser.id, request });
+    void sendNotification({ organizationId: authUser.organizationId, eventType: 'auth.login', recipientEmail: authUser.email, recipientName: authUser.fullName, subject: 'New iPayTech sign-in', eyebrow: 'Security activity', title: 'A new sign-in was recorded', summary: 'Your iPayTech Operations account was just used to sign in.', fields: [{ label: 'Account', value: authUser.email }, { label: 'IP address', value: address }, { label: 'Time', value: new Date().toLocaleString('en-GB') }], action: { label: 'Review profile', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/profile` } });
     const response = NextResponse.json({ user: authUser });
     setSessionCookie(response, session.token, session.maxAge);
     return response;

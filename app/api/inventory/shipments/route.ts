@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { ACCESS, getSession, requireRole } from '@/lib/auth';
+import { ACCESS, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
 
 const shipmentSchema = z.object({
@@ -13,8 +13,9 @@ const shipmentSchema = z.object({
 }).refine(value => value.transferId || value.saleId, { message: 'A transfer or sale is required.' });
 
 export async function GET(request: NextRequest) {
-  const session = await getSession(request);
-  if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+  const auth = await requireRole(request, ACCESS.operations);
+  if ('response' in auth) return auth.response;
+  const { session } = auth;
   const result = await query(
     `SELECT id, number, transfer_id, sale_id, carrier, tracking_number, status, shipped_at, delivered_at, created_at
      FROM shipments WHERE organization_id = $1 ORDER BY created_at DESC LIMIT 200`,
@@ -29,6 +30,14 @@ export async function POST(request: Request) {
     if ('response' in auth) return auth.response;
     const { session } = auth;
     const body = shipmentSchema.parse(await request.json());
+    if (body.transferId) {
+      const transfer = await query('SELECT id FROM stock_transfers WHERE id = $1 AND organization_id = $2', [body.transferId, session.user.organizationId]);
+      if (!transfer.rows[0]) return NextResponse.json({ error: 'Stock transfer not found.' }, { status: 404 });
+    }
+    if (body.saleId) {
+      const sale = await query('SELECT id FROM sales WHERE id = $1 AND organization_id = $2', [body.saleId, session.user.organizationId]);
+      if (!sale.rows[0]) return NextResponse.json({ error: 'Sale not found.' }, { status: 404 });
+    }
     const number = `SHP-${new Date().getFullYear()}-${randomUUID().slice(0, 6).toUpperCase()}`;
     const result = await query(
       `INSERT INTO shipments (organization_id, number, transfer_id, sale_id, carrier, tracking_number, status, shipped_at, delivered_at, created_by)

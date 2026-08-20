@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { ACCESS, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const auth = await requireRole(request, ACCESS.hr);
   if ('response' in auth) return auth.response;
   const { session } = auth;

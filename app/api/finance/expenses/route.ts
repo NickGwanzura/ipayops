@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { ACCESS, getSession, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
+import { sendNotification } from '@/lib/notifications';
 
 const expenseSchema = z.object({
   category: z.string().trim().min(2).max(80),
@@ -42,6 +43,7 @@ export async function POST(request: Request) {
        RETURNING id, number, category, description, amount, currency, status, submitted_at`,
       [session.user.organizationId, `EXP-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`, session.user.id, body.category, body.description, body.amount],
     );
+    void sendNotification({ organizationId: session.user.organizationId, eventType: 'expense.submitted', recipientEmail: session.user.email, recipientName: session.user.fullName, subject: `Expense ${result.rows[0].number} submitted`, eyebrow: 'Finance activity', title: 'Expense claim submitted', summary: 'Your expense claim has been recorded and is awaiting finance review.', fields: [{ label: 'Expense', value: result.rows[0].number }, { label: 'Description', value: result.rows[0].description }, { label: 'Amount', value: String(result.rows[0].amount) }] });
     return NextResponse.json({ expense: result.rows[0] }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: 'Category, description, and a positive amount are required.' }, { status: 400 });

@@ -5,7 +5,8 @@ import { query } from '@/lib/db';
 
 const statusSchema = z.object({ status: z.enum(['Draft', 'Dispatched', 'In transit', 'Delivered', 'Cancelled']) });
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const auth = await requireRole(request, ACCESS.operations);
     if ('response' in auth) return auth.response;

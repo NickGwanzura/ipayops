@@ -11,13 +11,22 @@ const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'applicat
 const parentTables = { job: 'job_cards', claim: 'warranty_claims', expense: 'expense_claims' } as const;
 
 function canManage(entityType: string, role: string) {
-  return entityType === 'expense' ? hasRole(role, ACCESS.expenseSubmitter) : hasRole(role, ACCESS.field);
+  if (entityType === 'expense') return hasRole(role, ACCESS.expenseSubmitter);
+  if (entityType === 'job') return hasRole(role, ACCESS.jobRead);
+  return hasRole(role, ACCESS.serviceRead);
+}
+
+function canView(entityType: string, role: string) {
+  if (entityType === 'expense') return hasRole(role, ACCESS.financeRead);
+  if (entityType === 'job') return hasRole(role, ACCESS.jobRead);
+  return hasRole(role, ACCESS.serviceRead);
 }
 
 export async function GET(request: NextRequest) {
   const session = await getSession(request);
   if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
   const entityType = request.nextUrl.searchParams.get('entityType') || ''; const entityId = request.nextUrl.searchParams.get('entityId') || '';
+  if (!['job', 'claim', 'expense'].includes(entityType) || !canView(entityType, session.user.role)) return NextResponse.json({ error: 'You do not have permission to view these attachments.' }, { status: 403 });
   const result = await query('SELECT id, entity_type, entity_id, file_name, mime_type, size_bytes, created_at FROM attachments WHERE organization_id = $1 AND entity_type = $2 AND entity_id = $3 ORDER BY created_at DESC', [session.user.organizationId, entityType, entityId]);
   return NextResponse.json({ attachments: result.rows });
 }

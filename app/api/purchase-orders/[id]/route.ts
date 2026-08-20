@@ -1,14 +1,16 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { ACCESS, getSession, requireRole } from '@/lib/auth';
+import { ACCESS, requireRole } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/db';
 
 const itemSchema = z.object({ sku: z.string().trim().min(1).max(80), description: z.string().trim().min(1).max(200), quantity: z.number().int().positive().max(100000), unitCost: z.number().nonnegative().max(100000000) });
 const updateSchema = z.object({ supplierId: z.string().uuid().optional(), destination: z.string().trim().min(2).max(160).optional(), expectedAt: z.string().date().nullable().optional(), status: z.enum(['Draft', 'Pending approval', 'Approved', 'Partially received', 'Fully received', 'Cancelled']).optional(), items: z.array(itemSchema).min(1).max(200).optional() });
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
-  const session = await getSession(request);
-  if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const auth = await requireRole(request, ACCESS.operations);
+  if ('response' in auth) return auth.response;
+  const { session } = auth;
 
   const result = await query(
     `SELECT po.id, po.number, po.destination, po.status, po.currency, po.total, po.expected_at, po.created_at,
@@ -34,7 +36,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
   return NextResponse.json({ purchaseOrder: result.rows[0] });
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const auth = await requireRole(request, ACCESS.operations);
     if ('response' in auth) return auth.response;
@@ -62,7 +65,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const auth = await requireRole(request, ACCESS.operations);
   if ('response' in auth) return auth.response;
   const result = await query(`UPDATE purchase_orders SET status = 'Cancelled', updated_at = now() WHERE id = $1 AND organization_id = $2 AND status NOT IN ('Fully received', 'Cancelled') RETURNING id, number, status`, [params.id, auth.session.user.organizationId]);

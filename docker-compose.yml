@@ -22,7 +22,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
       PORT: 3000
       APP_URL: http://localhost:3000
       DATABASE_URL: postgresql://ipaytech:ipaytech_local_password@db:5432/ipaytech_ops
@@ -30,7 +30,7 @@ services:
       DEFAULT_TIMEZONE: Africa/Harare
       DEFAULT_CURRENCY: USD
       STORAGE_DRIVER: local
-      HEALTHCHECK_DATABASE: "false"
+      HEALTHCHECK_DATABASE: "true"
     ports:
       - "3000:3000"
     healthcheck:

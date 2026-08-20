@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { ACCESS, getSession, requireRole } from '@/lib/auth';
+import { ACCESS, requireRole } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/db';
 
 const jobSchema = z.object({
@@ -11,8 +11,11 @@ const jobSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const session = await getSession(request);
-  if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+  const auth = await requireRole(request, ACCESS.jobRead);
+  if ('response' in auth) return auth.response;
+  const { session } = auth;
+  const assignmentClause = session.user.role === 'sales_consultant' ? ' AND j.installer_id = $2' : '';
+  const parameters = session.user.role === 'sales_consultant' ? [session.user.organizationId, session.user.id] : [session.user.organizationId];
   const result = await query(
     `SELECT j.id, j.number, j.title, j.status, j.scheduled_for, j.notes, j.signoff_name, j.signed_at,
             c.id AS client_id, c.name AS client_name, u.full_name AS installer_name,
@@ -20,21 +23,30 @@ export async function GET(request: NextRequest) {
               ORDER BY jci.serial_number) FILTER (WHERE jci.id IS NOT NULL), '[]'::json) AS items
      FROM job_cards j JOIN clients c ON c.id = j.client_id LEFT JOIN users u ON u.id = j.installer_id
      LEFT JOIN job_card_items jci ON jci.job_card_id = j.id
-     WHERE j.organization_id = $1 GROUP BY j.id, c.id, u.id ORDER BY j.scheduled_for NULLS LAST, j.created_at DESC LIMIT 200`,
-    [session.user.organizationId],
+     WHERE j.organization_id = $1${assignmentClause} GROUP BY j.id, c.id, u.id ORDER BY j.scheduled_for NULLS LAST, j.created_at DESC LIMIT 200`,
+    parameters,
   );
   return NextResponse.json({ jobs: result.rows });
 }
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireRole(request, ACCESS.field);
+    const auth = await requireRole(request, ACCESS.jobWrite);
     if ('response' in auth) return auth.response;
     const { session } = auth;
     const body = jobSchema.parse(await request.json());
     const job = await withTransaction(async client => {
       const clientResult = await client.query('SELECT id FROM clients WHERE id = $1 AND organization_id = $2', [body.clientId, session.user.organizationId]);
       if (!clientResult.rows[0]) throw Object.assign(new Error('Client not found.'), { code: 'CLIENT_NOT_FOUND' });
+      if (body.saleId) {
+        const saleResult = await client.query('SELECT id, client_id FROM sales WHERE id = $1 AND organization_id = $2', [body.saleId, session.user.organizationId]);
+        if (!saleResult.rows[0]) throw Object.assign(new Error('Sale not found.'), { code: 'SALE_NOT_FOUND' });
+        if (saleResult.rows[0].client_id !== body.clientId) throw Object.assign(new Error('Sale client mismatch.'), { code: 'SALE_CLIENT_MISMATCH' });
+      }
+      if (body.installerId) {
+        const installerResult = await client.query(`SELECT id FROM users WHERE id = $1 AND organization_id = $2 AND is_active = true AND role IN ('sales_consultant', 'manager', 'ceo')`, [body.installerId, session.user.organizationId]);
+        if (!installerResult.rows[0]) throw Object.assign(new Error('Installer not found.'), { code: 'INSTALLER_NOT_FOUND' });
+      }
       const inventory = body.inventoryItemIds.length ? await client.query(
         `SELECT id, serial_number, status FROM inventory_items WHERE organization_id = $1 AND id = ANY($2::uuid[]) FOR UPDATE`,
         [session.user.organizationId, body.inventoryItemIds],
@@ -57,7 +69,8 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: 'Client, title, and valid job details are required.' }, { status: 400 });
     const code = (error as { code?: string }).code;
-    if (code === 'CLIENT_NOT_FOUND' || code === 'ITEM_NOT_FOUND') return NextResponse.json({ error: 'Client or inventory item not found.' }, { status: 404 });
+    if (code === 'CLIENT_NOT_FOUND' || code === 'ITEM_NOT_FOUND' || code === 'SALE_NOT_FOUND' || code === 'INSTALLER_NOT_FOUND') return NextResponse.json({ error: 'Client, sale, installer, or inventory item not found.' }, { status: 404 });
+    if (code === 'SALE_CLIENT_MISMATCH') return NextResponse.json({ error: 'The selected sale belongs to a different client.' }, { status: 409 });
     if (code === 'ITEM_UNAVAILABLE') return NextResponse.json({ error: 'One or more inventory items cannot be installed.' }, { status: 409 });
     console.error('Job create failed', error);
     return NextResponse.json({ error: 'Unable to create job card.' }, { status: 500 });

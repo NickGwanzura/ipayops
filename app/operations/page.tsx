@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Boxes, BriefcaseBusiness, Check, ClipboardCheck, FileText, Plus, Search, Settings2, ShieldCheck, ShoppingCart, Upload, Users, X } from 'lucide-react';
 import { moduleMeta, type OpsModule } from '@/lib/ops-data';
@@ -11,10 +12,12 @@ import FinanceWorkspace from './finance-workspace';
 import ReportsWorkspace from './reports-workspace';
 import { JobsWorkspace, WarrantyWorkspace } from './service-workspace';
 import { useOrganizationSettings } from '../organization-settings';
+import { useDialogFocus } from '../dialog-focus';
+import { ALL_OPS_MODULES, canAccessConfiguration, canAccessModule } from '@/lib/rbac';
 import './ops.css';
 
-const modules: OpsModule[] = ['Procurement', 'Inventory', 'Sales & CRM', 'Job cards', 'Warranty', 'Finance & HR', 'Reports'];
-type User = { fullName: string };
+const modules: OpsModule[] = ALL_OPS_MODULES;
+type User = { fullName: string; role: string };
 
 export default function OperationsPage() {
   const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
@@ -27,6 +30,7 @@ export default function OperationsPage() {
   const [importOpen, setImportOpen] = useState(false);
   const settings = useOrganizationSettings();
   const meta = moduleMeta[module];
+  const visibleModules = useMemo(() => user ? modules.filter(item => canAccessModule(user.role, item)) : [], [user]);
 
   useEffect(() => {
     void fetch('/api/auth/me', { cache: 'no-store' }).then(async response => {
@@ -36,17 +40,29 @@ export default function OperationsPage() {
     }).catch(() => { window.location.href = '/login'; });
   }, []);
 
+  useEffect(() => {
+    if (!user || canAccessModule(user.role, module)) return;
+    const fallback = visibleModules[0] || 'Reports';
+    setModule(fallback);
+    window.history.replaceState(null, '', `/operations?module=${encodeURIComponent(fallback)}`);
+  }, [user, module, visibleModules]);
+
   const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 2500); };
   const goToProfile = () => { window.location.href = '/profile'; };
   const goToConfiguration = () => { window.location.href = '/configuration'; };
   const setModuleAndReset = (next: OpsModule) => { setModule(next); setQuery(''); setNewRecordSignal(0); window.history.replaceState(null, '', `/operations?module=${encodeURIComponent(next)}`); };
-  const handleNewRecord = () => { const target = module === 'Inventory' ? 'Procurement' : module === 'Reports' ? 'Sales & CRM' : module; if (target !== module) setModuleAndReset(target); setNewRecordSignal(signal => signal + 1); };
+  const newRecordTarget = module === 'Inventory' ? 'Procurement' : module === 'Reports' ? 'Sales & CRM' : module;
+  const handleNewRecord = () => { if (!user || !canAccessModule(user.role, newRecordTarget)) return; if (newRecordTarget !== module) setModuleAndReset(newRecordTarget); setNewRecordSignal(signal => signal + 1); };
   const searchableQuery = useMemo(() => query.trim(), [query]);
+  const canImport = module === 'Procurement' || module === 'Sales & CRM';
+  const canCreateRecord = Boolean(user && ((module !== 'Reports' && canAccessModule(user.role, newRecordTarget)) || (module === 'Reports' && canAccessModule(user.role, 'Sales & CRM'))));
+
+  if (!user) return <div className="ops-shell"><main className="ops-main"><div className="ops-content"><section className="ops-panel role-loading"><p>Loading your workspace…</p></section></div></main></div>;
 
   return <div className="ops-shell">
-    <aside className="ops-rail"><a className="ops-brand" href="/"><Image className="ops-logo" src="/iPaytechLogo.jpg" alt="iPayTech" width={160} height={67} priority /></a><div className="ops-rail-title">OPERATIONS</div>{modules.map(item => <button key={item} className={module === item ? 'ops-nav active' : 'ops-nav'} onClick={() => setModuleAndReset(item)}>{iconFor(item)}<span>{item}</span></button>)}<div className="ops-rail-bottom"><button className="ops-nav" onClick={goToConfiguration}><Settings2 size={16}/><span>Configuration</span></button><a className="back-dashboard" href="/"><ArrowLeft size={15}/> Dashboard</a></div></aside>
-    <main className="ops-main"><header className="ops-top"><div className="ops-breadcrumb"><a href="/">Overview</a><span>/</span><strong>{meta.title}</strong></div><div className="ops-top-actions"><div className="ops-search"><Search size={16}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search this module..."/><kbd>⌘ K</kbd></div><button className="ops-avatar" onClick={goToProfile} title="Open profile" aria-label="Open profile">{initials(user?.fullName || 'User')}</button></div></header><div className="ops-content"><div className="ops-heading"><div><span className="ops-kicker">Operations workspace</span><h1>{meta.title}</h1><p>{meta.description}</p></div><div className="ops-heading-actions"><button className="ops-btn ghost" onClick={() => setImportOpen(true)}><Upload size={15}/> Import</button><button className="ops-btn blue" onClick={handleNewRecord}><Plus size={16}/> New record</button></div></div><div className="module-strip">{modules.map(item => <button key={item} className={module === item ? 'module-chip selected' : 'module-chip'} onClick={() => setModuleAndReset(item)}>{iconFor(item)}{item}</button>)}</div>
-      {module === 'Procurement' && <ProcurementWorkflows notify={notify} newRecordSignal={newRecordSignal} query={searchableQuery}/>} {module === 'Inventory' && <InventoryWorkspace query={searchableQuery} notify={notify}/>} {module === 'Sales & CRM' && <CrmWorkspace notify={notify} newRecordSignal={newRecordSignal}/>} {module === 'Job cards' && <JobsWorkspace notify={notify} newRecordSignal={newRecordSignal}/>} {module === 'Warranty' && <WarrantyWorkspace notify={notify} newRecordSignal={newRecordSignal}/>} {module === 'Finance & HR' && <FinanceWorkspace notify={notify} newRecordSignal={newRecordSignal}/>} {module === 'Reports' && <ReportsWorkspace notify={notify}/>}<div className="ops-footer"><span><span className="status-dot"/> Database-sourced view · Last synced just now</span><span>Timezone: {settings.timezone} · Currency: {settings.currency}</span></div></div></main>
+    <aside className="ops-rail"><Link className="ops-brand" href="/"><Image className="ops-logo" src="/iPaytechLogo.jpg" alt="iPayTech" width={160} height={67} priority /></Link><div className="ops-rail-title">OPERATIONS</div>{visibleModules.map(item => <button key={item} className={module === item ? 'ops-nav active' : 'ops-nav'} onClick={() => setModuleAndReset(item)}>{iconFor(item)}<span>{item}</span></button>)}<div className="ops-rail-bottom">{user && canAccessConfiguration(user.role) && <button className="ops-nav" onClick={goToConfiguration}><Settings2 size={16}/><span>Configuration</span></button>}<Link className="back-dashboard" href="/"><ArrowLeft size={15}/> Dashboard</Link></div></aside>
+    <main className="ops-main"><header className="ops-top"><div className="ops-breadcrumb"><Link href="/">Overview</Link><span>/</span><strong>{meta.title}</strong></div><div className="ops-top-actions"><div className="ops-search"><Search size={16}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search this module..."/><kbd>⌘ K</kbd></div><button className="ops-avatar" onClick={goToProfile} title="Open profile" aria-label="Open profile">{initials(user.fullName)}</button></div></header><div className="ops-content"><div className="ops-heading"><div><span className="ops-kicker">Operations workspace</span><h1>{meta.title}</h1><p>{meta.description}</p></div><div className="ops-heading-actions">{canImport && <button className="ops-btn ghost" onClick={() => setImportOpen(true)}><Upload size={15}/> Import</button>}{canCreateRecord && <button className="ops-btn blue" onClick={handleNewRecord}><Plus size={16}/> {module === 'Finance & HR' && user.role === 'finance' ? 'Submit expense' : module === 'Finance & HR' ? 'Add consultant' : 'New record'}</button>}</div></div><div className="module-strip">{visibleModules.map(item => <button key={item} className={module === item ? 'module-chip selected' : 'module-chip'} onClick={() => setModuleAndReset(item)}>{iconFor(item)}{item}</button>)}</div>
+      {module === 'Procurement' && <ProcurementWorkflows notify={notify} newRecordSignal={newRecordSignal} query={searchableQuery}/>} {module === 'Inventory' && <InventoryWorkspace query={searchableQuery} notify={notify}/>} {module === 'Sales & CRM' && <CrmWorkspace notify={notify} newRecordSignal={newRecordSignal} role={user?.role || 'sales_consultant'}/>} {module === 'Job cards' && <JobsWorkspace notify={notify} newRecordSignal={newRecordSignal} role={user?.role || 'sales_consultant'}/>} {module === 'Warranty' && <WarrantyWorkspace notify={notify} newRecordSignal={newRecordSignal}/>} {module === 'Finance & HR' && <FinanceWorkspace notify={notify} newRecordSignal={newRecordSignal} role={user?.role || 'finance'}/>} {module === 'Reports' && <ReportsWorkspace notify={notify}/>}<div className="ops-footer"><span><span className="status-dot"/> Database-sourced view · Last synced just now</span><span>Timezone: {settings.timezone} · Currency: {settings.currency}</span></div></div></main>
     {importOpen && <ImportDialog module={module} close={() => setImportOpen(false)} imported={count => { setImportOpen(false); notify(`${count} record${count === 1 ? '' : 's'} imported`); window.setTimeout(() => window.location.reload(), 350); }} />}{toast && <div className="ops-toast"><span><Check size={13}/></span>{toast}</div>}
   </div>;
 }
@@ -59,6 +75,7 @@ function ImportDialog({ module, close, imported }: { module: OpsModule; close: (
   const targets: ImportTarget[] = module === 'Procurement' ? ['suppliers'] : module === 'Sales & CRM' ? ['clients', 'leads'] : [];
   const [target, setTarget] = useState<ImportTarget>(targets[0] || 'suppliers');
   const [file, setFile] = useState<File | null>(null); const [saving, setSaving] = useState(false); const [error, setError] = useState('');
+  const dialogRef = useDialogFocus<HTMLDivElement>(close);
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!targets.length) { setError('CSV import is currently available for suppliers, clients, and leads.'); return; }
@@ -74,7 +91,7 @@ function ImportDialog({ module, close, imported }: { module: OpsModule; close: (
       imported(count);
     } catch (submitError) { setError(submitError instanceof Error ? submitError.message : 'Unable to import CSV.'); } finally { setSaving(false); }
   };
-  return <div className="workflow-dialog-backdrop" role="presentation"><div className="workflow-dialog" role="dialog" aria-modal="true" aria-label="Import CSV"><div className="workflow-dialog-head"><h3>Import CSV records</h3><button onClick={close} aria-label="Close"><X size={16}/></button></div><form className="workflow-form" onSubmit={submit}><p className="workflow-help">Use a header row. Supported fields include name, contact_name, phone, email, source, notes, payment_terms, and lead_time_days.</p>{targets.length > 0 ? <label className="workflow-field"><span>Record type</span><select value={target} onChange={event => setTarget(event.target.value as ImportTarget)}>{targets.map(item => <option key={item} value={item}>{item}</option>)}</select></label> : <p className="workflow-help">This module has no CSV importer yet.</p>}<label className="workflow-field"><span>CSV file</span><input required type="file" accept=".csv,text/csv" onChange={event => setFile(event.target.files?.[0] || null)}/></label>{error && <p className="workflow-error" role="alert">{error}</p>}<div className="workflow-dialog-actions"><button type="button" className="ops-btn ghost" onClick={close}>Cancel</button><button className="ops-btn blue" disabled={saving}>{saving ? 'Importing…' : 'Import records'}</button></div></form></div></div>;
+  return <div className="workflow-dialog-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) close(); }}><div ref={dialogRef} className="workflow-dialog" role="dialog" aria-modal="true" aria-label="Import CSV" tabIndex={-1}><div className="workflow-dialog-head"><h3>Import CSV records</h3><button onClick={close} aria-label="Close"><X size={16}/></button></div><form className="workflow-form" onSubmit={submit}><p className="workflow-help">Use a header row. Supported fields include name, contact_name, phone, email, source, notes, payment_terms, and lead_time_days.</p>{targets.length > 0 ? <label className="workflow-field"><span>Record type</span><select value={target} onChange={event => setTarget(event.target.value as ImportTarget)}>{targets.map(item => <option key={item} value={item}>{item}</option>)}</select></label> : <p className="workflow-help">This module has no CSV importer yet.</p>}<label className="workflow-field"><span>CSV file</span><input required type="file" accept=".csv,text/csv" onChange={event => setFile(event.target.files?.[0] || null)}/></label>{error && <p className="workflow-error" role="alert">{error}</p>}<div className="workflow-dialog-actions"><button type="button" className="ops-btn ghost" onClick={close}>Cancel</button><button className="ops-btn blue" disabled={saving}>{saving ? 'Importing…' : 'Import records'}</button></div></form></div></div>;
 }
 
 function parseCsv(text: string) { const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean); if (lines.length < 2) return []; const headers = splitCsvLine(lines[0]).map(header => header.trim().toLowerCase()); return lines.slice(1).map(line => Object.fromEntries(splitCsvLine(line).map((cell, index) => [headers[index] || `column_${index}`, cell.trim()]))); }

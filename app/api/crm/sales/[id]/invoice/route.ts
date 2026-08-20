@@ -3,13 +3,16 @@ import { randomUUID } from 'node:crypto';
 import { ACCESS, requireRole } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/db';
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
-    const auth = await requireRole(request, ACCESS.operations);
-    if ('response' in auth) return auth.response;
-    const { session } = auth;
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const auth = await requireRole(request, ACCESS.sales);
+  if ('response' in auth) return auth.response;
+  const { session } = auth;
   try {
     const invoice = await withTransaction(async client => {
-      const saleResult = await client.query(`SELECT s.id, s.client_id, s.total FROM sales s WHERE s.id = $1 AND s.organization_id = $2 FOR UPDATE`, [params.id, session.user.organizationId]);
+      const scope = session.user.role === 'sales_consultant' ? ' AND (s.consultant_id = $3 OR s.created_by = $3)' : '';
+      const values = session.user.role === 'sales_consultant' ? [params.id, session.user.organizationId, session.user.id] : [params.id, session.user.organizationId];
+      const saleResult = await client.query(`SELECT s.id, s.client_id, s.total FROM sales s WHERE s.id = $1 AND s.organization_id = $2${scope} FOR UPDATE`, values);
       if (!saleResult.rows[0]) throw Object.assign(new Error('Sale not found.'), { code: 'SALE_NOT_FOUND' });
       const existing = await client.query('SELECT id FROM invoices WHERE sale_id = $1', [params.id]); if (existing.rows[0]) throw Object.assign(new Error('Invoice already exists.'), { code: 'EXISTS' });
       const number = `INV-${new Date().getFullYear()}-${randomUUID().slice(0, 6).toUpperCase()}`;

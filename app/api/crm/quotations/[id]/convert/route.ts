@@ -8,17 +8,18 @@ const convertSchema = z.object({
   items: z.array(z.object({ quotationItemId: z.string().uuid(), inventoryItemIds: z.array(z.string().uuid()).min(1) })).min(1),
 });
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
-    const auth = await requireRole(request, ACCESS.operations);
+    const auth = await requireRole(request, ACCESS.sales);
     if ('response' in auth) return auth.response;
     const { session } = auth;
     const body = convertSchema.parse(await request.json());
     const sale = await withTransaction(async client => {
       const quoteResult = await client.query(
         `SELECT q.id, q.number, q.client_id, q.status, q.total FROM quotations q
-         WHERE q.id = $1 AND q.organization_id = $2 FOR UPDATE`,
-        [params.id, session.user.organizationId],
+         WHERE q.id = $1 AND q.organization_id = $2 AND ($3::uuid IS NULL OR q.created_by = $3) FOR UPDATE`,
+        [params.id, session.user.organizationId, session.user.role === 'sales_consultant' ? session.user.id : null],
       );
       const quote = quoteResult.rows[0];
       if (!quote) throw Object.assign(new Error('Quotation not found.'), { code: 'QUOTE_NOT_FOUND' });
@@ -42,9 +43,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
       }
       const number = `SAL-${new Date().getFullYear()}-${randomUUID().slice(0, 6).toUpperCase()}`;
       const saleResult = await client.query(
-        `INSERT INTO sales (organization_id, number, quotation_id, client_id, total, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, number, status, total, confirmed_at`,
-        [session.user.organizationId, number, params.id, quote.client_id, quote.total, session.user.id],
+        `INSERT INTO sales (organization_id, number, quotation_id, client_id, total, consultant_id, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, number, status, total, confirmed_at`,
+        [session.user.organizationId, number, params.id, quote.client_id, quote.total, session.user.role === 'sales_consultant' ? session.user.id : null, session.user.id],
       );
       for (const requested of body.items) {
         const line = lineMap.get(requested.quotationItemId)!;

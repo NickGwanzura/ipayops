@@ -6,7 +6,8 @@ import { withTransaction } from '@/lib/db';
 
 const refundSchema = z.object({ method: z.enum(['Bank transfer', 'Cash', 'Card', 'Mobile money', 'Credit note']), reference: z.string().trim().max(120).optional().default('') });
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const auth = await requireRole(request, ACCESS.finance);
     if ('response' in auth) return auth.response;

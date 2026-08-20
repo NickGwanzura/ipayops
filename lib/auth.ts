@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { SignJWT, jwtVerify } from 'jose';
 import { query } from '@/lib/db';
+import { normalizeRole } from '@/lib/rbac';
 
 export const SESSION_COOKIE = 'ipaytech_session';
 const DEFAULT_SESSION_SECONDS = 60 * 60 * 8;
@@ -19,22 +20,30 @@ export type AuthUser = {
 
 export const ROLE = {
   CEO: 'ceo',
-  ADMIN: 'admin',
   MANAGER: 'manager',
-  OPERATOR: 'operator',
   FINANCE: 'finance',
-  HR: 'hr',
-  INSTALLER: 'installer',
-  VIEWER: 'viewer',
+  SALES_CONSULTANT: 'sales_consultant',
 } as const;
 
 export const ACCESS = {
-  leadership: [ROLE.CEO, ROLE.ADMIN, ROLE.MANAGER] as const,
-  finance: [ROLE.CEO, ROLE.ADMIN, ROLE.MANAGER, ROLE.FINANCE] as const,
-  hr: [ROLE.CEO, ROLE.ADMIN, ROLE.MANAGER, ROLE.HR] as const,
-  operations: [ROLE.CEO, ROLE.ADMIN, ROLE.MANAGER, ROLE.OPERATOR] as const,
-  field: [ROLE.CEO, ROLE.ADMIN, ROLE.MANAGER, ROLE.OPERATOR, ROLE.INSTALLER] as const,
-  expenseSubmitter: [ROLE.CEO, ROLE.ADMIN, ROLE.MANAGER, ROLE.OPERATOR, ROLE.FINANCE, ROLE.HR, ROLE.INSTALLER] as const,
+  leadership: [ROLE.CEO] as const,
+  management: [ROLE.CEO, ROLE.MANAGER] as const,
+  finance: [ROLE.CEO, ROLE.FINANCE] as const,
+  financeRead: [ROLE.CEO, ROLE.FINANCE] as const,
+  documents: [ROLE.CEO, ROLE.MANAGER, ROLE.FINANCE, ROLE.SALES_CONSULTANT] as const,
+  financeSettings: [ROLE.CEO, ROLE.MANAGER, ROLE.FINANCE] as const,
+  hr: [ROLE.CEO, ROLE.MANAGER] as const,
+  operations: [ROLE.CEO, ROLE.MANAGER] as const,
+  sales: [ROLE.CEO, ROLE.MANAGER, ROLE.SALES_CONSULTANT] as const,
+  reports: [ROLE.CEO, ROLE.MANAGER, ROLE.FINANCE, ROLE.SALES_CONSULTANT] as const,
+  inventoryRead: [ROLE.CEO, ROLE.MANAGER, ROLE.SALES_CONSULTANT] as const,
+  jobRead: [ROLE.CEO, ROLE.MANAGER, ROLE.SALES_CONSULTANT] as const,
+  serviceRead: [ROLE.CEO, ROLE.MANAGER] as const,
+  field: [ROLE.CEO, ROLE.MANAGER, ROLE.SALES_CONSULTANT] as const,
+  jobWrite: [ROLE.CEO, ROLE.MANAGER] as const,
+  people: [ROLE.CEO, ROLE.MANAGER, ROLE.FINANCE] as const,
+  commissionRead: [ROLE.CEO, ROLE.MANAGER, ROLE.FINANCE, ROLE.SALES_CONSULTANT] as const,
+  expenseSubmitter: [ROLE.CEO, ROLE.MANAGER, ROLE.FINANCE, ROLE.SALES_CONSULTANT] as const,
 } as const;
 
 export type AuthSession = { user: AuthUser; sessionId: string };
@@ -46,7 +55,7 @@ function authSecret() {
 }
 
 export function publicUser(row: { id: string; organization_id: string; email: string; full_name: string; role: string }): AuthUser {
-  return { id: row.id, organizationId: row.organization_id, email: row.email, fullName: row.full_name, role: row.role };
+  return { id: row.id, organizationId: row.organization_id, email: row.email, fullName: row.full_name, role: normalizeRole(row.role) };
 }
 
 export async function verifyPassword(password: string, passwordHash: string) {
@@ -98,7 +107,7 @@ async function readSessionToken(token: string | undefined) {
 }
 
 export async function getSession(request?: Request): Promise<AuthSession | null> {
-  const token = request?.headers.get('cookie')?.match(new RegExp(`${SESSION_COOKIE}=([^;]+)`))?.[1] ?? cookies().get(SESSION_COOKIE)?.value;
+  const token = request?.headers.get('cookie')?.match(new RegExp(`${SESSION_COOKIE}=([^;]+)`))?.[1] ?? (await cookies()).get(SESSION_COOKIE)?.value;
   return readSessionToken(token);
 }
 
@@ -111,6 +120,13 @@ export async function requireRole(request: Request, roles: readonly string[]) {
 
 export function hasRole(role: string, roles: readonly string[]) {
   return roles.includes(role.toLowerCase());
+}
+
+export function canManageEmployee(session: AuthSession, targetRole?: string, requestedRole?: string, targetId?: string) {
+  if (session.user.role === ROLE.CEO) return targetId !== session.user.id;
+  if (session.user.role !== ROLE.MANAGER) return false;
+  if (targetId === session.user.id) return false;
+  return normalizeRole(targetRole || '') !== ROLE.CEO && normalizeRole(requestedRole || '') !== ROLE.CEO;
 }
 
 export async function deleteSession(request: Request) {

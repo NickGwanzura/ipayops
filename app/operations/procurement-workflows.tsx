@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Boxes, PackageCheck, Plus, RefreshCw, ShoppingCart, Users, X } from 'lucide-react';
 import { formatOrganizationDate, useOrganizationSettings } from '../organization-settings';
+import { useDialogFocus } from '../dialog-focus';
 
 type Supplier = { id: string; code: string; name: string; contact_name?: string; phone?: string; payment_terms?: string; lead_time_days?: number; status: string };
 type PurchaseOrder = { id: string; number: string; supplier_name: string; destination?: string; status: string; total?: string | number; expected_at?: string; ordered_quantity: number; received_quantity: number };
@@ -93,7 +94,8 @@ function SupplierEditDialog({ supplier, close, onSaved }: { supplier: Supplier; 
   return <Dialog title={`Edit ${supplier.name}`} close={close}><form className="workflow-form" onSubmit={submit}><Field label="Supplier name"><input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}/></Field><Field label="Contact name"><input value={form.contactName} onChange={e => setForm({ ...form, contactName: e.target.value })}/></Field><Field label="Phone"><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })}/></Field><div className="workflow-form-grid"><Field label="Payment terms"><input value={form.paymentTerms} onChange={e => setForm({ ...form, paymentTerms: e.target.value })}/></Field><Field label="Lead time (days)"><input type="number" min="0" value={form.leadTimeDays} onChange={e => setForm({ ...form, leadTimeDays: e.target.value })}/></Field></div><Field label="Status"><select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}><option>Active</option><option>Inactive</option><option>Blocked</option></select></Field>{error && <p className="workflow-error" role="alert">{error}</p>}<div className="workflow-dialog-actions"><button type="button" className="ops-btn ghost" onClick={close}>Cancel</button><button className="ops-btn blue" disabled={saving}>{saving ? 'Saving…' : 'Save supplier'}</button></div></form></Dialog>;
 }
 function Dialog({ title, children, close }: { title: string; children: React.ReactNode; close: () => void }) {
-  return <div className="workflow-dialog-backdrop" role="presentation"><div className="workflow-dialog" role="dialog" aria-modal="true" aria-label={title}><div className="workflow-dialog-head"><h3>{title}</h3><button onClick={close} aria-label="Close"><X size={16}/></button></div>{children}</div></div>;
+  const dialogRef = useDialogFocus<HTMLDivElement>(close);
+  return <div className="workflow-dialog-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) close(); }}><div ref={dialogRef} className="workflow-dialog" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}><div className="workflow-dialog-head"><h3>{title}</h3><button onClick={close} aria-label="Close"><X size={16}/></button></div>{children}</div></div>;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="workflow-field"><span>{label}</span>{children}</label>; }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { ACCESS, getSession, requireRole } from '@/lib/auth';
+import { ACCESS, requireRole } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/db';
 
 const transferSchema = z.object({
@@ -11,8 +11,9 @@ const transferSchema = z.object({
 }).refine(value => value.sourceLocation !== value.destinationLocation, { message: 'Transfer locations must be different.' });
 
 export async function GET(request: NextRequest) {
-  const session = await getSession(request);
-  if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+  const auth = await requireRole(request, ACCESS.operations);
+  if ('response' in auth) return auth.response;
+  const { session } = auth;
   const result = await query(
     `SELECT st.id, st.number, st.source_location, st.destination_location, st.status, st.dispatched_at, st.received_at, st.created_at,
             COALESCE(json_agg(json_build_object('id', sti.inventory_item_id, 'serialNumber', sti.serial_number, 'sku', sti.sku, 'description', sti.description)

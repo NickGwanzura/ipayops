@@ -5,9 +5,10 @@ import { withTransaction } from '@/lib/db';
 
 const replacementSchema = z.object({ replacementInventoryItemId: z.string().uuid(), reason: z.string().trim().min(3).max(500) });
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
-    const auth = await requireRole(request, ACCESS.field);
+    const auth = await requireRole(request, ACCESS.serviceRead);
     if ('response' in auth) return auth.response;
     const { session } = auth;
     const body = replacementSchema.parse(await request.json());

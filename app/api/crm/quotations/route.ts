@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { ACCESS, getSession, requireRole } from '@/lib/auth';
+import { ACCESS, requireRole } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/db';
 
 const quotationSchema = z.object({
@@ -10,28 +10,35 @@ const quotationSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const session = await getSession(request);
-  if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+  const auth = await requireRole(request, ACCESS.sales);
+  if ('response' in auth) return auth.response;
+  const { session } = auth;
+  const ownershipClause = session.user.role === 'sales_consultant' ? ' AND q.created_by = $2' : '';
+  const parameters = session.user.role === 'sales_consultant' ? [session.user.organizationId, session.user.id] : [session.user.organizationId];
   const result = await query(
     `SELECT q.id, q.number, q.status, q.currency, q.total, q.valid_until, q.created_at, c.id AS client_id, c.name AS client_name,
             COALESCE(json_agg(json_build_object('id', qi.id, 'sku', qi.sku, 'description', qi.description, 'quantity', qi.quantity, 'unitPrice', qi.unit_price)
               ORDER BY qi.created_at) FILTER (WHERE qi.id IS NOT NULL), '[]'::json) AS items
      FROM quotations q JOIN clients c ON c.id = q.client_id LEFT JOIN quotation_items qi ON qi.quotation_id = q.id
-     WHERE q.organization_id = $1 GROUP BY q.id, c.id ORDER BY q.created_at DESC LIMIT 200`,
-    [session.user.organizationId],
+     WHERE q.organization_id = $1${ownershipClause} GROUP BY q.id, c.id ORDER BY q.created_at DESC LIMIT 200`,
+    parameters,
   );
   return NextResponse.json({ quotations: result.rows });
 }
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireRole(request, ACCESS.operations);
+    const auth = await requireRole(request, ACCESS.sales);
     if ('response' in auth) return auth.response;
     const { session } = auth;
     const body = quotationSchema.parse(await request.json());
     const quotation = await withTransaction(async client => {
       const clientResult = await client.query('SELECT id FROM clients WHERE id = $1 AND organization_id = $2', [body.clientId, session.user.organizationId]);
       if (!clientResult.rows[0]) throw Object.assign(new Error('Client not found.'), { code: 'CLIENT_NOT_FOUND' });
+      if (body.opportunityId) {
+        const opportunityResult = await client.query('SELECT id FROM opportunities WHERE id = $1 AND organization_id = $2', [body.opportunityId, session.user.organizationId]);
+        if (!opportunityResult.rows[0]) throw Object.assign(new Error('Opportunity not found.'), { code: 'OPPORTUNITY_NOT_FOUND' });
+      }
       const number = `QUO-${new Date().getFullYear()}-${randomUUID().slice(0, 6).toUpperCase()}`;
       const total = body.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
       const header = await client.query(
@@ -46,6 +53,7 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: 'Client and at least one valid quotation line are required.' }, { status: 400 });
     if ((error as { code?: string }).code === 'CLIENT_NOT_FOUND') return NextResponse.json({ error: 'Client not found.' }, { status: 404 });
+    if ((error as { code?: string }).code === 'OPPORTUNITY_NOT_FOUND') return NextResponse.json({ error: 'Opportunity not found.' }, { status: 404 });
     console.error('Quotation create failed', error);
     return NextResponse.json({ error: 'Unable to create quotation.' }, { status: 500 });
   }

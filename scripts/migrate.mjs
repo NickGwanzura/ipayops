@@ -6,7 +6,10 @@ const { Pool } = pg;
 if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required.');
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined });
 const client = await pool.connect();
+let migrationLockAcquired = false;
 try {
+  await client.query("SELECT pg_advisory_lock(hashtext('ipaytech_ops_schema_migrations'))");
+  migrationLockAcquired = true;
   await client.query('CREATE TABLE IF NOT EXISTS schema_migrations (id text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');
   const files = (await readdir(join(process.cwd(), 'db/migrations'))).filter(file => file.endsWith('.sql')).sort();
   for (const file of files) {
@@ -24,6 +27,7 @@ try {
     }
   }
 } finally {
+  if (migrationLockAcquired) await client.query("SELECT pg_advisory_unlock(hashtext('ipaytech_ops_schema_migrations'))");
   client.release();
   await pool.end();
 }

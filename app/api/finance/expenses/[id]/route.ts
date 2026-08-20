@@ -5,7 +5,8 @@ import { query } from '@/lib/db';
 
 const updateSchema = z.object({ category: z.string().trim().min(2).max(80).optional(), description: z.string().trim().min(2).max(240).optional() });
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const auth = await requireRole(request, ACCESS.finance);
   if ('response' in auth) return auth.response;
   const result = await query(`SELECT e.id, e.number, e.category, e.description, e.amount, e.currency, e.status, e.submitted_at, e.approved_at, e.paid_at, u.full_name AS submitter_name, a.full_name AS approver_name, COALESCE((SELECT json_agg(json_build_object('id', att.id, 'fileName', att.file_name, 'mimeType', att.mime_type, 'sizeBytes', att.size_bytes, 'createdAt', att.created_at) ORDER BY att.created_at DESC) FROM attachments att WHERE att.entity_id = e.id AND att.entity_type = 'expense'), '[]'::json) AS attachments FROM expense_claims e JOIN users u ON u.id = e.submitter_id LEFT JOIN users a ON a.id = e.approved_by WHERE e.id = $1 AND e.organization_id = $2 GROUP BY e.id, u.full_name, a.full_name`, [params.id, auth.session.user.organizationId]);
@@ -13,7 +14,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
   return NextResponse.json({ expense: result.rows[0] });
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const auth = await requireRole(request, ACCESS.finance);
     if ('response' in auth) return auth.response;
@@ -28,7 +30,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const auth = await requireRole(request, ACCESS.finance);
   if ('response' in auth) return auth.response;
   const result = await query(`UPDATE expense_claims SET status = 'Rejected', updated_at = now() WHERE id = $1 AND organization_id = $2 AND status = 'Pending' RETURNING id, number, status`, [params.id, auth.session.user.organizationId]);

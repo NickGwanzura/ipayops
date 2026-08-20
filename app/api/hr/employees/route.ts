@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { ACCESS, hashPassword, requireRole } from '@/lib/auth';
+import { ACCESS, canManageEmployee, hashPassword, requireRole } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/db';
+import { sendNotification } from '@/lib/notifications';
 
 const createSchema = z.object({
   fullName: z.string().trim().min(2).max(120),
   email: z.string().trim().email().max(200),
   password: z.string().min(12).max(128),
-  role: z.enum(['ceo', 'admin', 'manager', 'operator', 'finance', 'hr', 'installer', 'viewer']).default('operator'),
+  role: z.enum(['ceo', 'manager', 'finance', 'sales_consultant']).default('sales_consultant'),
 });
 
 export async function GET(request: Request) {
@@ -31,6 +32,7 @@ export async function POST(request: Request) {
     const auth = await requireRole(request, ACCESS.hr);
     if ('response' in auth) return auth.response;
     const body = createSchema.parse(await request.json());
+    if (!canManageEmployee(auth.session, undefined, body.role)) return NextResponse.json({ error: 'Managers cannot create or assign CEO accounts.' }, { status: 403 });
     const passwordHash = await hashPassword(body.password);
     const employee = await withTransaction(async client => {
       const result = await client.query(
@@ -46,6 +48,7 @@ export async function POST(request: Request) {
       );
       return result.rows[0];
     });
+    void sendNotification({ organizationId: auth.session.user.organizationId, eventType: 'employee.onboarding', recipientEmail: employee.email, recipientName: employee.full_name, subject: 'Welcome to iPayTech Operations', eyebrow: 'People & onboarding', title: 'Your workspace account is ready', summary: 'An iPayTech Operations account has been created for you. Contact your manager for secure sign-in credentials.', fields: [{ label: 'Name', value: employee.full_name }, { label: 'Role', value: employee.role }, { label: 'Account', value: employee.email }] });
     return NextResponse.json({ employee }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: 'Name, email, password, and role are required.' }, { status: 400 });

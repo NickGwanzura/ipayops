@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { ACCESS, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
-  const session = await getSession(request);
-  if (!session) return NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 });
+  const auth = await requireRole(request, ACCESS.sales);
+  if ('response' in auth) return auth.response;
+  const { session } = auth;
   const serial = request.nextUrl.searchParams.get('serial')?.trim() || '';
   if (!serial) return NextResponse.json({ error: 'Serial number is required.' }, { status: 400 });
   const result = await query(

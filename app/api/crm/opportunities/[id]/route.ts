@@ -12,19 +12,26 @@ const updateSchema = z.object({
   notes: z.string().trim().max(500).optional(),
 });
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
-    const auth = await requireRole(request, ACCESS.operations);
+    const auth = await requireRole(request, ACCESS.sales);
     if ('response' in auth) return auth.response;
     const { session } = auth;
     const body = updateSchema.parse(await request.json());
+    if (body.clientId) {
+      const client = await query('SELECT id FROM clients WHERE id = $1 AND organization_id = $2', [body.clientId, session.user.organizationId]);
+      if (!client.rows[0]) return NextResponse.json({ error: 'Client not found.' }, { status: 404 });
+    }
+    const ownershipClause = session.user.role === 'sales_consultant' ? ' AND owner_id = $9' : '';
+    const parameters = [body.name ?? null, body.clientId ?? null, body.stage ?? null, body.value ?? null, body.expectedClose ?? null, body.notes ?? null, params.id, session.user.organizationId, ...(session.user.role === 'sales_consultant' ? [session.user.id] : [])];
     const result = await query(
       `UPDATE opportunities SET
         name = COALESCE($1, name), client_id = COALESCE($2, client_id), stage = COALESCE($3, stage),
         value = COALESCE($4, value), expected_close = COALESCE($5, expected_close), notes = COALESCE($6, notes), updated_at = now()
-       WHERE id = $7 AND organization_id = $8
+       WHERE id = $7 AND organization_id = $8${ownershipClause}
        RETURNING id, name, client_id, lead_id, stage, value, expected_close, notes, updated_at`,
-      [body.name ?? null, body.clientId ?? null, body.stage ?? null, body.value ?? null, body.expectedClose ?? null, body.notes ?? null, params.id, session.user.organizationId],
+      parameters,
     );
     if (!result.rows[0]) return NextResponse.json({ error: 'Opportunity not found.' }, { status: 404 });
     return NextResponse.json({ opportunity: result.rows[0] });
@@ -35,10 +42,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
-  const auth = await requireRole(request, ACCESS.operations);
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const auth = await requireRole(request, ACCESS.sales);
   if ('response' in auth) return auth.response;
-  const result = await query(`UPDATE opportunities SET stage = 'Lost', updated_at = now() WHERE id = $1 AND organization_id = $2 RETURNING id, stage`, [params.id, auth.session.user.organizationId]);
+  const scope = auth.session.user.role === 'sales_consultant' ? ' AND owner_id = $3' : '';
+  const values = auth.session.user.role === 'sales_consultant' ? [params.id, auth.session.user.organizationId, auth.session.user.id] : [params.id, auth.session.user.organizationId];
+  const result = await query(`UPDATE opportunities SET stage = 'Lost', updated_at = now() WHERE id = $1 AND organization_id = $2${scope} RETURNING id, stage`, values);
   if (!result.rows[0]) return NextResponse.json({ error: 'Opportunity not found.' }, { status: 404 });
   return NextResponse.json({ opportunity: result.rows[0], archived: true });
 }

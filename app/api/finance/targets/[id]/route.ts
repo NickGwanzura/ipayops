@@ -5,9 +5,10 @@ import { query } from '@/lib/db';
 
 const updateSchema = z.object({ consultantId: z.string().uuid().optional(), periodStart: z.string().date().optional(), periodEnd: z.string().date().optional(), targetAmount: z.number().nonnegative().max(100000000).optional() });
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
-    const auth = await requireRole(request, ACCESS.finance);
+    const auth = await requireRole(request, ACCESS.financeSettings);
     if ('response' in auth) return auth.response;
     const body = updateSchema.parse(await request.json());
     if (body.consultantId) { const consultant = await query(`SELECT id FROM users WHERE id = $1 AND organization_id = $2 AND is_active = true`, [body.consultantId, auth.session.user.organizationId]); if (!consultant.rows[0]) return NextResponse.json({ error: 'Consultant not found.' }, { status: 404 }); }
@@ -22,8 +23,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
-  const auth = await requireRole(request, ACCESS.finance);
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const auth = await requireRole(request, ACCESS.financeSettings);
   if ('response' in auth) return auth.response;
   const result = await query(`UPDATE consultant_targets SET is_active = false WHERE id = $1 AND organization_id = $2 RETURNING id, is_active`, [params.id, auth.session.user.organizationId]);
   if (!result.rows[0]) return NextResponse.json({ error: 'Consultant target not found.' }, { status: 404 });
