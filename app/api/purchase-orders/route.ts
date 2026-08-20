@@ -3,10 +3,11 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { ACCESS, requireRole } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/db';
+import { notifyOrganizationRoles } from '@/lib/notifications';
+import { writeAuditLog } from '@/lib/audit';
 
 const itemSchema = z.object({
-  sku: z.string().trim().min(1).max(80),
-  description: z.string().trim().min(1).max(200),
+  productId: z.string().uuid(),
   quantity: z.number().int().positive().max(100000),
   unitCost: z.number().nonnegative().max(100000000),
 });
@@ -15,7 +16,7 @@ const purchaseOrderSchema = z.object({
   supplierId: z.string().uuid(),
   destination: z.string().trim().min(2).max(160),
   expectedAt: z.string().date().optional(),
-  status: z.enum(['Draft', 'Pending approval', 'Approved']).optional().default('Pending approval'),
+  status: z.enum(['Draft', 'Pending approval']).optional().default('Pending approval'),
   items: z.array(itemSchema).min(1).max(200),
 });
 
@@ -60,18 +61,27 @@ export async function POST(request: Request) {
         [session.user.organizationId, number, body.supplierId, body.destination, body.status, total, body.expectedAt || null, session.user.id],
       );
       for (const item of body.items) {
+        const product = await client.query(
+          `SELECT id, product_type, product_name, sku, serial_required
+           FROM supplier_products
+           WHERE id = $1 AND supplier_id = $2 AND organization_id = $3 AND status = 'Active'`,
+          [item.productId, body.supplierId, session.user.organizationId],
+        );
+        if (!product.rows[0]) throw Object.assign(new Error('Supplier product not found.'), { code: 'PRODUCT_NOT_FOUND' });
         await client.query(
-          `INSERT INTO purchase_order_items (purchase_order_id, sku, description, quantity, unit_cost)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [header.rows[0].id, item.sku, item.description, item.quantity, item.unitCost],
+          `INSERT INTO purchase_order_items (purchase_order_id, supplier_product_id, product_type, serial_required, sku, description, quantity, unit_cost)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [header.rows[0].id, product.rows[0].id, product.rows[0].product_type, product.rows[0].serial_required, product.rows[0].sku, product.rows[0].product_name, item.quantity, item.unitCost],
         );
       }
       return header.rows[0];
     });
+    await writeAuditLog({ organizationId: session.user.organizationId, actorUserId: session.user.id, action: 'purchase_order.submitted', entityType: 'purchase_order', entityId: order.id, metadata: { number: order.number, status: order.status, total: order.total }, request });
+    void notifyOrganizationRoles({ organizationId: session.user.organizationId, roles: ['ceo', 'manager'], excludeUserId: session.user.id, eventType: 'purchase_order.submitted', subject: `Purchase order ${order.number} requires approval`, eyebrow: 'Procurement approval', title: 'Purchase order submitted', summary: 'A serialized procurement order is waiting for approval before receiving can begin.', fields: [{ label: 'Purchase order', value: order.number }, { label: 'Status', value: order.status }, { label: 'Total', value: String(order.total) }], action: { label: 'Open procurement', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Procurement` } });
     return NextResponse.json({ purchaseOrder: order }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: 'Supplier, destination, and at least one valid line item are required.' }, { status: 400 });
-    if ((error as { code?: string }).code === 'SUPPLIER_NOT_FOUND') return NextResponse.json({ error: 'Active supplier not found.' }, { status: 404 });
+    if ((error as { code?: string }).code === 'SUPPLIER_NOT_FOUND' || (error as { code?: string }).code === 'PRODUCT_NOT_FOUND') return NextResponse.json({ error: 'Active supplier or supplier product not found.' }, { status: 404 });
     console.error('Purchase order create failed', error);
     return NextResponse.json({ error: 'Unable to create purchase order.' }, { status: 500 });
   }

@@ -29,7 +29,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       const allItemIds = body.items.flatMap(item => item.inventoryItemIds);
       if (new Set(allItemIds).size !== allItemIds.length) throw Object.assign(new Error('Inventory items must be unique.'), { code: 'DUPLICATE_ITEMS' });
       const inventory = await client.query(
-        `SELECT id, serial_number, sku, description, status FROM inventory_items
+        `SELECT id, serial_number, sku, description, status, cost_price, selling_price FROM inventory_items
          WHERE organization_id = $1 AND id = ANY($2::uuid[]) FOR UPDATE`,
         [session.user.organizationId, allItemIds],
       );
@@ -53,9 +53,9 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         for (const inventoryItemId of requested.inventoryItemIds) {
           const item = inventoryMap.get(inventoryItemId);
           await client.query(
-            `INSERT INTO sale_items (sale_id, quotation_item_id, inventory_item_id, serial_number, sku, description, amount)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [saleResult.rows[0].id, line.id, item.id, item.serial_number, item.sku, item.description, amount],
+            `INSERT INTO sale_items (sale_id, quotation_item_id, inventory_item_id, serial_number, sku, description, amount, purchase_cost, selling_price)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+            [saleResult.rows[0].id, line.id, item.id, item.serial_number, item.sku, item.description, amount, Number(item.cost_price || 0), amount],
           );
           await client.query(`UPDATE inventory_items SET status = 'Sold', client_name = (SELECT name FROM clients WHERE id = $1), updated_at = now() WHERE id = $2`, [quote.client_id, item.id]);
           await client.query(

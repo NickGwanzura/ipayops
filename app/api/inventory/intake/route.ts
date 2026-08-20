@@ -4,7 +4,7 @@ import { ACCESS, requireRole } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/db';
 import { writeAuditLog } from '@/lib/audit';
 
-const intakeSchema = z.object({ category: z.enum(['Laptop', 'POS']), productName: z.string().trim().min(2).max(160), sku: z.string().trim().min(2).max(80), location: z.string().trim().min(2).max(120), serialNumbers: z.array(z.string().trim().min(2).max(120)).min(1).max(500), notes: z.string().trim().max(500).optional().default('') });
+const intakeSchema = z.object({ category: z.enum(['Laptop', 'POS']), productName: z.string().trim().min(2).max(160), sku: z.string().trim().min(2).max(80), location: z.string().trim().min(2).max(120), serialNumbers: z.array(z.string().trim().min(2).max(120)).min(1).max(500), supplierProductId: z.string().uuid().optional(), notes: z.string().trim().max(500).optional().default('') });
 
 export async function POST(request: Request) {
   try {
@@ -12,6 +12,9 @@ export async function POST(request: Request) {
     if ('response' in auth) return auth.response;
     const { session } = auth;
     const body = intakeSchema.parse(await request.json());
+    const product = body.supplierProductId ? (await query(`SELECT id, product_type, sku, product_name, cost_price, selling_price FROM supplier_products WHERE id = $1 AND organization_id = $2 AND status = 'Active'`, [body.supplierProductId, session.user.organizationId])).rows[0] : null;
+    if (body.supplierProductId && !product) return NextResponse.json({ error: 'Supplier product not found.' }, { status: 404 });
+    if (product && (product.product_type !== body.category || product.sku !== body.sku)) return NextResponse.json({ error: 'Selected supplier product does not match the product type or SKU.' }, { status: 400 });
     const normalizedSerials = body.serialNumbers.map(serial => serial.trim()).filter(Boolean);
     if (new Set(normalizedSerials.map(serial => serial.toLowerCase())).size !== normalizedSerials.length) return NextResponse.json({ error: 'Serial numbers must be unique.' }, { status: 400 });
     const result = await withTransaction(async client => {
@@ -19,7 +22,7 @@ export async function POST(request: Request) {
       if (duplicate.rows[0]) throw Object.assign(new Error(`Serial ${duplicate.rows[0].serial_number} already exists.`), { code: 'DUPLICATE_SERIAL' });
       const items = [];
       for (const serial of normalizedSerials) {
-        const inserted = await client.query(`INSERT INTO inventory_items (organization_id, serial_number, sku, description, location, status) VALUES ($1, $2, $3, $4, $5, 'Available') RETURNING id, serial_number, sku, description, location, status`, [session.user.organizationId, serial, body.sku, `${body.category} · ${body.productName}`, body.location]);
+        const inserted = await client.query(`INSERT INTO inventory_items (organization_id, supplier_product_id, product_type, serial_number, sku, description, location, cost_price, selling_price, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Available') RETURNING id, serial_number, sku, description, location, status`, [session.user.organizationId, product?.id || null, body.category, serial, body.sku, `${body.category} · ${body.productName}`, body.location, product?.cost_price || 0, product?.selling_price || 0]);
         items.push(inserted.rows[0]);
       }
       return items;

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { ACCESS, requireRole } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/db';
 
-const itemSchema = z.object({ sku: z.string().trim().min(1).max(80), description: z.string().trim().min(1).max(200), quantity: z.number().int().positive().max(100000), unitPrice: z.number().nonnegative().max(100000000) });
+const itemSchema = z.object({ productId: z.string().uuid().optional(), sku: z.string().trim().min(1).max(80).optional(), description: z.string().trim().min(1).max(200).optional(), quantity: z.number().int().positive().max(100000), unitPrice: z.number().nonnegative().max(100000000).optional() });
 const updateSchema = z.object({ clientId: z.string().uuid().optional(), validUntil: z.string().date().nullable().optional(), status: z.enum(['Draft', 'Sent', 'Accepted', 'Expired', 'Cancelled']).optional(), items: z.array(itemSchema).min(1).max(200).optional() });
 
 export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
@@ -13,7 +13,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
   const scope = auth.session.user.role === 'sales_consultant' ? ' AND q.created_by = $3' : '';
   const result = await query(
     `SELECT q.id, q.number, q.status, q.currency, q.total, q.valid_until, q.created_at, q.updated_at, c.id AS client_id, c.name AS client_name,
-            COALESCE(json_agg(json_build_object('id', qi.id, 'sku', qi.sku, 'description', qi.description, 'quantity', qi.quantity, 'unitPrice', qi.unit_price) ORDER BY qi.created_at) FILTER (WHERE qi.id IS NOT NULL), '[]'::json) AS items
+            COALESCE(json_agg(json_build_object('id', qi.id, 'productId', qi.supplier_product_id, 'productType', qi.product_type, 'sku', qi.sku, 'description', qi.description, 'quantity', qi.quantity, 'unitPrice', qi.unit_price) ORDER BY qi.created_at) FILTER (WHERE qi.id IS NOT NULL), '[]'::json) AS items
      FROM quotations q JOIN clients c ON c.id = q.client_id LEFT JOIN quotation_items qi ON qi.quotation_id = q.id
      WHERE q.id = $1 AND q.organization_id = $2${scope} GROUP BY q.id, c.id`,
     auth.session.user.role === 'sales_consultant' ? [params.id, auth.session.user.organizationId, auth.session.user.id] : [params.id, auth.session.user.organizationId],
@@ -38,7 +38,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
         if (!clientResult.rows[0]) throw Object.assign(new Error('Client not found.'), { code: 'CLIENT_NOT_FOUND' });
       }
       let total: number | null = null;
-      if (body.items) { total = body.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0); await client.query('DELETE FROM quotation_items WHERE quotation_id = $1', [params.id]); for (const item of body.items) await client.query('INSERT INTO quotation_items (quotation_id, sku, description, quantity, unit_price) VALUES ($1, $2, $3, $4, $5)', [params.id, item.sku, item.description, item.quantity, item.unitPrice]); }
+      if (body.items) { const resolvedItems: Array<{ productId: string | null; productType: string | null; sku: string; description: string; quantity: number; unitPrice: number }> = []; for (const item of body.items) { const product = item.productId ? (await client.query(`SELECT id, product_type, product_name, sku, selling_price FROM supplier_products WHERE id = $1 AND organization_id = $2 AND status = 'Active'`, [item.productId, auth.session.user.organizationId])).rows[0] : null; if (item.productId && !product) throw Object.assign(new Error('Product not found.'), { code: 'PRODUCT_NOT_FOUND' }); const sku = product?.sku || item.sku; const description = product?.product_name || item.description; const unitPrice = product ? Number(product.selling_price) : item.unitPrice; if (!sku || !description || unitPrice === undefined) throw Object.assign(new Error('Quotation line is incomplete.'), { code: 'LINE_INVALID' }); resolvedItems.push({ productId: product?.id || null, productType: product?.product_type || null, sku, description, quantity: item.quantity, unitPrice }); } total = resolvedItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0); await client.query('DELETE FROM quotation_items WHERE quotation_id = $1', [params.id]); for (const item of resolvedItems) await client.query('INSERT INTO quotation_items (quotation_id, supplier_product_id, product_type, sku, description, quantity, unit_price) VALUES ($1, $2, $3, $4, $5, $6, $7)', [params.id, item.productId, item.productType, item.sku, item.description, item.quantity, item.unitPrice]); }
       const result = await client.query(`UPDATE quotations SET client_id = COALESCE($1, client_id), valid_until = COALESCE($2, valid_until), status = COALESCE($3, status), total = COALESCE($4, total), updated_at = now() WHERE id = $5 RETURNING id, number, status, total, valid_until, updated_at`, [body.clientId ?? null, body.validUntil ?? null, body.status ?? null, total, params.id]);
       return result.rows[0];
     });
@@ -48,6 +48,8 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     const code = (error as { code?: string }).code;
     if (code === 'NOT_FOUND') return NextResponse.json({ error: 'Quotation not found.' }, { status: 404 });
     if (code === 'CLIENT_NOT_FOUND') return NextResponse.json({ error: 'Client not found.' }, { status: 404 });
+    if (code === 'PRODUCT_NOT_FOUND') return NextResponse.json({ error: 'Product not found.' }, { status: 404 });
+    if (code === 'LINE_INVALID') return NextResponse.json({ error: 'Every quotation line must select a product or provide SKU, description, and price.' }, { status: 400 });
     if (code === 'LOCKED') return NextResponse.json({ error: 'Converted quotations cannot be edited.' }, { status: 409 });
     console.error('Quotation update failed', error);
     return NextResponse.json({ error: 'Unable to update quotation.' }, { status: 500 });

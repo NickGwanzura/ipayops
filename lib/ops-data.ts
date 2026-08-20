@@ -1,4 +1,4 @@
-export type OpsModule = 'Procurement' | 'Inventory' | 'Sales & CRM' | 'Job cards' | 'Warranty' | 'Finance & HR' | 'Reports' | 'Audit Logs';
+export type OpsModule = 'Procurement' | 'Products' | 'Inventory' | 'Sales & CRM' | 'Job cards' | 'Warranty' | 'Finance & HR' | 'Reports' | 'Audit Logs';
 export type RecordStatus = 'Approved' | 'Pending' | 'In transit' | 'Available' | 'Reserved' | 'Active' | 'Needs review' | 'In progress' | 'Paid';
 
 export const suppliers = [
@@ -56,6 +56,7 @@ export const reportRows = [
 
 export const moduleMeta: Record<OpsModule, { title:string; description:string; icon:string }> = {
   'Procurement': { title:'Procurement control', description:'Purchase orders, suppliers, receipts, and delivery commitments', icon:'shopping' },
+  'Products': { title:'Products and pricing', description:'Serialized Laptop/POS products, cost prices, selling prices, and margin controls', icon:'products' },
   'Inventory': { title:'Serialized inventory', description:'Trace every device from supplier receipt to delivery and warranty', icon:'boxes' },
   'Sales & CRM': { title:'Sales & CRM', description:'Clients, pipeline, pre-sales, reservations, and confirmed sales', icon:'crm' },
   'Job cards': { title:'Jobs & installations', description:'Schedule, assign, configure, and sign off device installations', icon:'jobs' },

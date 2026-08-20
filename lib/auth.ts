@@ -44,6 +44,8 @@ export const ACCESS = {
   people: [ROLE.CEO, ROLE.MANAGER, ROLE.FINANCE] as const,
   commissionRead: [ROLE.CEO, ROLE.MANAGER, ROLE.FINANCE, ROLE.SALES_CONSULTANT] as const,
   expenseSubmitter: [ROLE.CEO, ROLE.MANAGER, ROLE.FINANCE, ROLE.SALES_CONSULTANT] as const,
+  productRead: [ROLE.CEO, ROLE.MANAGER, ROLE.FINANCE, ROLE.SALES_CONSULTANT] as const,
+  productManage: [ROLE.CEO, ROLE.MANAGER] as const,
 } as const;
 
 export type AuthSession = { user: AuthUser; sessionId: string };

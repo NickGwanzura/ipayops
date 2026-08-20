@@ -18,7 +18,12 @@ export type NotificationEvent =
   | 'expense.submitted'
   | 'expense.status_changed'
   | 'employee.onboarding'
-  | 'employee.offboarded';
+  | 'employee.offboarded'
+  | 'purchase_order.submitted'
+  | 'purchase_order.approved'
+  | 'goods_receipt.posted'
+  | 'repair_requisition.submitted'
+  | 'expense.asset_linked';
 
 export async function sendNotification(input: { organizationId: string; eventType: NotificationEvent; recipientEmail: string; recipientName?: string; subject: string; eyebrow: string; title: string; summary: string; fields?: EmailField[]; action?: { label: string; url: string } }) {
   if (!emailConfigured()) return { status: 'not_configured' as const, providerId: null, errorMessage: null };
@@ -38,4 +43,14 @@ export async function sendNotification(input: { organizationId: string; eventTyp
     console.error('Notification delivery log failed', error);
   }
   return { status, providerId, errorMessage };
+}
+
+export async function notifyOrganizationRoles(input: Omit<Parameters<typeof sendNotification>[0], 'recipientEmail' | 'recipientName'> & { roles: string[]; excludeUserId?: string }) {
+  const recipients = await query<{ email: string; full_name: string }>(
+    `SELECT email, full_name FROM users
+     WHERE organization_id = $1 AND is_active = true AND role = ANY($2::text[])
+       AND ($3::uuid IS NULL OR id <> $3)`,
+    [input.organizationId, input.roles, input.excludeUserId || null],
+  );
+  return Promise.all(recipients.rows.map(recipient => sendNotification({ ...input, recipientEmail: recipient.email, recipientName: recipient.full_name })));
 }
