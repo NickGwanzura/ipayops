@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { PDFDocument, rgb } from 'pdf-lib';
 import { ACCESS, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
-import { drawPdfFooter, drawPdfHeader, embedIpaytechFonts, embedIpaytechLogo, embedReportVerificationQr, PDF_INK, PDF_MUTED, PDF_PAGE_SIZE } from '@/lib/pdf-brand';
+import { drawPdfFooter, drawPdfHeader, drawPdfTableHeader, drawPdfWrappedText, embedIpaytechFonts, embedIpaytechLogo, embedReportVerificationQr, PDF_INK, PDF_MUTED, PDF_PAGE_SIZE } from '@/lib/pdf-brand';
 import { formatOrganizationDate } from '@/lib/organization-settings';
 import { getOrganizationSettings } from '@/lib/server-organization-settings';
 import { createXlsxWorkbook } from '@/lib/xlsx-export';
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
     return new Response(buffer.buffer as ArrayBuffer, { headers:{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':`attachment; filename="ipaytech-operations-${from}-to-${to}.xlsx"`} });
   }
   const pdf = await PDFDocument.create(); const logo = await embedIpaytechLogo(pdf); const { regular: font, semibold: bold } = await embedIpaytechFonts(pdf); const qr = await embedReportVerificationQr(pdf, request, { from, to, region, product });
-  const rowsPerPage = 22; const dataRows = rows.slice(1); const totalPages = Math.max(1, Math.ceil(dataRows.length / rowsPerPage));
+  const rowsPerPage = 20; const dataRows = rows.slice(1); const totalPages = Math.max(1, Math.ceil(dataRows.length / rowsPerPage));
   for (let pageIndex = 0; pageIndex < totalPages; pageIndex += 1) {
     const page = pdf.addPage(PDF_PAGE_SIZE);
     if (pageIndex === 0) {
@@ -62,10 +62,17 @@ export async function GET(request: NextRequest) {
       page.drawText(`Continued · ${from} to ${to}`, { x: 42, y: 784, size: 8, font, color: rgb(.45, .5, .58) });
       page.drawLine({ start: { x: 42, y: 765 }, end: { x: 553, y: 765 }, thickness: 1, color: rgb(.86, .9, .95) });
     }
-    const pageRows = [rows[0], ...dataRows.slice(pageIndex * rowsPerPage, (pageIndex + 1) * rowsPerPage)];
     const tableTop = pageIndex === 0 ? 620 : 740;
-    page.drawRectangle({ x: 42, y: tableTop + 12, width: 511, height: 24, color: rgb(.94, .96, .98) });
-    pageRows.forEach((row, index) => row.forEach((cell, col) => page.drawText(cell, { x: 48 + col * 130, y: tableTop - index * 26, size: index === 0 ? 8.5 : 9.5, font: index === 0 ? bold : font, color: index === 0 ? PDF_MUTED : PDF_INK })));
+    let rowY = drawPdfTableHeader(page, { y: tableTop, columns: [{ label: 'Reference', x: 48 }, { label: 'Client / Supplier', x: 178 }, { label: 'Status', x: 350 }, { label: 'Value', x: 476 }], font: bold });
+    const pageRows = dataRows.slice(pageIndex * rowsPerPage, (pageIndex + 1) * rowsPerPage);
+    pageRows.forEach((row) => {
+      drawPdfWrappedText(page, row[0], { x: 48, y: rowY, maxWidth: 115, font, size: 8.5, maxLines: 2 });
+      drawPdfWrappedText(page, row[1], { x: 178, y: rowY, maxWidth: 155, font, size: 8.5, maxLines: 2 });
+      drawPdfWrappedText(page, row[2], { x: 350, y: rowY, maxWidth: 110, font, size: 8.5, maxLines: 2 });
+      page.drawText(row[3], { x: 476, y: rowY, size: 8.5, font, color: PDF_INK });
+      page.drawLine({ start: { x: 48, y: rowY - 9 }, end: { x: 553, y: rowY - 9 }, thickness: .5, color: rgb(.9, .92, .95) });
+      rowY -= 25;
+    });
     drawPdfFooter(page, { font, generatedAt: formatOrganizationDate(qr.generatedAt, settings), pageNumber: pageIndex + 1, totalPages });
   }
   const bytes = await pdf.save();

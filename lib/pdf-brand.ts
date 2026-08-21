@@ -12,6 +12,16 @@ export const PDF_MUTED = rgb(0.35, 0.42, 0.52);
 const SOFT = rgb(0.45, 0.5, 0.58);
 const TEAL = rgb(0.07, 0.62, 0.45);
 const RULE = rgb(0.86, 0.9, 0.95);
+const HEADER = rgb(0.97, 0.98, 0.99);
+const TABLE_HEADER = rgb(0.93, 0.96, 0.98);
+
+export const PDF_LAYOUT = {
+  left: 42,
+  right: 553,
+  width: 511,
+  top: 638,
+  bottom: 72,
+};
 
 export async function embedIpaytechLogo(pdf: PDFDocument) {
   const logo = await readFile(join(process.cwd(), 'public', 'iPaytechLogo.jpg'));
@@ -37,7 +47,7 @@ export function drawPdfHeader(
     subtitle?: string;
   },
 ) {
-  page.drawRectangle({ x: 0, y: 735, width: PDF_PAGE_SIZE[0], height: 107, color: rgb(0.97, 0.98, 0.99) });
+  page.drawRectangle({ x: 0, y: 735, width: PDF_PAGE_SIZE[0], height: 107, color: HEADER });
   page.drawRectangle({ x: 0, y: 735, width: 6, height: 107, color: TEAL });
   page.drawImage(input.logo, { x: 42, y: 758, width: 165, height: 69 });
   page.drawText(input.settings.organizationName, { x: 230, y: 810, size: 11, font: input.bold, color: PDF_INK });
@@ -48,6 +58,42 @@ export function drawPdfHeader(
   if (input.subtitle) page.drawText(input.subtitle, { x: 42, y: 685, size: 9, font: input.font, color: PDF_MUTED });
   page.drawLine({ start: { x: 42, y: 665 }, end: { x: 553, y: 665 }, thickness: 1, color: RULE });
   return 638;
+}
+
+export function drawPdfSectionHeading(page: PDFPage, input: { title: string; y: number; font: PDFFont; bold: PDFFont }) {
+  page.drawText(input.title.toUpperCase(), { x: PDF_LAYOUT.left, y: input.y, size: 8.5, font: input.bold, color: PDF_MUTED });
+  page.drawLine({ start: { x: PDF_LAYOUT.left, y: input.y - 7 }, end: { x: PDF_LAYOUT.right, y: input.y - 7 }, thickness: 0.8, color: RULE });
+  return input.y - 25;
+}
+
+export function drawPdfTableHeader(page: PDFPage, input: { y: number; columns: Array<{ label: string; x: number }> ; font: PDFFont }) {
+  page.drawRectangle({ x: PDF_LAYOUT.left, y: input.y - 8, width: PDF_LAYOUT.width, height: 24, color: TABLE_HEADER });
+  for (const column of input.columns) {
+    page.drawText(column.label.toUpperCase(), { x: column.x, y: input.y, size: 7.5, font: input.font, color: PDF_MUTED });
+  }
+  return input.y - 28;
+}
+
+export function drawPdfWrappedText(page: PDFPage, text: string, input: { x: number; y: number; maxWidth: number; font: PDFFont; size?: number; color?: ReturnType<typeof rgb>; lineHeight?: number; maxLines?: number }) {
+  const size = input.size ?? 9;
+  const lineHeight = input.lineHeight ?? size + 4;
+  const words = String(text || '—').split(/\s+/);
+  const lines: string[] = [];
+  let line = '';
+  for (const word of words) {
+    const candidate = line ? `${line} ${word}` : word;
+    if (input.font.widthOfTextAtSize(candidate, size) <= input.maxWidth || !line) line = candidate;
+    else { lines.push(line); line = word; }
+  }
+  if (line) lines.push(line);
+  const visibleLines = input.maxLines ? lines.slice(0, input.maxLines) : lines;
+  if (input.maxLines && lines.length > input.maxLines && visibleLines.length) {
+    let last = visibleLines[visibleLines.length - 1];
+    while (last.length && input.font.widthOfTextAtSize(`${last}...`, size) > input.maxWidth) last = last.slice(0, -1);
+    visibleLines[visibleLines.length - 1] = `${last}...`;
+  }
+  visibleLines.forEach((lineText, index) => page.drawText(lineText, { x: input.x, y: input.y - index * lineHeight, size, font: input.font, color: input.color ?? PDF_INK }));
+  return input.y - visibleLines.length * lineHeight;
 }
 
 export function drawPdfFooter(page: PDFPage, input: { font: PDFFont; generatedAt: string; pageNumber: number; totalPages: number }) {

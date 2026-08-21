@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { PDFDocument, rgb } from 'pdf-lib';
 import { ACCESS, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
-import { drawPdfFooter, drawPdfHeader, embedDocumentVerificationQr, embedIpaytechFonts, embedIpaytechLogo, PDF_PAGE_SIZE } from '@/lib/pdf-brand';
+import { drawPdfFooter, drawPdfHeader, drawPdfSectionHeading, drawPdfWrappedText, embedDocumentVerificationQr, embedIpaytechFonts, embedIpaytechLogo, PDF_PAGE_SIZE } from '@/lib/pdf-brand';
 import { formatOrganizationDate } from '@/lib/organization-settings';
 import { getOrganizationSettings } from '@/lib/server-organization-settings';
 
@@ -31,13 +31,13 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
   const { regular: font, semibold: bold } = await embedIpaytechFonts(pdf);
   const qr = await embedDocumentVerificationQr(pdf, request, { type: 'job-card', id: params.id, documentTimestamp: new Date(job.created_at).toISOString() });
   let y = drawPdfHeader(page, { logo, qr: qr.image, font, bold, settings, title: 'Job card', subtitle: `${job.number} · ${job.title}` });
-  page.drawText('Installation details', { x: 42, y, size: 9, font: bold, color: rgb(.35, .42, .52) }); y -= 22;
+  y = drawPdfSectionHeading(page, { title: 'Installation details', y, font, bold });
   page.drawText(`Client: ${job.client_name}`, { x: 42, y, size: 10, font });
   page.drawText(`Status: ${job.status}`, { x: 330, y, size: 10, font }); y -= 18;
   page.drawText(`Scheduled: ${job.scheduled_for ? formatOrganizationDate(job.scheduled_for, settings) : 'Unscheduled'}`, { x: 42, y, size: 9, font });
   page.drawText(`Installer: ${job.installer_name || 'Unassigned'}`, { x: 330, y, size: 9, font }); y -= 18;
   page.drawText(`Client contact: ${job.client_email || job.client_phone || 'No contact recorded'}`, { x: 42, y, size: 9, font }); y -= 28;
-  page.drawText('Serialized devices and configuration checklist', { x: 42, y, size: 9, font: bold, color: rgb(.35, .42, .52) }); y -= 20;
+  y = drawPdfSectionHeading(page, { title: 'Serialized devices and configuration checklist', y, font, bold }); y += 3;
   page.drawRectangle({ x: 42, y: y - 8, width: 511, height: 22, color: rgb(.94, .96, .98) });
   page.drawText('Serial number', { x: 50, y, size: 8, font: bold }); page.drawText('Checklist progress', { x: 300, y, size: 8, font: bold }); y -= 26;
   for (const item of job.items as Array<{ serialNumber: string; checklist?: Array<{ done: boolean }> }>) {
@@ -49,8 +49,9 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
   }
   if (!job.items.length) { page.drawText('No serialized devices assigned.', { x: 50, y, size: 9, font, color: rgb(.45, .5, .58) }); y -= 20; }
   y -= 10;
-  page.drawText('Notes', { x: 42, y, size: 9, font: bold, color: rgb(.35, .42, .52) }); y -= 18;
-  page.drawText(job.notes || 'No installation notes recorded.', { x: 42, y, size: 9, font }); y -= 24;
+  y = drawPdfSectionHeading(page, { title: 'Notes', y, font, bold });
+  y = drawPdfWrappedText(page, job.notes || 'No installation notes recorded.', { x: 42, y, maxWidth: 511, font, size: 9, color: job.notes ? rgb(.06, .12, .22) : rgb(.45, .5, .58), maxLines: 4 });
+  y -= 12;
   if (job.signoff_name) { page.drawText(`Signed off by: ${job.signoff_name}`, { x: 42, y, size: 9, font }); y -= 16; page.drawText(`Sign-off date: ${job.signed_at ? formatOrganizationDate(job.signed_at, settings) : '—'}`, { x: 42, y, size: 9, font }); }
   drawPdfFooter(page, { font, generatedAt: formatOrganizationDate(qr.generatedAt, settings), pageNumber: 1, totalPages: 1 });
   const bytes = await pdf.save();

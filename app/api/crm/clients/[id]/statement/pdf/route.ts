@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, PDFPage, rgb } from 'pdf-lib';
 import { ACCESS, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
-import { embedDocumentVerificationQr, embedIpaytechFonts, embedIpaytechLogo } from '@/lib/pdf-brand';
+import { drawPdfFooter, drawPdfHeader, drawPdfSectionHeading, drawPdfTableHeader, embedDocumentVerificationQr, embedIpaytechFonts, embedIpaytechLogo, PDF_INK, PDF_LAYOUT, PDF_MUTED, PDF_PAGE_SIZE } from '@/lib/pdf-brand';
 import { formatCurrency, formatOrganizationDate } from '@/lib/organization-settings';
 import { getOrganizationSettings } from '@/lib/server-organization-settings';
 
@@ -13,11 +13,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
   const auth = await requireRole(request, ACCESS.documents);
   if ('response' in auth) return auth.response;
   const { session } = auth;
-  const clientResult = await query(
-    `SELECT id, code, name, contact_name, email, phone, address, status, created_at
-     FROM clients WHERE id = $1 AND organization_id = $2`,
-    [params.id, session.user.organizationId],
-  );
+  const clientResult = await query(`SELECT id, code, name, email, phone, created_at FROM clients WHERE id = $1 AND organization_id = $2`, [params.id, session.user.organizationId]);
   const client = clientResult.rows[0];
   if (!client) return NextResponse.json({ error: 'Client not found.' }, { status: 404 });
   const [invoicesResult, paymentsResult] = await Promise.all([
@@ -26,7 +22,6 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
   ]);
   const settings = await getOrganizationSettings(session.user.organizationId);
   const pdf = await PDFDocument.create();
-  let page = pdf.addPage([595, 842]);
   const logo = await embedIpaytechLogo(pdf);
   const { regular: font, semibold: bold } = await embedIpaytechFonts(pdf);
   const qr = await embedDocumentVerificationQr(pdf, request, { type: 'client-statement', id: params.id, documentTimestamp: new Date(client.created_at).toISOString() });
@@ -34,39 +29,60 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
   const payments = paymentsResult.rows;
   const totalInvoiced = invoices.reduce((sum, item) => sum + Number(item.total || 0), 0);
   const totalPaid = payments.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-  let y = 700;
-  page.drawImage(logo, { x: 44, y: 730, width: 175, height: 73 });
-  page.drawImage(qr.image, { x: 482, y: 735, width: 78, height: 78 });
-  page.drawText(settings.address, { x: 240, y: 780, size: 8, font });
-  page.drawText(settings.phone, { x: 240, y: 766, size: 8, font });
-  page.drawText(`CLIENT STATEMENT · ${client.code}`, { x: 48, y, size: 13, font: bold });
-  y -= 22;
-  page.drawText(`Client: ${client.name}`, { x: 48, y, size: 10, font });
-  page.drawText(`Generated: ${formatOrganizationDate(qr.generatedAt, settings)}`, { x: 350, y, size: 9, font });
-  y -= 28;
-  page.drawText(`Invoiced: ${formatCurrency(totalInvoiced, settings.currency)}`, { x: 48, y, size: 10, font: bold });
-  page.drawText(`Paid: ${formatCurrency(totalPaid, settings.currency)}`, { x: 220, y, size: 10, font: bold });
-  page.drawText(`Outstanding: ${formatCurrency(Math.max(0, totalInvoiced - totalPaid), settings.currency)}`, { x: 370, y, size: 10, font: bold });
-  y -= 34;
-  page.drawText('INVOICES', { x: 48, y, size: 9, font: bold }); y -= 18;
+  const pages: PDFPage[] = [];
+  const addPage = (continued = false) => {
+    const page = pdf.addPage(PDF_PAGE_SIZE);
+    let y = drawPdfHeader(page, { logo, qr: qr.image, font, bold, settings, title: 'Client statement', subtitle: continued ? `${client.code} · continued` : `${client.code} · Account activity` });
+    if (!continued) {
+      y = drawPdfSectionHeading(page, { title: 'Account summary', y, font, bold });
+      page.drawText(`Client: ${client.name}`, { x: PDF_LAYOUT.left, y, size: 10, font: bold, color: PDF_INK });
+      page.drawText(`Account: ${client.code}`, { x: 420, y, size: 9, font, color: PDF_MUTED });
+      y -= 18;
+      page.drawText(`Contact: ${client.email || client.phone || 'No contact recorded'}`, { x: PDF_LAYOUT.left, y, size: 8.5, font, color: PDF_MUTED });
+      y -= 28;
+      page.drawRectangle({ x: PDF_LAYOUT.left, y: y - 30, width: PDF_LAYOUT.width, height: 50, color: rgb(.94, .96, .98) });
+      page.drawText('INVOICED', { x: 58, y: y + 2, size: 7.5, font: bold, color: PDF_MUTED });
+      page.drawText(formatCurrency(totalInvoiced, settings.currency), { x: 58, y: y - 16, size: 12, font: bold, color: PDF_INK });
+      page.drawText('PAID', { x: 230, y: y + 2, size: 7.5, font: bold, color: PDF_MUTED });
+      page.drawText(formatCurrency(totalPaid, settings.currency), { x: 230, y: y - 16, size: 12, font: bold, color: PDF_INK });
+      page.drawText('OUTSTANDING', { x: 400, y: y + 2, size: 7.5, font: bold, color: PDF_MUTED });
+      page.drawText(formatCurrency(Math.max(0, totalInvoiced - totalPaid), settings.currency), { x: 400, y: y - 16, size: 12, font: bold, color: PDF_INK });
+      y -= 72;
+    } else y -= 12;
+    pages.push(page);
+    return { page, y };
+  };
+  const invoiceHeader = (current: { page: typeof pages[number]; y: number }) => {
+    current.y = drawPdfSectionHeading(current.page, { title: 'Invoices', y: current.y, font, bold });
+    current.y = drawPdfTableHeader(current.page, { y: current.y, columns: [{ label: 'Invoice', x: 50 }, { label: 'Issued', x: 170 }, { label: 'Status', x: 300 }, { label: 'Outstanding', x: 450 }], font: bold });
+  };
+  let current = addPage();
+  invoiceHeader(current);
   for (const item of invoices) {
-    if (y < 90) { page = pdf.addPage([595, 842]); y = 780; }
-    page.drawText(item.number, { x: 52, y, size: 9, font });
-    page.drawText(item.issued_at ? formatOrganizationDate(item.issued_at, settings) : '—', { x: 170, y, size: 9, font });
-    page.drawText(item.status, { x: 300, y, size: 9, font });
-    page.drawText(formatCurrency(item.outstanding, settings.currency), { x: 450, y, size: 9, font }); y -= 16;
+    if (current.y < 112) { current = addPage(true); invoiceHeader(current); }
+    current.page.drawText(item.number, { x: 50, y: current.y, size: 8.5, font, color: PDF_INK });
+    current.page.drawText(item.issued_at ? formatOrganizationDate(item.issued_at, settings) : '—', { x: 170, y: current.y, size: 8.5, font, color: PDF_INK });
+    current.page.drawText(item.status || '—', { x: 300, y: current.y, size: 8.5, font, color: PDF_INK });
+    current.page.drawText(formatCurrency(item.outstanding, item.currency || settings.currency), { x: 450, y: current.y, size: 8.5, font, color: PDF_INK });
+    current.page.drawLine({ start: { x: 50, y: current.y - 9 }, end: { x: PDF_LAYOUT.right, y: current.y - 9 }, thickness: .5, color: rgb(.9, .92, .95) });
+    current.y -= 21;
   }
-  y -= 12; page.drawText('PAYMENT RECEIPTS', { x: 48, y, size: 9, font: bold }); y -= 18;
+  if (!invoices.length) { current.page.drawText('No invoices recorded.', { x: 50, y: current.y, size: 9, font, color: PDF_MUTED }); current.y -= 22; }
+  current.y -= 16;
+  if (current.y < 150) current = addPage(true);
+  current.y = drawPdfSectionHeading(current.page, { title: 'Payment receipts', y: current.y, font, bold });
+  current.y = drawPdfTableHeader(current.page, { y: current.y, columns: [{ label: 'Invoice', x: 50 }, { label: 'Paid', x: 170 }, { label: 'Method', x: 300 }, { label: 'Amount', x: 450 }], font: bold });
   for (const item of payments) {
-    if (y < 90) { page = pdf.addPage([595, 842]); y = 780; }
-    page.drawText(item.invoice_number, { x: 52, y, size: 9, font });
-    page.drawText(item.paid_at ? formatOrganizationDate(item.paid_at, settings) : '—', { x: 170, y, size: 9, font });
-    page.drawText(item.method, { x: 300, y, size: 9, font });
-    page.drawText(formatCurrency(item.amount, settings.currency), { x: 450, y, size: 9, font }); y -= 16;
+    if (current.y < 112) { current = addPage(true); current.y = drawPdfSectionHeading(current.page, { title: 'Payment receipts · continued', y: current.y, font, bold }); current.y = drawPdfTableHeader(current.page, { y: current.y, columns: [{ label: 'Invoice', x: 50 }, { label: 'Paid', x: 170 }, { label: 'Method', x: 300 }, { label: 'Amount', x: 450 }], font: bold }); }
+    current.page.drawText(item.invoice_number, { x: 50, y: current.y, size: 8.5, font, color: PDF_INK });
+    current.page.drawText(item.paid_at ? formatOrganizationDate(item.paid_at, settings) : '—', { x: 170, y: current.y, size: 8.5, font, color: PDF_INK });
+    current.page.drawText(item.method || '—', { x: 300, y: current.y, size: 8.5, font, color: PDF_INK });
+    current.page.drawText(formatCurrency(item.amount, settings.currency), { x: 450, y: current.y, size: 8.5, font, color: PDF_INK });
+    current.page.drawLine({ start: { x: 50, y: current.y - 9 }, end: { x: PDF_LAYOUT.right, y: current.y - 9 }, thickness: .5, color: rgb(.9, .92, .95) });
+    current.y -= 21;
   }
-  for (const statementPage of pdf.getPages()) {
-    statementPage.drawText(`Generated ${qr.generatedAt} · Scan QR to verify authenticity`, { x: 48, y: 34, size: 7, font });
-  }
+  if (!payments.length) current.page.drawText('No payment receipts recorded.', { x: 50, y: current.y, size: 9, font, color: PDF_MUTED });
+  pages.forEach((page, index) => drawPdfFooter(page, { font, generatedAt: formatOrganizationDate(qr.generatedAt, settings), pageNumber: index + 1, totalPages: pages.length }));
   const bytes = await pdf.save();
   return new NextResponse(Buffer.from(bytes), { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${client.code}-statement.pdf"` } });
 }
