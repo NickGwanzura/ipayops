@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title>iPayTech</title>
+  <rect width="64" height="64" rx="14" fill="#101c32"/>
+  <path d="M32 13c-2.9 0-5.2 2.3-5.2 5.2s2.3 5.2 5.2 5.2 5.2-2.3 5.2-5.2S34.9 13 32 13Z" fill="#44d7ad"/>
+  <path d="M25.8 29.2h12.4V50H25.8V29.2Z" fill="#fff"/>
+  <path d="M18 50h28v-5.5H18V50Z" fill="#2f7cf6"/>
+</svg>
