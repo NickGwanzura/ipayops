@@ -1,0 +1,271 @@
+/* Responsive operations primitives. Keep wide tables readable without forcing
+   every dashboard card to become a horizontal scrolling viewport. */
+.data-table,
+.report-table {
+  min-width: 0;
+}
+
+.data-table .table-head,
+.data-table .data-row,
+.report-table .table-head,
+.report-table .data-row {
+  min-width: 0;
+}
+
+.data-row > *,
+.table-head > * {
+  min-width: 0;
+}
+
+.data-row > span,
+.data-row > strong,
+.data-row > div {
+  overflow-wrap: anywhere;
+}
+
+.row-action {
+  min-height: 32px;
+}
+
+.product-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.finance-priority-grid > :first-child {
+  order: 2;
+}
+
+.finance-priority-grid > :nth-child(2) {
+  order: 1;
+}
+
+@media (max-width: 1050px) {
+  .ops-grid-two {
+    grid-template-columns: 1fr;
+  }
+
+  .ops-grid-two .data-table {
+    overflow: visible;
+  }
+
+  .finance-priority-grid {
+    display: flex;
+    flex-direction: column;
+  }
+
+}
+
+@media (max-width: 700px) {
+  .ops-shell {
+    display: block;
+  }
+
+  .ops-rail {
+    width: 100%;
+    min-height: 60px;
+    height: auto;
+    padding: 8px 10px;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    overflow-x: auto;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .ops-brand {
+    flex: 0 0 auto;
+    padding: 0 8px;
+  }
+
+  .ops-logo {
+    width: 116px;
+    height: auto;
+  }
+
+  .ops-rail-title {
+    display: none;
+  }
+
+  .ops-nav {
+    width: auto;
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+    flex: 0 0 auto;
+    justify-content: center;
+    padding: 0 10px;
+    margin: 0;
+    font-size: 11px;
+  }
+
+  .ops-nav span {
+    display: none;
+  }
+
+  .ops-rail-bottom {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    flex: 0 0 auto;
+  }
+
+  .ops-rail-bottom .ops-nav span {
+    display: none;
+  }
+
+  .back-dashboard {
+    display: none;
+  }
+
+  .ops-top {
+    height: auto;
+    display: grid;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+
+  .ops-top-actions {
+    width: 100%;
+    margin: 0;
+  }
+
+  .ops-search {
+    width: 100%;
+  }
+
+  .ops-avatar {
+    flex: 0 0 36px;
+    width: 36px;
+    height: 36px;
+  }
+
+  .ops-content {
+    padding: 18px 12px 28px;
+  }
+
+  .ops-heading-actions {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .ops-heading-actions .ops-btn,
+  .workflow-actions .ops-btn {
+    min-height: 44px;
+  }
+
+  .ops-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .ops-kpi {
+    padding: 13px;
+  }
+
+  .ops-kpi strong {
+    font-size: 19px;
+  }
+
+  .ops-panel {
+    padding: 14px;
+  }
+
+  .ops-panel-head {
+    display: block;
+  }
+
+  .ops-panel-head > :last-child {
+    margin-top: 10px;
+  }
+
+  .product-panel-actions {
+    justify-content: space-between;
+  }
+
+  .data-table,
+  .report-table {
+    overflow: visible;
+  }
+
+  .data-table .table-head,
+  .report-table .table-head {
+    display: none;
+  }
+
+  .data-table .data-row,
+  .report-table .data-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+    min-height: 0;
+    padding: 14px 0;
+  }
+
+  .data-row > .transfer-card-actions,
+  .data-row > .row-action:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .data-row > .transfer-card-actions {
+    justify-content: flex-start;
+  }
+
+  .row-action {
+    min-height: 36px;
+  }
+
+  .trace-search {
+    display: block;
+  }
+
+  .serial-field {
+    width: 100%;
+    margin-top: 14px;
+  }
+
+  .transfer-form {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .transfer-form label {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .transfer-row {
+    min-width: 0 !important;
+  }
+
+  .transfer-card {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .transfer-card > div:first-child {
+    width: 100%;
+  }
+
+  .report-filters {
+    display: grid;
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+
+  .filter-select {
+    width: 100%;
+    min-height: 40px;
+  }
+
+  .client-history-row {
+    grid-template-columns: 1fr auto;
+  }
+}

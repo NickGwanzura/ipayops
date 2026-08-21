@@ -4,7 +4,7 @@ import { query } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
-const validTypes = new Set(['invoice', 'delivery-note', 'client-statement', 'payment-receipt']);
+const validTypes = new Set(['invoice', 'delivery-note', 'client-statement', 'payment-receipt', 'job-card']);
 
 function isValidSignature(type: string, id: string, documentTimestamp: string, generatedAt: string, signature: string) {
   const secret = process.env.AUTH_SECRET;
@@ -30,7 +30,9 @@ export async function GET(request: Request) {
       ? await query(`SELECT d.number, d.status, d.created_at AS issued_at, c.name AS client_name FROM delivery_notes d JOIN clients c ON c.id = d.client_id WHERE d.id = $1`, [id])
       : type === 'client-statement'
         ? await query(`SELECT 'CLIENT-STATEMENT' AS number, c.status, c.created_at AS issued_at, c.name AS client_name FROM clients c WHERE c.id = $1`, [id])
-        : await query(`SELECT 'PAYMENT-RECEIPT-' || p.id AS number, i.status, p.paid_at AS issued_at, c.name AS client_name FROM invoice_payments p JOIN invoices i ON i.id = p.invoice_id JOIN clients c ON c.id = i.client_id WHERE p.id = $1`, [id]);
+        : type === 'payment-receipt'
+          ? await query(`SELECT 'PAYMENT-RECEIPT-' || p.id AS number, i.status, p.paid_at AS issued_at, c.name AS client_name FROM invoice_payments p JOIN invoices i ON i.id = p.invoice_id JOIN clients c ON c.id = i.client_id WHERE p.id = $1`, [id])
+          : await query(`SELECT j.number, j.status, j.created_at AS issued_at, c.name AS client_name FROM job_cards j JOIN clients c ON c.id = j.client_id WHERE j.id = $1`, [id]);
   const document = result.rows[0];
   if (!document || new Date(document.issued_at).toISOString() !== documentTimestamp) return NextResponse.json({ valid: false, error: 'Document not found or timestamp mismatch.' }, { status: 404 });
   return NextResponse.json({ valid: true, type, document, generatedAt });

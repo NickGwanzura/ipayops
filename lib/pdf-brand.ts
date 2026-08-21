@@ -57,7 +57,7 @@ export function drawPdfFooter(page: PDFPage, input: { font: PDFFont; generatedAt
   page.drawText(`Page ${input.pageNumber} of ${input.totalPages}`, { x: 486, y: 34, size: 7, font: input.font, color: SOFT });
 }
 
-export type VerifiableDocument = 'invoice' | 'delivery-note' | 'client-statement' | 'payment-receipt';
+export type VerifiableDocument = 'invoice' | 'delivery-note' | 'client-statement' | 'payment-receipt' | 'job-card';
 
 function verificationSignature(type: VerifiableDocument, id: string, documentTimestamp: string, generatedAt: string) {
   const secret = process.env.AUTH_SECRET;
