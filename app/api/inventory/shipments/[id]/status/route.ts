@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { ACCESS, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
+import { notifyOrganizationRoles } from '@/lib/notifications';
 
 const statusSchema = z.object({ status: z.enum(['Draft', 'Dispatched', 'In transit', 'Delivered', 'Cancelled']) });
 
@@ -21,6 +22,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       [body.status, params.id, session.user.organizationId],
     );
     if (!result.rows[0]) return NextResponse.json({ error: 'Shipment not found.' }, { status: 404 });
+    void notifyOrganizationRoles({ organizationId: session.user.organizationId, roles: ['ceo', 'manager', 'finance'], excludeUserId: session.user.id, eventType: 'shipment.status_changed', subject: `Shipment ${result.rows[0].number} is ${result.rows[0].status}`, eyebrow: 'Shipping oversight', title: 'Shipment status updated', summary: `${session.user.fullName} updated a shipment status.`, fields: [{ label: 'Shipment', value: result.rows[0].number }, { label: 'Status', value: result.rows[0].status }, { label: 'Carrier', value: result.rows[0].carrier || 'Not specified' }, { label: 'Tracking', value: result.rows[0].tracking_number || 'Not specified' }], action: { label: 'Open inventory', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Inventory` } });
     return NextResponse.json({ shipment: result.rows[0] });
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: 'A valid shipment status is required.' }, { status: 400 });

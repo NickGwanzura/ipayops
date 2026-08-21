@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { ACCESS, requireRole } from '@/lib/auth';
 import { withTransaction } from '@/lib/db';
+import { notifyOrganizationRoles } from '@/lib/notifications';
 
 const convertSchema = z.object({
   items: z.array(z.object({ quotationItemId: z.string().uuid(), inventoryItemIds: z.array(z.string().uuid()).min(1) })).min(1),
@@ -69,6 +70,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       await client.query(`UPDATE quotations SET status = 'Converted', updated_at = now() WHERE id = $1`, [params.id]);
       return saleResult.rows[0];
     });
+    void notifyOrganizationRoles({ organizationId: session.user.organizationId, roles: ['ceo', 'manager'], excludeUserId: session.user.id, eventType: 'quotation.converted', subject: `Quotation converted to sale ${sale.number}`, eyebrow: 'Sales conversion', title: 'Quotation converted', summary: `${session.user.fullName} converted a quotation into a confirmed serialized sale.`, fields: [{ label: 'Sale', value: sale.number }, { label: 'Total', value: String(sale.total) }, { label: 'Status', value: sale.status }], action: { label: 'Open Sales & CRM', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Sales%20%26%20CRM` } });
     return NextResponse.json({ sale }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: 'Quotation line serial assignments are required.' }, { status: 400 });

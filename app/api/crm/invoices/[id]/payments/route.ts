@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { ACCESS, requireRole } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/db';
+import { notifyOrganizationRoles } from '@/lib/notifications';
 
 const paymentSchema = z.object({
   amount: z.number().positive().max(100000000),
@@ -42,6 +43,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       const updated = await client.query('UPDATE invoices SET paid_amount = $1, status = $2, paid_at = CASE WHEN $2 = \'Paid\' THEN now() ELSE paid_at END, payment_reference = NULLIF($3, \'\') WHERE id = $4 RETURNING id, number, total, paid_amount, status, paid_at', [paidAmount, status, body.reference, params.id]);
       return updated.rows[0];
     });
+    void notifyOrganizationRoles({ organizationId: session.user.organizationId, roles: ['ceo', 'manager', 'finance'], excludeUserId: session.user.id, eventType: 'invoice.payment_received', subject: `Payment received for invoice ${result.number}`, eyebrow: 'Finance notification', title: 'Invoice payment received', summary: `${session.user.fullName} recorded a payment against an invoice.`, fields: [{ label: 'Invoice', value: result.number }, { label: 'Payment', value: String(body.amount) }, { label: 'Status', value: result.status }, { label: 'Reference', value: body.reference || 'Not provided' }], action: { label: 'Open Finance & HR', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Finance%20%26%20HR` } });
     return NextResponse.json({ invoice: result }, { status: 201 });
   } catch (error) {
     const code = (error as { code?: string }).code;

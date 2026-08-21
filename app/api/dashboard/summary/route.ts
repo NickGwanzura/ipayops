@@ -13,12 +13,12 @@ export async function GET(request: Request) {
     const organizationId = session.user.organizationId;
     const [summary, performance, activity, stockByCategory, approvals] = await Promise.all([
       query(`SELECT
-        COALESCE((SELECT SUM(s.total) FROM sales s WHERE s.organization_id = $1 AND s.confirmed_at >= date_trunc('month', current_date)), 0) AS revenue,
-        COALESCE((SELECT COUNT(*) FROM sales s WHERE s.organization_id = $1 AND s.confirmed_at >= date_trunc('month', current_date)), 0)::int AS confirmed_sales,
+        COALESCE((SELECT SUM(s.total) FROM sales s WHERE s.organization_id = $1 AND s.confirmed_at >= date_trunc('month', current_date) AND s.status NOT IN ('Cancelled', 'Returned', 'Partially returned')), 0) AS revenue,
+        COALESCE((SELECT COUNT(*) FROM sales s WHERE s.organization_id = $1 AND s.confirmed_at >= date_trunc('month', current_date) AND s.status NOT IN ('Cancelled', 'Returned', 'Partially returned')), 0)::int AS confirmed_sales,
         COALESCE((SELECT COUNT(*) FROM inventory_items i WHERE i.organization_id = $1 AND i.status IN ('Available', 'Reserved')), 0)::int AS units_in_stock,
         COALESCE((SELECT COUNT(*) FROM job_cards j WHERE j.organization_id = $1 AND j.status IN ('Scheduled', 'In progress')), 0)::int AS open_jobs`, [organizationId]),
       query(`SELECT to_char(days.day, 'DD Mon') AS day,
-        COALESCE((SELECT SUM(s.total) FROM sales s WHERE s.organization_id = $1 AND s.confirmed_at::date = days.day::date), 0) AS sales,
+        COALESCE((SELECT SUM(s.total) FROM sales s WHERE s.organization_id = $1 AND s.confirmed_at::date = days.day::date AND s.status NOT IN ('Cancelled', 'Returned', 'Partially returned')), 0) AS sales,
         COALESCE((SELECT COUNT(*) FROM inventory_items i WHERE i.organization_id = $1 AND i.received_at::date = days.day::date), 0)::int AS stock
         FROM generate_series(current_date - interval '29 days', current_date, interval '1 day') AS days(day)
         ORDER BY days.day`, [organizationId]),

@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { ACCESS, requireRole } from '@/lib/auth';
 import { withTransaction } from '@/lib/db';
+import { notifyOrganizationRoles } from '@/lib/notifications';
 
 const refundSchema = z.object({ method: z.enum(['Bank transfer', 'Cash', 'Card', 'Mobile money', 'Credit note']), reference: z.string().trim().max(120).optional().default('') });
 
@@ -21,6 +22,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       const updated = await client.query(`UPDATE returns SET refund_status = 'Processed', refund_method = $1, refund_reference = NULLIF($2, ''), credit_note_number = COALESCE($3, credit_note_number), refunded_at = now() WHERE id = $4 RETURNING id, number, refund_amount, refund_status, refund_method, refund_reference, credit_note_number, refunded_at`, [body.method, body.reference, creditNote, params.id]);
       return updated.rows[0];
     });
+    void notifyOrganizationRoles({ organizationId: auth.session.user.organizationId, roles: ['ceo', 'manager', 'finance'], excludeUserId: auth.session.user.id, eventType: 'return.refunded', subject: `Return ${result.number} refunded`, eyebrow: 'Returns and finance', title: 'Return refund processed', summary: `${auth.session.user.fullName} processed a refund or credit note for a returned sale.`, fields: [{ label: 'Return', value: result.number }, { label: 'Refund amount', value: String(result.refund_amount) }, { label: 'Method', value: result.refund_method }, { label: 'Reference', value: result.refund_reference || result.credit_note_number || 'Not provided' }], action: { label: 'Open Sales & CRM', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Sales%20%26%20CRM` } });
     return NextResponse.json({ refund: result });
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: 'A valid refund method is required.' }, { status: 400 });

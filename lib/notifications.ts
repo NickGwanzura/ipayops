@@ -10,6 +10,7 @@ export type NotificationEvent =
   | 'invoice.overdue'
   | 'quotation.created'
   | 'quotation.converted'
+  | 'return.refunded'
   | 'lead.created'
   | 'opportunity.created'
   | 'inventory.received'
