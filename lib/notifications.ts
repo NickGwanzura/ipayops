@@ -1,6 +1,38 @@
 import { query } from '@/lib/db';
 import { emailConfigured, sendBrandedEmail, type EmailField } from '@/lib/email';
 
+const EMAIL_MIN_INTERVAL_MS = 150;
+let emailQueue: Promise<void> = Promise.resolve();
+
+function wait(milliseconds: number) {
+  return new Promise<void>(resolve => setTimeout(resolve, milliseconds));
+}
+
+async function sendBrandedEmailWithRetry(input: Parameters<typeof sendBrandedEmail>[0]) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await sendBrandedEmail(input);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      if (attempt === 0 && /429|too many requests|rate limit/i.test(message)) {
+        await wait(1200);
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw new Error('Email delivery retry failed.');
+}
+
+function enqueueEmail<T>(task: () => Promise<T>) {
+  const next = emailQueue.then(async () => {
+    await wait(EMAIL_MIN_INTERVAL_MS);
+    return task();
+  });
+  emailQueue = next.then(() => undefined, () => undefined);
+  return next;
+}
+
 export type NotificationEvent =
   | 'notification.test'
   | 'auth.login'
@@ -37,7 +69,7 @@ export async function sendNotification(input: { organizationId: string; eventTyp
   let providerId: string | null = null;
   let errorMessage: string | null = null;
   try {
-    const result = await sendBrandedEmail({ ...input, to: input.recipientEmail });
+    const result = await enqueueEmail(() => sendBrandedEmailWithRetry({ ...input, to: input.recipientEmail }));
     if (result.sent) { status = 'sent'; providerId = result.providerId; }
   } catch (error) {
     status = 'failed';
