@@ -4,12 +4,14 @@ const checks = [
   { name: 'health endpoint', method: 'GET', path: '/api/health', expected: 200 },
   { name: 'login page', method: 'GET', path: '/login', expected: 200 },
   { name: 'login security headers', method: 'GET', path: '/login', expected: 200, headers: ['x-content-type-options', 'x-frame-options', 'referrer-policy'] },
+  { name: 'invalid invitation is rejected', method: 'GET', path: '/api/auth/invitations/invalid-test-token', expected: 410 },
   ...[
     '/api/auth/me', '/api/organization-settings', '/api/audit-logs', '/api/dashboard/summary', '/api/inventory',
     '/api/inventory/summary', '/api/purchase-orders', '/api/suppliers', '/api/crm/clients',
     '/api/crm/leads', '/api/crm/opportunities', '/api/crm/quotations', '/api/crm/sales',
     '/api/crm/invoices', '/api/crm/delivery-notes', '/api/jobs', '/api/warranty/claims',
     '/api/finance/expenses', '/api/finance/targets', '/api/hr/employees',
+    '/api/hr/invitations',
     '/api/reports/summary?from=2026-01-01&to=2026-12-31',
   ].map(path => ({ name: `protected ${path}`, method: 'GET', path, expected: 401 })),
   ...[
@@ -19,6 +21,7 @@ const checks = [
     ['/api/finance/expenses', 'POST'],
     ['/api/hr/employees', 'POST'],
     ['/api/warranty/claims', 'POST'],
+    ['/api/hr/invitations', 'POST'],
   ].map(([path, method]) => ({ name: `protected ${method} ${path}`, method, path, expected: 401 })),
 ];
 

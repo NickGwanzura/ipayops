@@ -54,6 +54,7 @@ export type NotificationEvent =
   | 'expense.submitted'
   | 'expense.status_changed'
   | 'employee.onboarding'
+  | 'employee.invited'
   | 'employee.offboarded'
   | 'purchase_order.submitted'
   | 'purchase_order.approved'

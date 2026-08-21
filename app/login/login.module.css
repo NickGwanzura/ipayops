@@ -123,3 +123,30 @@
   .inputShell, .checkbox, .submitButton { transition: none; }
 }
 .brandLogo { width: 180px; height: 76px; object-fit: cover; object-position: center; border-radius: 8px; background: #f4f7fb; padding: 4px; }
+
+.card { width: min(100%, 520px); padding: 42px clamp(24px, 6vw, 58px); border: 1px solid #e2eaf2; border-radius: 16px; background: #fff; box-shadow: 0 24px 60px rgba(16, 39, 72, .08); }
+.card .brand { display: grid; justify-items: start; gap: 12px; color: #16243a; }
+.card .brand img { width: 180px; height: 76px; object-fit: cover; object-position: center; border-radius: 8px; background: #f4f7fb; padding: 4px; }
+.card .brand span { color: #2f70e8; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+.heading { margin: 34px 0 28px; }
+.heading h1 { margin: 10px 0 10px; color: #16243a; font-size: clamp(28px, 5vw, 38px); line-height: 1.08; letter-spacing: -1.4px; }
+.heading p { color: #77859a; font-size: 14px; line-height: 1.65; }
+.heading strong { color: #26364e; }
+.card .form { gap: 16px; }
+.card .form > label { display: grid; gap: 8px; color: #26364e; font-size: 13px; font-weight: 700; }
+.card .form input { min-height: 48px; width: 100%; box-sizing: border-box; padding: 0 13px; border: 1px solid #dce4ee; border-radius: 8px; outline: 0; color: #1c2c44; background: #fff; font-size: 14px; }
+.card .form input:focus { border-color: #2f7cf6; box-shadow: 0 0 0 4px rgba(47, 124, 246, .11); }
+.passwordField { min-height: 48px; display: flex; align-items: center; gap: 9px; padding: 0 12px; border: 1px solid #dce4ee; border-radius: 8px; color: #8c9bad; background: #fff; }
+.passwordField:focus-within { border-color: #2f7cf6; box-shadow: 0 0 0 4px rgba(47, 124, 246, .11); }
+.passwordField input { min-height: 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; }
+.passwordField button { display: grid; place-items: center; padding: 5px; color: #8c9bad; cursor: pointer; }
+.submit { min-height: 48px; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 8px; color: #fff; background: #2f7cf6; box-shadow: 0 8px 18px rgba(47, 124, 246, .2); font-size: 14px; font-weight: 700; text-decoration: none; cursor: pointer; }
+.submit:disabled { opacity: .7; cursor: wait; }
+.error { padding: 10px 12px; border: 1px solid #f0c8c8; border-radius: 7px; color: #a52f38; background: #fff4f4; font-size: 12px; line-height: 1.5; }
+.inviteSummary { display: flex; align-items: flex-start; gap: 12px; padding: 14px; border: 1px solid #dcebe6; border-radius: 9px; color: #0b9971; background: #f1fbf7; }
+.inviteSummary div { display: grid; gap: 3px; }
+.inviteSummary strong { color: #16243a; font-size: 14px; }
+.inviteSummary span, .inviteSummary small { color: #71819a; font-size: 12px; }
+.note { color: #8a98a9; font-size: 12px; line-height: 1.55; }
+.spinner { color: #2f7cf6; animation: invite-spin 900ms linear infinite; }
+@keyframes invite-spin { to { transform: rotate(360deg); } }
