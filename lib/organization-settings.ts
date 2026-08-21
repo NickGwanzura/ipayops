@@ -1,6 +1,7 @@
-export type OrganizationSettings = { timezone: string; currency: string; date_format: string; address: string; phone: string };
+export type OrganizationSettings = { organizationName: string; timezone: string; currency: string; date_format: string; address: string; phone: string };
 
 export const DEFAULT_ORGANIZATION_SETTINGS: OrganizationSettings = {
+  organizationName: 'iPayTech',
   timezone: 'Africa/Harare',
   currency: 'USD',
   date_format: 'DD/MM/YYYY',

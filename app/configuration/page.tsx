@@ -10,9 +10,9 @@ import styles from './page.module.css';
 type Location = { id: string; code: string; name: string; address: string | null; is_active: boolean };
 type Role = { role: string; count: number };
 type AuditEvent = { id: string; action: string; entity_type?: string; actor_name?: string; created_at: string; metadata?: Record<string, unknown> };
-type Configuration = { organization: { id: string; name: string; slug: string }; settings: { timezone: string; currency: string; date_format: string; address: string; phone: string }; locations: Location[]; roles: Role[] };
+type Configuration = { organization: { id: string; name: string; slug: string }; settings: { organizationName: string; timezone: string; currency: string; date_format: string; address: string; phone: string }; locations: Location[]; roles: Role[] };
 
-const empty: Configuration = { organization: { id: '', name: '', slug: '' }, settings: { timezone: 'Africa/Harare', currency: 'USD', date_format: 'DD/MM/YYYY', address: '', phone: '' }, locations: [], roles: [] };
+const empty: Configuration = { organization: { id: '', name: '', slug: '' }, settings: { organizationName: '', timezone: 'Africa/Harare', currency: 'USD', date_format: 'DD/MM/YYYY', address: '', phone: '' }, locations: [], roles: [] };
 
 export default function ConfigurationPage() {
   const [configuration, setConfiguration] = useState<Configuration>(empty);

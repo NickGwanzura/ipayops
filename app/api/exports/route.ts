@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { PDFDocument, rgb } from 'pdf-lib';
 import { ACCESS, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
-import { embedIpaytechFonts, embedIpaytechLogo, embedReportVerificationQr } from '@/lib/pdf-brand';
+import { drawPdfFooter, drawPdfHeader, embedIpaytechFonts, embedIpaytechLogo, embedReportVerificationQr, PDF_INK, PDF_MUTED, PDF_PAGE_SIZE } from '@/lib/pdf-brand';
 import { formatOrganizationDate } from '@/lib/organization-settings';
 import { getOrganizationSettings } from '@/lib/server-organization-settings';
 import { createXlsxWorkbook } from '@/lib/xlsx-export';
@@ -52,17 +52,21 @@ export async function GET(request: NextRequest) {
   const pdf = await PDFDocument.create(); const logo = await embedIpaytechLogo(pdf); const { regular: font, semibold: bold } = await embedIpaytechFonts(pdf); const qr = await embedReportVerificationQr(pdf, request, { from, to, region, product });
   const rowsPerPage = 22; const dataRows = rows.slice(1); const totalPages = Math.max(1, Math.ceil(dataRows.length / rowsPerPage));
   for (let pageIndex = 0; pageIndex < totalPages; pageIndex += 1) {
-    const page = pdf.addPage([595, 842]);
+    const page = pdf.addPage(PDF_PAGE_SIZE);
     if (pageIndex === 0) {
-      page.drawImage(logo, {x:42,y:748,width:175,height:73}); page.drawImage(qr.image, {x:482,y:735,width:78,height:78}); page.drawText('Operations summary export', {x:42,y:730,size:11,font,color:rgb(.35,.42,.52)});
-      page.drawText(`Generated ${formatOrganizationDate(new Date(), settings)}`, {x:42,y:712,size:9,font,color:rgb(.45,.5,.58)}); page.drawText(`Filters: ${region || 'All regions'} · ${product || 'All products'}`, {x:42,y:698,size:8,font,color:rgb(.45,.5,.58)}); page.drawText('Scan QR to verify export', {x:450,y:34,size:7,font});
+      drawPdfHeader(page, { logo, qr: qr.image, font, bold, settings, title: 'Operations summary', subtitle: `Management export · ${from} to ${to}` });
+      page.drawText('Applied filters', { x: 42, y: 646, size: 8, font: bold, color: rgb(.35, .42, .52) });
+      page.drawText(`${region || 'All regions'}  ·  ${product || 'All products'}`, { x: 118, y: 646, size: 8, font, color: rgb(.45, .5, .58) });
     } else {
-      page.drawText('Operations summary export - continued', {x:42,y:790,size:11,font: bold,color:rgb(.35,.42,.52)});
-      page.drawText(`Page ${pageIndex + 1} of ${totalPages}`, {x:460,y:790,size:8,font,color:rgb(.45,.5,.58)});
+      page.drawText('Operations summary', { x: 42, y: 802, size: 12, font: bold, color: rgb(.35, .42, .52) });
+      page.drawText(`Continued · ${from} to ${to}`, { x: 42, y: 784, size: 8, font, color: rgb(.45, .5, .58) });
+      page.drawLine({ start: { x: 42, y: 765 }, end: { x: 553, y: 765 }, thickness: 1, color: rgb(.86, .9, .95) });
     }
     const pageRows = [rows[0], ...dataRows.slice(pageIndex * rowsPerPage, (pageIndex + 1) * rowsPerPage)];
-    pageRows.forEach((row, index) => row.forEach((cell, col) => page.drawText(cell, {x:42 + col*130,y:pageIndex === 0 ? 660-index*28 : 750-index*28,size:index===0?9:10,font:index===0?bold:font,color:rgb(.1,.15,.22)})));
-    page.drawText(`Page ${pageIndex + 1} of ${totalPages}`, {x:42,y:34,size:7,font,color:rgb(.45,.5,.58)});
+    const tableTop = pageIndex === 0 ? 620 : 740;
+    page.drawRectangle({ x: 42, y: tableTop + 12, width: 511, height: 24, color: rgb(.94, .96, .98) });
+    pageRows.forEach((row, index) => row.forEach((cell, col) => page.drawText(cell, { x: 48 + col * 130, y: tableTop - index * 26, size: index === 0 ? 8.5 : 9.5, font: index === 0 ? bold : font, color: index === 0 ? PDF_MUTED : PDF_INK })));
+    drawPdfFooter(page, { font, generatedAt: formatOrganizationDate(qr.generatedAt, settings), pageNumber: pageIndex + 1, totalPages });
   }
   const bytes = await pdf.save();
   return new Response(Buffer.from(bytes), { headers:{'Content-Type':'application/pdf','Content-Disposition':`attachment; filename="ipaytech-operations-${from}-to-${to}.pdf"`} });
