@@ -38,6 +38,25 @@ export default function LoginPage() {
 
   return (
     <main className={styles.page}>
+      <section className={styles.visualPanel} aria-label="iPayTech POS operations">
+        <div className={styles.visualGlow} aria-hidden="true" />
+        <div className={styles.visualGrid} aria-hidden="true" />
+        <div className={styles.visualContent}>
+          <Link href="/" className={styles.brand} aria-label="iPayTech Ops home">
+            <Image className={styles.brandLogo} src="/iPaytechLogo.jpg" alt="iPayTech" width={180} height={76} priority />
+          </Link>
+        </div>
+        <div className={styles.posStage}>
+          <Image
+            className={styles.posImage}
+            src="/pos-login-hero.png"
+            alt="Zimbabwean iPayTech support specialist holding a point-of-sale terminal"
+            width={1024}
+            height={1536}
+            priority
+          />
+        </div>
+      </section>
       <section className={styles.formPanel}>
         <div className={styles.formWrap}>
           <div className={styles.mobileBrand}>
