@@ -32,4 +32,4 @@ export async function middleware(request: NextRequest) {
   return response;
 }
 
-export const config = { matcher: ['/((?!login|verify|invite|api|_next/static|_next/image|favicon.ico|iPaytechLogo.jpg).*)'] };
+export const config = { matcher: ['/((?!login|verify|invite|api|_next/static|_next/image|favicon.ico|iPaytechLogo.jpg|pos-login-hero.webp).*)'] };

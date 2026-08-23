@@ -49,7 +49,7 @@ export default function LoginPage() {
         <div className={styles.posStage}>
           <Image
             className={styles.posImage}
-            src="/pos-login-hero.png"
+            src="/pos-login-hero.webp"
             alt="Zimbabwean iPayTech support specialist holding a point-of-sale terminal"
             width={1024}
             height={1536}
