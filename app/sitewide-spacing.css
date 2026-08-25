@@ -1,0 +1,89 @@
+/* Shared control and layout rhythm. */
+.btn,
+.primary,
+.secondary,
+.danger {
+  min-height: 44px;
+  height: auto;
+  padding: 10px 16px;
+  border-radius: 8px;
+  line-height: 1.2;
+}
+
+.btn,
+.primary,
+.danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.heading-actions {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.panel-header {
+  gap: 16px;
+}
+
+.panel-header > :first-child {
+  min-width: 0;
+}
+
+.panel-header > :last-child {
+  flex: 0 0 auto;
+}
+
+.text-btn {
+  min-height: 36px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  gap: 6px;
+}
+
+.icon-btn {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 9px;
+  border-radius: 8px;
+}
+
+.select {
+  min-height: 40px;
+  padding: 9px 12px;
+  border-radius: 7px;
+}
+
+.user-card-actions {
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.user-card-action {
+  min-height: 40px;
+  padding: 10px 12px;
+  border-radius: 7px;
+}
+
+@media (max-width: 700px) {
+  .heading-actions {
+    gap: 10px;
+    margin-top: 20px;
+  }
+
+  .heading-actions .btn {
+    min-width: 0;
+    padding-inline: 14px;
+  }
+
+  .panel-header {
+    display: grid;
+    gap: 12px;
+  }
+
+  .panel-header > :last-child {
+    justify-self: start;
+  }
+}

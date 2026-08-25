@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import './font.css';
+import './sitewide-spacing.css';
 import { OrganizationSettingsProvider } from './organization-settings';
 
 export const metadata: Metadata = {

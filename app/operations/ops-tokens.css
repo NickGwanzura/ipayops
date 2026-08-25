@@ -550,3 +550,85 @@
     max-width: 100%;
   }
 }
+
+/* Shared operations action rhythm. Keep action rows visually separated from
+ * the content panel below them, especially on the Job cards workspace. */
+.ops-btn,
+.workflow-dialog-actions .ops-btn {
+  min-height: 44px;
+  height: auto;
+  padding: 10px 16px;
+  gap: 8px;
+  border-radius: 8px;
+  line-height: 1.2;
+}
+
+.link-btn {
+  min-height: 40px;
+  padding: 9px 12px;
+  gap: 6px;
+  border-radius: 7px;
+}
+
+.row-action {
+  min-height: 36px;
+  padding: 8px 10px;
+  gap: 6px;
+  border-radius: 6px;
+}
+
+.ops-heading-actions,
+.workflow-actions,
+.product-panel-actions,
+.inventory-panel-actions {
+  gap: 12px;
+}
+
+.workflow-actions {
+  margin-bottom: 16px;
+}
+
+.workflow-dialog-actions {
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.ops-panel-head {
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.ops-grid-two {
+  gap: 20px;
+}
+
+.ops-panel {
+  margin-bottom: 20px;
+}
+
+.ops-footer {
+  margin-top: 32px;
+}
+
+@media (max-width: 760px) {
+  .workflow-actions {
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .workflow-dialog-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workflow-dialog-actions .ops-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .workflow-dialog-actions {
+    grid-template-columns: 1fr;
+  }
+}
