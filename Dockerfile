@@ -7,7 +7,9 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+# Keep the source layer explicit so a production rebuild cannot reuse an old
+# compiled Next.js bundle when Dokploy's builder cache is warm.
+COPY . /app/
 RUN npm run typecheck
 RUN npm run build
 
