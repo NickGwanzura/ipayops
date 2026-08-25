@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { FormEvent, useEffect, useState } from 'react';
 import { ArrowLeft, LogOut, Save, Shield } from 'lucide-react';
+import { useOrganizationSettings } from '../organization-settings';
 import styles from './page.module.css';
 
 type User = { id: string; organizationId: string; email: string; fullName: string; role: string };
@@ -13,6 +14,7 @@ function initials(name: string) {
 }
 
 export default function ProfilePage() {
+  const settings = useOrganizationSettings();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState({ fullName: '', email: '' });
   const [password, setPassword] = useState({ currentPassword: '', newPassword: '' });
@@ -79,7 +81,7 @@ export default function ProfilePage() {
             <label className={styles.field}>Role<input value={user?.role || ''} disabled/></label>
             <div className={styles.actions}><button className={styles.primary} disabled={saving}><Save size={14}/> {saving ? 'Saving…' : 'Save profile'}</button></div>
           </form>
-          <div className={styles.meta}><div className={styles.metaRow}><span>Initials</span><span>{initials(user?.fullName || profile.fullName)}</span></div><div className={styles.metaRow}><span>Workspace</span><span>Harare HQ</span></div></div>
+          <div className={styles.meta}><div className={styles.metaRow}><span>Initials</span><span>{initials(user?.fullName || profile.fullName)}</span></div><div className={styles.metaRow}><span>Workspace</span><span>{settings.organizationName || 'Workspace'}</span></div><div className={styles.metaRow}><span>Address</span><span>{settings.address || 'Not recorded'}</span></div><div className={styles.metaRow}><span>Timezone</span><span>{settings.timezone}</span></div><div className={styles.metaRow}><span>Currency</span><span>{settings.currency}</span></div></div>
         </section>
         <section className={styles.card}>
           <h2>Change password</h2><p>Changing your password signs out other active sessions.</p>

@@ -19,7 +19,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       [body.name, body.notes, params.id, session.user.organizationId],
     );
     if (!result.rows[0]) return NextResponse.json({ error: 'Job card not found.' }, { status: 404 });
-    void Promise.all([
+    await Promise.all([
       sendNotification({ organizationId: session.user.organizationId, eventType: 'job.completed', recipientEmail: session.user.email, recipientName: session.user.fullName, subject: `Job ${result.rows[0].number} completed`, eyebrow: 'Job cards', title: 'Job card completed', summary: 'A job card has been completed and signed off.', fields: [{ label: 'Job', value: result.rows[0].number }, { label: 'Signed off by', value: body.name }, { label: 'Status', value: result.rows[0].status }], action: { label: 'Open job cards', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Job%20cards` } }),
       notifyOrganizationRoles({ organizationId: session.user.organizationId, roles: ['ceo', 'manager'], excludeUserId: session.user.id, eventType: 'job.completed', subject: `Job ${result.rows[0].number} completed`, eyebrow: 'Job-card oversight', title: 'Job card completed', summary: `${session.user.fullName} completed and signed off a job card.`, fields: [{ label: 'Job', value: result.rows[0].number }, { label: 'Signed off by', value: body.name }], action: { label: 'Open job cards', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Job%20cards` } }),
     ]);

@@ -29,12 +29,17 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       const values = session.user.role === 'sales_consultant' ? [params.id, session.user.organizationId, session.user.id] : [params.id, session.user.organizationId];
       const saleResult = await client.query(`SELECT id FROM sales WHERE id = $1 AND organization_id = $2${scope} FOR UPDATE`, values);
       if (!saleResult.rows[0]) throw Object.assign(new Error('Sale not found.'), { code: 'SALE_NOT_FOUND' });
+      const requestedItemIds = body.items.map(item => item.saleItemId);
+      if (new Set(requestedItemIds).size !== requestedItemIds.length) throw Object.assign(new Error('Sale items must be unique.'), { code: 'DUPLICATE_ITEMS' });
       const saleItems = await client.query(
-        `SELECT si.id, si.inventory_item_id, si.returned FROM sale_items si WHERE si.sale_id = $1 AND si.id = ANY($2::uuid[]) FOR UPDATE`,
+        `SELECT si.id, si.inventory_item_id, si.amount, si.returned FROM sale_items si WHERE si.sale_id = $1 AND si.id = ANY($2::uuid[]) FOR UPDATE`,
         [params.id, body.items.map(item => item.saleItemId)],
       );
       if (saleItems.rows.length !== body.items.length) throw Object.assign(new Error('Sale item not found.'), { code: 'ITEM_NOT_FOUND' });
       if (saleItems.rows.some(item => item.returned)) throw Object.assign(new Error('Sale item already returned.'), { code: 'ALREADY_RETURNED' });
+      if (body.refundAmount > 0 && !body.refundMethod) throw Object.assign(new Error('A refund method is required for positive refunds.'), { code: 'REFUND_METHOD_REQUIRED' });
+      const selectedValue = saleItems.rows.reduce((sum, item) => sum + Number(item.amount), 0);
+      if (body.refundAmount > selectedValue) throw Object.assign(new Error('Refund exceeds the value of selected sale items.'), { code: 'REFUND_EXCEEDS_ITEMS' });
       const number = `RET-${new Date().getFullYear()}-${randomUUID().slice(0, 6).toUpperCase()}`;
       const returnResult = await client.query(
         `INSERT INTO returns (organization_id, number, sale_id, reason, refund_amount, refund_method, refund_status, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, number, status, refund_amount, refund_status, created_at`,
@@ -57,6 +62,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     const code = (error as { code?: string }).code;
     if (code === 'SALE_NOT_FOUND' || code === 'ITEM_NOT_FOUND') return NextResponse.json({ error: 'Sale or sale item not found.' }, { status: 404 });
     if (code === 'ALREADY_RETURNED') return NextResponse.json({ error: 'One or more sale items have already been returned.' }, { status: 409 });
+    if (code === 'DUPLICATE_ITEMS' || code === 'REFUND_EXCEEDS_ITEMS') return NextResponse.json({ error: 'Return validation failed.' }, { status: 409 });
+    if (code === 'REFUND_METHOD_REQUIRED') return NextResponse.json({ error: 'A refund method is required when refundAmount is greater than zero.' }, { status: 400 });
     console.error('Sale return failed', error);
     return NextResponse.json({ error: 'Unable to complete return.' }, { status: 500 });
   }

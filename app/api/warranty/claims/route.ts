@@ -44,7 +44,7 @@ export async function POST(request: Request) {
       await client.query(`UPDATE inventory_items SET status = 'Warranty', updated_at = now() WHERE id = $1`, [body.inventoryItemId]);
       return result.rows[0];
     });
-    void sendNotification({ organizationId: session.user.organizationId, eventType: 'warranty.claim_opened', recipientEmail: session.user.email, recipientName: session.user.fullName, subject: `Warranty claim ${claim.number} opened`, eyebrow: 'Warranty activity', title: 'Warranty claim opened', summary: 'A new warranty claim has been created and entered the service queue.', fields: [{ label: 'Claim', value: claim.number }, { label: 'Issue', value: claim.issue }, { label: 'Status', value: claim.status }], action: { label: 'Open warranty desk', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Warranty` } });
+    await sendNotification({ organizationId: session.user.organizationId, eventType: 'warranty.claim_opened', recipientEmail: session.user.email, recipientName: session.user.fullName, subject: `Warranty claim ${claim.number} opened`, eyebrow: 'Warranty activity', title: 'Warranty claim opened', summary: 'A new warranty claim has been created and entered the service queue.', fields: [{ label: 'Claim', value: claim.number }, { label: 'Issue', value: claim.issue }, { label: 'Status', value: claim.status }], action: { label: 'Open warranty desk', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Warranty` } });
     return NextResponse.json({ claim }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: 'Inventory item and issue are required.' }, { status: 400 });

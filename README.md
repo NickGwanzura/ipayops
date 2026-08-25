@@ -28,7 +28,8 @@ This starts the app and PostgreSQL on a persistent named volume. The container a
 ```bash
 cp .env.example .env
 # Set NODE_ENV=production, DATABASE_URL, HTTPS APP_URL, a strong AUTH_SECRET,
-# HEALTHCHECK_DATABASE=true, TRUST_PROXY=true, Resend email variables,
+# HEALTHCHECK_DATABASE=true, HEALTHCHECK_STORAGE=true, TRUST_PROXY=true,
+# an HTTPS ERROR_MONITORING_WEBHOOK_URL, Resend email variables,
 # BACKUP_ENCRYPTION_KEY, and STORAGE_DRIVER=s3 with all S3_* variables.
 npm run check:env
 docker build -t ipaytech-ops .
@@ -39,7 +40,7 @@ The image uses Next standalone output, runs as a non-root user, listens on the p
 
 ## Environment
 
-See [.env.example](./.env.example). Production requires `DATABASE_URL`, `AUTH_SECRET`, HTTPS `APP_URL`, `HEALTHCHECK_DATABASE=true`, `TRUST_PROXY=true`, Resend email configuration, a 64-hex-character `BACKUP_ENCRYPTION_KEY`, and S3-compatible variables with `STORAGE_DRIVER=s3`. Production uploads must not use local storage.
+See [.env.example](./.env.example). Production requires `DATABASE_URL`, `AUTH_SECRET`, HTTPS `APP_URL`, `HEALTHCHECK_DATABASE=true`, `HEALTHCHECK_STORAGE=true`, `TRUST_PROXY=true`, an HTTPS `ERROR_MONITORING_WEBHOOK_URL`, Resend email configuration, a 64-hex-character `BACKUP_ENCRYPTION_KEY`, and S3-compatible variables with `STORAGE_DRIVER=s3`. Production uploads must not use local storage.
 
 ## Deployment
 

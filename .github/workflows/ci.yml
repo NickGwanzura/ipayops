@@ -10,6 +10,39 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: integration
+          POSTGRES_PASSWORD: integration_password_2026
+          POSTGRES_DB: ipaytech_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U integration -d ipaytech_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      DATABASE_URL: postgresql://integration:integration_password_2026@127.0.0.1:5432/ipaytech_test
+      DATABASE_SSL: 'false'
+      AUTH_SECRET: luna-ci-auth-secret-2026-use-only-in-ephemeral-tests-7f8e9d0c1b2a
+      APP_URL: http://127.0.0.1:3000
+      PORT: '3000'
+      TRUST_PROXY: 'true'
+      HEALTHCHECK_DATABASE: 'true'
+      HEALTHCHECK_STORAGE: 'false'
+      REQUIRE_PRIVILEGED_MFA: 'true'
+      BACKUP_ADMIN_ORGANIZATION_ID: 11111111-1111-4111-8111-111111111111
+      BACKUP_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      STORAGE_DRIVER: local
+      RESEND_API_KEY: ''
+      EMAIL_FROM: integration@example.test
+      BACKGROUND_WORKER_INTERVAL_MS: '60000'
+      INTEGRATION_TEST_DATABASE: 'true'
+      RESTORE_DRILL: 'true'
+      RESTORE_DATABASE_URL: postgresql://integration:integration_password_2026@127.0.0.1:5432/ipaytech_restore_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,3 +53,10 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
+      - run: npm run db:migrate
+      - run: npm run test:integration
+      - name: Create empty restore target database
+        env:
+          PGPASSWORD: integration_password_2026
+        run: createdb --host 127.0.0.1 --port 5432 --username integration ipaytech_restore_test
+      - run: npm run test:restore

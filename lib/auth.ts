@@ -4,7 +4,9 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { SignJWT, jwtVerify } from 'jose';
 import { query } from '@/lib/db';
+import { setDbRequestContext, setDbRequestId } from '@/lib/db-request-context';
 import { normalizeRole } from '@/lib/rbac';
+import { isPrivilegedMfaRequired } from '@/lib/server-env';
 
 export const SESSION_COOKIE = 'ipaytech_session';
 const DEFAULT_SESSION_SECONDS = 60 * 60 * 8;
@@ -48,7 +50,18 @@ export const ACCESS = {
   productManage: [ROLE.CEO, ROLE.MANAGER] as const,
 } as const;
 
-export type AuthSession = { user: AuthUser; sessionId: string };
+export type AuthSession = { user: AuthUser; sessionId: string; mfaAssured: boolean };
+
+function contextBoundSession(user: AuthUser, sessionId: string, mfaAssured: boolean): AuthSession {
+  return {
+    get user() {
+      setDbRequestContext({ organizationId: user.organizationId, actorUserId: user.id });
+      return user;
+    },
+    sessionId,
+    mfaAssured,
+  };
+}
 
 function authSecret() {
   const secret = process.env.AUTH_SECRET;
@@ -68,10 +81,10 @@ export async function hashPassword(password: string) {
   return bcrypt.hash(password, 12);
 }
 
-export async function createSession(user: AuthUser, remember: boolean) {
+export async function createSession(user: AuthUser, remember: boolean, mfaAssured = false) {
   const id = randomUUID();
   const maxAge = remember ? REMEMBER_SESSION_SECONDS : DEFAULT_SESSION_SECONDS;
-  await query('INSERT INTO sessions (id, user_id, expires_at) VALUES ($1, $2, now() + ($3 * interval \'1 second\'))', [id, user.id, maxAge]);
+  await query('INSERT INTO sessions (id, user_id, mfa_assured, expires_at) VALUES ($1, $2, $3, now() + ($4 * interval \'1 second\'))', [id, user.id, mfaAssured, maxAge]);
   const token = await new SignJWT({ sid: id, org: user.organizationId, role: user.role })
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(user.id)
@@ -94,21 +107,31 @@ async function readSessionToken(token: string | undefined) {
   try {
     const { payload } = await jwtVerify(token, authSecret());
     if (typeof payload.sub !== 'string' || typeof payload.sid !== 'string') return null;
-    const result = await query<{ id: string; organization_id: string; email: string; full_name: string; role: string }>(
-      `SELECT u.id, u.organization_id, u.email, u.full_name, u.role
+    const result = await query<{ id: string; organization_id: string; email: string; full_name: string; role: string; mfa_assured: boolean }>(
+      `SELECT u.id, u.organization_id, u.email, u.full_name, u.role, s.mfa_assured
        FROM sessions s JOIN users u ON u.id = s.user_id
        WHERE s.id = $1 AND s.expires_at > now() AND u.is_active = true`,
       [payload.sid],
     );
     if (!result.rows[0]) return null;
+    const user = publicUser(result.rows[0]);
+    const mfaAssured = result.rows[0].mfa_assured === true;
+    const privileged = user.role === ROLE.CEO || user.role === ROLE.FINANCE;
+    if (privileged && isPrivilegedMfaRequired() && !mfaAssured) {
+      await query('DELETE FROM sessions WHERE id = $1', [payload.sid]);
+      return null;
+    }
     await query('UPDATE sessions SET last_seen_at = now() WHERE id = $1', [payload.sid]);
-    return { user: publicUser(result.rows[0]), sessionId: payload.sid };
+    const session = contextBoundSession(user, payload.sid, mfaAssured);
+    setDbRequestContext({ organizationId: user.organizationId, actorUserId: user.id });
+    return session;
   } catch {
     return null;
   }
 }
 
 export async function getSession(request?: Request): Promise<AuthSession | null> {
+  setDbRequestId(request?.headers.get('x-request-id'));
   const token = request?.headers.get('cookie')?.match(new RegExp(`${SESSION_COOKIE}=([^;]+)`))?.[1] ?? (await cookies()).get(SESSION_COOKIE)?.value;
   return readSessionToken(token);
 }
@@ -117,7 +140,12 @@ export async function requireRole(request: Request, roles: readonly string[]) {
   const session = await getSession(request);
   if (!session) return { response: NextResponse.json({ error: 'Unauthenticated.' }, { status: 401 }) } as const;
   if (!hasRole(session.user.role, roles)) return { response: NextResponse.json({ error: 'You do not have permission to perform this action.' }, { status: 403 }) } as const;
-  return { session } as const;
+  return {
+    get session() {
+      setDbRequestContext({ organizationId: session.user.organizationId, actorUserId: session.user.id });
+      return session;
+    },
+  } as const;
 }
 
 export function hasRole(role: string, roles: readonly string[]) {
@@ -132,6 +160,7 @@ export function canManageEmployee(session: AuthSession, targetRole?: string, req
 }
 
 export async function deleteSession(request: Request) {
+  setDbRequestId(request.headers.get('x-request-id'));
   const token = request.headers.get('cookie')?.match(new RegExp(`${SESSION_COOKIE}=([^;]+)`))?.[1];
   const session = await readSessionToken(token);
   if (session) await query('DELETE FROM sessions WHERE id = $1', [session.sessionId]);

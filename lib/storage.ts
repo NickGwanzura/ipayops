@@ -1,5 +1,5 @@
 import { createReadStream } from 'node:fs';
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 let client: S3Client | undefined;
 
@@ -30,6 +30,23 @@ function getClient() {
 
 export function usesS3() {
   return (process.env.STORAGE_DRIVER || 'local').toLowerCase() === 's3';
+}
+
+export type StorageHealth = {
+  driver: string;
+  state: 'ok' | 'unavailable' | 'skipped';
+};
+
+export async function checkStorageHealth(): Promise<StorageHealth> {
+  const driver = (process.env.STORAGE_DRIVER || 'local').toLowerCase();
+  if (driver !== 's3') return { driver, state: 'skipped' };
+  try {
+    const values = config();
+    await getClient().send(new HeadBucketCommand({ Bucket: values.bucket }));
+    return { driver, state: 'ok' };
+  } catch {
+    return { driver, state: 'unavailable' };
+  }
 }
 
 export async function putStorageObject(key: string, body: Uint8Array, contentType: string) {

@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   const region = params.get('region')?.trim() || null;
   const product = params.get('product')?.trim() || null;
   const values = [auth.session.user.organizationId, from, to, region, product];
-  const where = `s.organization_id = $1 AND s.confirmed_at::date BETWEEN $2::date AND $3::date AND s.status NOT IN ('Cancelled', 'Returned', 'Partially returned')
+  const where = `s.organization_id = $1 AND s.confirmed_at::date BETWEEN $2::date AND $3::date AND s.status NOT IN ('Cancelled', 'Returned') AND si.returned = false
     AND ($4::text IS NULL OR ii.location = $4)
     AND ($5::text IS NULL OR ii.sku = $5 OR ii.product_type = $5 OR ii.description ILIKE '%' || $5 || '%')`;
   const [summary, rows] = await Promise.all([

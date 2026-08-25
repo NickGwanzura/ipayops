@@ -10,7 +10,9 @@ export async function GET(request: Request) {
   try {
     await query('INSERT INTO organization_settings (organization_id) VALUES ($1) ON CONFLICT (organization_id) DO NOTHING', [session.user.organizationId]);
     const result = await query(
-      `SELECT timezone, currency, date_format, address, phone FROM organization_settings WHERE organization_id = $1`,
+      `SELECT o.name AS "organizationName", s.timezone, s.currency, s.date_format, s.address, s.phone
+       FROM organizations o JOIN organization_settings s ON s.organization_id = o.id
+       WHERE o.id = $1`,
       [session.user.organizationId],
     );
     return NextResponse.json({ settings: result.rows[0] });

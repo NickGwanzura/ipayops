@@ -14,21 +14,33 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     if ('response' in auth) return auth.response;
     const body = refundSchema.parse(await request.json());
     const result = await withTransaction(async client => {
-      const current = await client.query(`SELECT id, number, refund_amount, refund_status FROM returns WHERE id = $1 AND organization_id = $2 FOR UPDATE`, [params.id, auth.session.user.organizationId]);
+      const current = await client.query(`SELECT id, number, sale_id, refund_amount, refund_status FROM returns WHERE id = $1 AND organization_id = $2 FOR UPDATE`, [params.id, auth.session.user.organizationId]);
       if (!current.rows[0]) throw Object.assign(new Error('Return not found.'), { code: 'NOT_FOUND' });
       if (Number(current.rows[0].refund_amount) <= 0) throw Object.assign(new Error('No refund is recorded for this return.'), { code: 'NO_REFUND' });
-      if (current.rows[0].refund_status === 'Processed') throw Object.assign(new Error('Refund already processed.'), { code: 'PROCESSED' });
+      if (current.rows[0].refund_status !== 'Pending') throw Object.assign(new Error('Refund is not pending.'), { code: 'INVALID_STATUS' });
+      const sale = await client.query(`SELECT id FROM sales WHERE id = $1 AND organization_id = $2 FOR UPDATE`, [current.rows[0].sale_id, auth.session.user.organizationId]);
+      if (!sale.rows[0]) throw Object.assign(new Error('Sale not found.'), { code: 'SALE_CONTEXT_NOT_FOUND' });
+      const invoice = await client.query(`SELECT id, paid_amount FROM invoices WHERE sale_id = $1 AND organization_id = $2 FOR UPDATE`, [current.rows[0].sale_id, auth.session.user.organizationId]);
+      const returnedValue = await client.query(`SELECT COALESCE(SUM(si.amount), 0) AS amount FROM return_items ri JOIN sale_items si ON si.id = ri.sale_item_id WHERE ri.return_id = $1`, [params.id]);
+      const refundAmount = Number(current.rows[0].refund_amount);
+      if (refundAmount > Number(returnedValue.rows[0].amount)) throw Object.assign(new Error('Refund exceeds the validated returned-item value.'), { code: 'RETURN_VALUE_EXCEEDED' });
+      if (body.method !== 'Credit note') {
+        const paidFunds = invoice.rows[0] ? Number(invoice.rows[0].paid_amount) : 0;
+        const priorRefunds = await client.query(`SELECT COALESCE(SUM(refund_amount), 0) AS amount FROM returns WHERE organization_id = $1 AND sale_id = $2 AND refund_status = 'Processed' AND refund_method IS DISTINCT FROM 'Credit note' AND id <> $3`, [auth.session.user.organizationId, current.rows[0].sale_id, params.id]);
+        if (refundAmount > paidFunds - Number(priorRefunds.rows[0].amount)) throw Object.assign(new Error('Refund exceeds paid invoice funds.'), { code: 'OVER_REFUND' });
+      }
       const creditNote = body.method === 'Credit note' ? `CN-${new Date().getFullYear()}-${randomUUID().slice(0, 6).toUpperCase()}` : null;
-      const updated = await client.query(`UPDATE returns SET refund_status = 'Processed', refund_method = $1, refund_reference = NULLIF($2, ''), credit_note_number = COALESCE($3, credit_note_number), refunded_at = now() WHERE id = $4 RETURNING id, number, refund_amount, refund_status, refund_method, refund_reference, credit_note_number, refunded_at`, [body.method, body.reference, creditNote, params.id]);
+      const updated = await client.query(`UPDATE returns SET refund_status = 'Processed', refund_method = $1, refund_reference = NULLIF($2, ''), credit_note_number = COALESCE($3, credit_note_number), refunded_at = now() WHERE id = $4 AND refund_status = 'Pending' RETURNING id, number, refund_amount, refund_status, refund_method, refund_reference, credit_note_number, refunded_at`, [body.method, body.reference, creditNote, params.id]);
+      if (!updated.rows[0]) throw Object.assign(new Error('Refund is not pending.'), { code: 'INVALID_STATUS' });
       return updated.rows[0];
     });
-    void notifyOrganizationRoles({ organizationId: auth.session.user.organizationId, roles: ['ceo', 'manager', 'finance'], excludeUserId: auth.session.user.id, eventType: 'return.refunded', subject: `Return ${result.number} refunded`, eyebrow: 'Returns and finance', title: 'Return refund processed', summary: `${auth.session.user.fullName} processed a refund or credit note for a returned sale.`, fields: [{ label: 'Return', value: result.number }, { label: 'Refund amount', value: String(result.refund_amount) }, { label: 'Method', value: result.refund_method }, { label: 'Reference', value: result.refund_reference || result.credit_note_number || 'Not provided' }], action: { label: 'Open Sales & CRM', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Sales%20%26%20CRM` } });
+    await notifyOrganizationRoles({ organizationId: auth.session.user.organizationId, roles: ['ceo', 'manager', 'finance'], excludeUserId: auth.session.user.id, eventType: 'return.refunded', subject: `Return ${result.number} refunded`, eyebrow: 'Returns and finance', title: 'Return refund processed', summary: `${auth.session.user.fullName} processed a refund or credit note for a returned sale.`, fields: [{ label: 'Return', value: result.number }, { label: 'Refund amount', value: String(result.refund_amount) }, { label: 'Method', value: result.refund_method }, { label: 'Reference', value: result.refund_reference || result.credit_note_number || 'Not provided' }], action: { label: 'Open Sales & CRM', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Sales%20%26%20CRM` } });
     return NextResponse.json({ refund: result });
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: 'A valid refund method is required.' }, { status: 400 });
     const code = (error as { code?: string }).code;
     if (code === 'NOT_FOUND') return NextResponse.json({ error: 'Return not found.' }, { status: 404 });
-    if (code === 'NO_REFUND' || code === 'PROCESSED') return NextResponse.json({ error: 'This return has no pending refundable amount.' }, { status: 409 });
+    if (code === 'NO_REFUND' || code === 'INVALID_STATUS' || code === 'RETURN_VALUE_EXCEEDED' || code === 'OVER_REFUND' || code === 'SALE_CONTEXT_NOT_FOUND') return NextResponse.json({ error: 'This return cannot be processed for the requested amount.' }, { status: 409 });
     console.error('Return refund failed', error);
     return NextResponse.json({ error: 'Unable to process refund.' }, { status: 500 });
   }

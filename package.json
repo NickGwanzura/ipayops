@@ -11,7 +11,9 @@
     "check:env": "node scripts/validate-env.mjs",
     "db:migrate": "node scripts/migrate.mjs",
     "db:create-user": "node scripts/create-user.mjs",
-    "test:smoke": "node scripts/smoke.mjs"
+    "test:smoke": "node scripts/smoke.mjs",
+    "test:integration": "node scripts/integration.mjs",
+    "test:restore": "node scripts/restore-drill.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1113.0",

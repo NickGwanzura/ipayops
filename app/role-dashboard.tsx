@@ -5,6 +5,7 @@ import { ArrowUpRight, Boxes, BriefcaseBusiness, Check, CircleDollarSign, Clipbo
 import { formatCurrency, type OrganizationSettings } from './organization-settings';
 import { normalizeRole, roleLabel } from '@/lib/rbac';
 import type { OpsModule } from '@/lib/ops-data';
+import { DashboardQuickActions } from './dashboard-guidance';
 
 type Props = { role: string; settings: OrganizationSettings; query: string; onNavigate: (module: OpsModule) => void };
 type Payload = Record<string, unknown>;
@@ -105,8 +106,8 @@ function SalesDashboard({ data, settings, query, onNavigate, error }: Omit<Props
   </RoleFrame>;
 }
 
-function RoleFrame({ eyebrow, title, subtitle, role, error, children }: { eyebrow: string; title: string; subtitle: string; role: string; onNavigate: (module: OpsModule) => void; error: string; children: React.ReactNode }) {
-  return <><div className="page-heading"><div><div className="eyebrow"><span className="live-dot"/> {eyebrow}</div><h1>{title}</h1><p>{subtitle} · {roleLabel(role)}</p></div></div>{error && <p className="workflow-error" role="alert">{error}</p>}{children}</>;
+function RoleFrame({ eyebrow, title, subtitle, role, onNavigate, error, children }: { eyebrow: string; title: string; subtitle: string; role: string; onNavigate: (module: OpsModule) => void; error: string; children: React.ReactNode }) {
+  return <><div className="page-heading"><div><div className="eyebrow"><span className="live-dot"/> {eyebrow}</div><h1>{title}</h1><p>{subtitle} · {roleLabel(role)}</p></div></div><DashboardQuickActions role={role} onNavigate={onNavigate}/>{error && <p className="workflow-error" role="alert">{error}</p>}{children}</>;
 }
 
 function RoleStat({ label, value, note, icon, tone, onClick }: { label: string; value: string; note: string; icon: React.ReactNode; tone: string; onClick?: () => void }) { const content = <><div className="stat-top"><span className={`icon-box ${tone}`}>{icon}</span><span className="change">Live</span></div><div className="stat-value">{value}</div><div className="stat-label">{label}</div><div className="stat-note">{note}</div></>; return onClick ? <button className="stat-card role-stat-action" onClick={onClick}>{content}</button> : <div className="stat-card">{content}</div>; }

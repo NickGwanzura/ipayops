@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { FormEvent, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { Check, CircleDollarSign, FileText, Paperclip, Plus, RotateCcw, Upload, Users, X } from 'lucide-react';
 import { formatCurrency, formatOrganizationDate, useOrganizationSettings } from '../organization-settings';
 import { normalizeRole } from '@/lib/rbac';
@@ -185,7 +185,7 @@ function EmployeeEditDialog({ employee, allowCeo, close, saved }: { employee: Em
 
 function InviteEmployeeDialog({ allowCeo, close, saved }: { allowCeo: boolean; close: () => void; saved: () => void }) {
   const [form, setForm] = useState({ fullName: '', email: '', role: 'sales_consultant' }); const [error, setError] = useState('');
-  const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch('/api/hr/invitations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to create invitation.'); return; } saved(); };
+  const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch('/api/hr/invitations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to create invitation.'); return; } if (data.emailStatus === 'not_configured') { setError('Invitation created, but email delivery is not configured. Configure branded email delivery before asking the employee to activate the account.'); return; } if (data.emailStatus === 'failed') { setError('Invitation created, but email delivery failed. Check notification delivery and resend the invitation.'); return; } saved(); };
   return <Dialog title="Invite employee" close={close}><form className="workflow-form" onSubmit={submit}><Field label="Full name"><input required value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })}/></Field><Field label="Work email"><input required type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}/></Field><Field label="Role"><select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}><option>sales_consultant</option><option>manager</option><option>finance</option>{allowCeo && <option>ceo</option>}</select></Field><p className="workflow-help">A branded, single-use invitation link will be emailed. It expires after 24 hours and the employee chooses their own password.</p>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Send invitation"/></form></Dialog>;
 }
 
@@ -197,9 +197,9 @@ function EmployeeHistoryDialog({ employee, close }: { employee: Employee; close:
 }
 
 function PaymentDialog({ invoice, close, saved }: { invoice: Invoice; close: () => void; saved: () => void }) {
-  const [form, setForm] = useState({ amount: Number(invoice.outstanding).toFixed(2), method: 'Bank transfer', reference: '' }); const [error, setError] = useState('');
+  const [form, setForm] = useState({ amount: Number(invoice.outstanding).toFixed(2), method: 'Bank transfer', reference: '' }); const [error, setError] = useState(''); const idempotencyKey = useRef<string | null>(null);
   const settings = useOrganizationSettings();
-  const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch(`/api/crm/invoices/${invoice.id}/payments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, amount: Number(form.amount) }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to record payment.'); return; } saved(); };
+  const submit = async (event: FormEvent) => { event.preventDefault(); setError(''); const key = idempotencyKey.current || crypto.randomUUID(); idempotencyKey.current = key; const response = await fetch(`/api/crm/invoices/${invoice.id}/payments`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key }, body: JSON.stringify({ ...form, amount: Number(form.amount) }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to record payment.'); return; } saved(); };
   return <Dialog title={`Record payment · ${invoice.number}`} close={close}><form className="workflow-form" onSubmit={submit}><p className="workflow-help">Outstanding balance: <strong>{formatCurrency(invoice.outstanding, settings.currency)}</strong></p><Field label={`Amount (${settings.currency})`}><input required type="number" min="0.01" max={invoice.outstanding} step="0.01" value={form.amount} onChange={event => setForm({ ...form, amount: event.target.value })}/></Field><Field label="Method"><select value={form.method} onChange={event => setForm({ ...form, method: event.target.value })}><option>Bank transfer</option><option>Cash</option><option>Card</option><option>Mobile money</option><option>Other</option></select></Field><Field label="Reference"><input value={form.reference} onChange={event => setForm({ ...form, reference: event.target.value })}/></Field>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Record payment"/></form></Dialog>;
 }
 

@@ -5,6 +5,13 @@
   min-width: 0;
 }
 
+/* Treat each workspace panel as its own responsive surface. The Finance & HR
+   dashboard commonly renders two panels side by side, so viewport-only
+   breakpoints leave their tables narrower than the 720px table minimum. */
+.ops-panel {
+  container-type: inline-size;
+}
+
 .data-table .table-head,
 .data-table .data-row,
 .report-table .table-head,
@@ -25,6 +32,16 @@
 
 .row-action {
   min-height: 32px;
+}
+
+.data-row > .transfer-card-actions {
+  min-width: 0;
+  align-items: center;
+  row-gap: 8px;
+}
+
+.workflow-actions {
+  flex-wrap: wrap;
 }
 
 .product-panel-actions {
@@ -267,5 +284,75 @@
 
   .client-history-row {
     grid-template-columns: 1fr auto;
+  }
+}
+
+/* Container-query equivalent of the mobile table treatment. This also fixes
+   narrow desktop cards and split-screen layouts, where the browser viewport
+   itself can still be wide enough to bypass the 700px media query. */
+@container (max-width: 760px) {
+  .ops-panel .data-table {
+    overflow: visible;
+  }
+
+  .ops-panel .data-table .table-head {
+    display: none;
+  }
+
+  .ops-panel .data-table .data-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px 14px;
+    min-width: 0;
+    min-height: 0;
+    padding: 15px 0;
+  }
+
+  .ops-panel .data-row > .transfer-card-actions,
+  .ops-panel .data-row > .row-action:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .ops-panel .data-row > .transfer-card-actions {
+    justify-content: flex-start;
+  }
+
+  .ops-panel .data-row > select {
+    width: 100%;
+  }
+}
+
+/* Keep the same behavior as a fallback for the common 1,280–1,500px desktop
+   workspace. At that size two panels are each narrower than the table's
+   desktop minimum even though the viewport is not a mobile viewport. */
+@media (min-width: 701px) and (max-width: 1500px) {
+  .ops-grid-two > .ops-panel .data-table {
+    overflow: visible;
+  }
+
+  .ops-grid-two > .ops-panel .data-table .table-head {
+    display: none;
+  }
+
+  .ops-grid-two > .ops-panel .data-table .data-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px 14px;
+    min-width: 0;
+    min-height: 0;
+    padding: 15px 0;
+  }
+
+  .ops-grid-two > .ops-panel .data-row > .transfer-card-actions,
+  .ops-grid-two > .ops-panel .data-row > .row-action:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .ops-grid-two > .ops-panel .data-row > .transfer-card-actions {
+    justify-content: flex-start;
+  }
+
+  .ops-grid-two > .ops-panel .data-row > select {
+    width: 100%;
   }
 }

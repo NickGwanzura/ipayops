@@ -39,8 +39,9 @@ export async function POST(request: Request) {
     const job = await withTransaction(async client => {
       const clientResult = await client.query('SELECT id FROM clients WHERE id = $1 AND organization_id = $2', [body.clientId, session.user.organizationId]);
       if (!clientResult.rows[0]) throw Object.assign(new Error('Client not found.'), { code: 'CLIENT_NOT_FOUND' });
+      if (body.inventoryItemIds.length > 0 && !body.saleId) throw Object.assign(new Error('A sale is required when inventory items are selected.'), { code: 'SALE_REQUIRED' });
       if (body.saleId) {
-        const saleResult = await client.query('SELECT id, client_id FROM sales WHERE id = $1 AND organization_id = $2', [body.saleId, session.user.organizationId]);
+        const saleResult = await client.query('SELECT id, client_id FROM sales WHERE id = $1 AND organization_id = $2 FOR UPDATE', [body.saleId, session.user.organizationId]);
         if (!saleResult.rows[0]) throw Object.assign(new Error('Sale not found.'), { code: 'SALE_NOT_FOUND' });
         if (saleResult.rows[0].client_id !== body.clientId) throw Object.assign(new Error('Sale client mismatch.'), { code: 'SALE_CLIENT_MISMATCH' });
       }
@@ -48,12 +49,18 @@ export async function POST(request: Request) {
         const installerResult = await client.query(`SELECT id FROM users WHERE id = $1 AND organization_id = $2 AND is_active = true AND role IN ('sales_consultant', 'manager', 'ceo')`, [body.installerId, session.user.organizationId]);
         if (!installerResult.rows[0]) throw Object.assign(new Error('Installer not found.'), { code: 'INSTALLER_NOT_FOUND' });
       }
+      if (new Set(body.inventoryItemIds).size !== body.inventoryItemIds.length) throw Object.assign(new Error('Inventory items must be unique.'), { code: 'DUPLICATE_ITEMS' });
       const inventory = body.inventoryItemIds.length ? await client.query(
         `SELECT id, serial_number, status FROM inventory_items WHERE organization_id = $1 AND id = ANY($2::uuid[]) FOR UPDATE`,
         [session.user.organizationId, body.inventoryItemIds],
       ) : { rows: [] };
       if (inventory.rows.length !== new Set(body.inventoryItemIds).size) throw Object.assign(new Error('Inventory item not found.'), { code: 'ITEM_NOT_FOUND' });
-      if (inventory.rows.some(item => !['Sold', 'Reserved', 'Available'].includes(item.status))) throw Object.assign(new Error('Inventory item cannot be installed.'), { code: 'ITEM_UNAVAILABLE' });
+      if (body.inventoryItemIds.length > 0) {
+        const saleItems = await client.query(`SELECT si.inventory_item_id, si.returned FROM sale_items si WHERE si.sale_id = $1 AND si.inventory_item_id = ANY($2::uuid[]) FOR UPDATE`, [body.saleId, body.inventoryItemIds]);
+        if (saleItems.rows.length !== body.inventoryItemIds.length) throw Object.assign(new Error('Inventory item is not part of the selected sale.'), { code: 'ITEM_NOT_IN_SALE' });
+        if (saleItems.rows.some(item => item.returned)) throw Object.assign(new Error('Returned inventory cannot be installed.'), { code: 'ITEM_RETURNED' });
+      }
+      if (inventory.rows.some(item => item.status !== 'Sold')) throw Object.assign(new Error('Only sold inventory can be installed.'), { code: 'ITEM_UNAVAILABLE' });
       const number = `JOB-${new Date().getFullYear()}-${randomUUID().slice(0, 6).toUpperCase()}`;
       const result = await client.query(
         `INSERT INTO job_cards (organization_id, number, client_id, sale_id, title, installer_id, scheduled_for, notes, created_by)
@@ -67,7 +74,7 @@ export async function POST(request: Request) {
       return result.rows[0];
     });
     const installer = body.installerId ? await query<{ email: string; full_name: string }>('SELECT email, full_name FROM users WHERE id = $1 AND organization_id = $2', [body.installerId, session.user.organizationId]) : { rows: [] as Array<{ email: string; full_name: string }> };
-    void Promise.all([
+    await Promise.all([
       installer.rows[0] ? sendNotification({ organizationId: session.user.organizationId, eventType: 'job.assigned', recipientEmail: installer.rows[0].email, recipientName: installer.rows[0].full_name, subject: `Job ${job.number} assigned`, eyebrow: 'Job cards', title: 'New job card assigned', summary: 'A new installation job card has been assigned to you.', fields: [{ label: 'Job', value: job.number }, { label: 'Title', value: job.title }, { label: 'Scheduled', value: job.scheduled_for ? new Date(job.scheduled_for).toLocaleString('en-GB') : 'Not scheduled' }], action: { label: 'Open job cards', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Job%20cards` } }) : Promise.resolve(),
       notifyOrganizationRoles({ organizationId: session.user.organizationId, roles: ['ceo', 'manager'], excludeUserId: session.user.id, eventType: 'job.assigned', subject: `New job card ${job.number}`, eyebrow: 'Job-card oversight', title: 'New job card created', summary: `${session.user.fullName} created a new job card for installation tracking.`, fields: [{ label: 'Job', value: job.number }, { label: 'Title', value: job.title }, { label: 'Scheduled', value: job.scheduled_for ? new Date(job.scheduled_for).toLocaleString('en-GB') : 'Not scheduled' }], action: { label: 'Open job cards', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Job%20cards` } }),
     ]);
@@ -76,6 +83,7 @@ export async function POST(request: Request) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: 'Client, title, and valid job details are required.' }, { status: 400 });
     const code = (error as { code?: string }).code;
     if (code === 'CLIENT_NOT_FOUND' || code === 'ITEM_NOT_FOUND' || code === 'SALE_NOT_FOUND' || code === 'INSTALLER_NOT_FOUND') return NextResponse.json({ error: 'Client, sale, installer, or inventory item not found.' }, { status: 404 });
+    if (code === 'SALE_REQUIRED' || code === 'DUPLICATE_ITEMS' || code === 'ITEM_NOT_IN_SALE' || code === 'ITEM_RETURNED') return NextResponse.json({ error: 'Selected inventory items must be unique, sold, retained items from the selected sale.' }, { status: 409 });
     if (code === 'SALE_CLIENT_MISMATCH') return NextResponse.json({ error: 'The selected sale belongs to a different client.' }, { status: 409 });
     if (code === 'ITEM_UNAVAILABLE') return NextResponse.json({ error: 'One or more inventory items cannot be installed.' }, { status: 409 });
     console.error('Job create failed', error);

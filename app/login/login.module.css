@@ -136,6 +136,20 @@
 .support { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px; margin: 25px 0 0; color: #91a0b1; font-size: 12px; }
 .support svg { color: #9aa8b8; }
 
+.mfaPanel { display: grid; gap: 20px; }
+.enrollmentCard { display: grid; justify-items: center; gap: 17px; padding: 20px; border: 1px solid #e2eaf2; border-radius: 12px; background: #f7fafc; }
+.qrCode { width: 210px; height: 210px; image-rendering: pixelated; border-radius: 6px; background: #fff; }
+.manualKey { display: grid; gap: 6px; width: 100%; text-align: center; }
+.manualKey span { color: #77859a; font-size: 11px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; }
+.manualKey code { overflow-wrap: anywhere; color: #26364e; font-size: 14px; font-weight: 700; letter-spacing: 1.4px; }
+.backButton, .secondaryButton { min-height: 44px; border: 1px solid #dce4ee; border-radius: 8px; color: #52647d; background: #fff; font-size: 13px; font-weight: 700; cursor: pointer; }
+.backButton:hover, .secondaryButton:hover { border-color: #b9c8da; background: #f7fafc; }
+.backButton:focus-visible, .secondaryButton:focus-visible { outline: 3px solid rgba(47, 124, 246, .22); outline-offset: 3px; }
+.recoveryCodes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 16px; border: 1px dashed #b9c9db; border-radius: 10px; background: #f7fafc; }
+.recoveryCodes code { padding: 10px 8px; border-radius: 6px; color: #26364e; background: #fff; font-size: 13px; font-weight: 700; letter-spacing: 1px; text-align: center; }
+.recoveryActions { display: grid; gap: 10px; }
+.warning { margin: 0; color: #9b6c09; font-size: 12px; line-height: 1.55; text-align: center; }
+
 @media (max-width: 900px) {
   .page { grid-template-columns: 1fr; }
   .visualPanel { display: none; }

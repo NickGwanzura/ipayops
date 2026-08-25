@@ -1,10 +1,14 @@
 const baseUrl = process.env.SMOKE_BASE_URL || process.env.APP_URL || 'http://localhost:3001';
+const propagatedRequestId = 'smoke-request-id';
 
 const checks = [
-  { name: 'health endpoint', method: 'GET', path: '/api/health', expected: 200 },
+  { name: 'health endpoint', method: 'GET', path: '/api/health', expected: 200, requestHeaders: { 'x-request-id': propagatedRequestId }, expectedRequestId: propagatedRequestId },
+  { name: 'API request ID generation', method: 'GET', path: '/api/health', expected: 200, expectRequestId: true },
+  { name: 'API request ID on auth failure', method: 'GET', path: '/api/auth/me', expected: 401, expectRequestId: true },
   { name: 'login page', method: 'GET', path: '/login', expected: 200 },
   { name: 'login security headers', method: 'GET', path: '/login', expected: 200, headers: ['x-content-type-options', 'x-frame-options', 'referrer-policy'] },
   { name: 'invalid invitation is rejected', method: 'GET', path: '/api/auth/invitations/invalid-test-token', expected: 410 },
+  { name: 'unauthenticated MFA challenge is rejected', method: 'GET', path: '/api/auth/mfa/challenge', expected: 401 },
   ...[
     '/api/auth/me', '/api/organization-settings', '/api/audit-logs', '/api/dashboard/summary', '/api/inventory',
     '/api/inventory/summary', '/api/purchase-orders', '/api/suppliers', '/api/crm/clients',
@@ -28,11 +32,14 @@ const checks = [
 let failures = 0;
 for (const check of checks) {
   try {
-    const response = await fetch(`${baseUrl}${check.path}`, { method: check.method, redirect: 'manual' });
+    const response = await fetch(`${baseUrl}${check.path}`, { method: check.method, headers: check.requestHeaders, redirect: 'manual' });
     const missingHeader = (check.headers || []).find(header => !response.headers.has(header));
-    if (response.status !== check.expected || missingHeader) {
+    const receivedRequestId = response.headers.get('x-request-id');
+    const requestIdMismatch = check.expectedRequestId && receivedRequestId !== check.expectedRequestId;
+    const missingRequestId = check.expectRequestId && !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(receivedRequestId || '');
+    if (response.status !== check.expected || missingHeader || requestIdMismatch || missingRequestId) {
       failures += 1;
-      console.error(`FAIL ${check.name}: status ${response.status}, expected ${check.expected}${missingHeader ? `, missing ${missingHeader}` : ''}`);
+      console.error(`FAIL ${check.name}: status ${response.status}, expected ${check.expected}${missingHeader ? `, missing ${missingHeader}` : ''}${requestIdMismatch ? `, x-request-id ${receivedRequestId || 'missing'}, expected ${check.expectedRequestId}` : ''}${missingRequestId ? ', missing or invalid generated x-request-id' : ''}`);
     } else {
       console.log(`PASS ${check.name}`);
     }

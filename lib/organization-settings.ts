@@ -1,12 +1,12 @@
 export type OrganizationSettings = { organizationName: string; timezone: string; currency: string; date_format: string; address: string; phone: string };
 
 export const DEFAULT_ORGANIZATION_SETTINGS: OrganizationSettings = {
-  organizationName: 'iPayTech',
-  timezone: 'Africa/Harare',
+  organizationName: 'Workspace',
+  timezone: 'UTC',
   currency: 'USD',
   date_format: 'DD/MM/YYYY',
-  address: '15th Floor, Trust Towers, 54-56, Samora Machel Ave, Harare',
-  phone: '077 867 4550',
+  address: '',
+  phone: '',
 };
 
 export function formatCurrency(value: string | number | null | undefined, currency: string, maximumFractionDigits = 2) {

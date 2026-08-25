@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { ACCESS, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
-import { executeBackup } from '@/lib/backup';
 import { usesS3 } from '@/lib/storage';
 import { writeAuditLog } from '@/lib/audit';
+import { isUuid } from '@/lib/server-env';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -33,9 +33,18 @@ function serialize(row: BackupRow) {
   };
 }
 
+function backupAuthority(sessionOrganizationId: string) {
+  const configuredOrganizationId = process.env.BACKUP_ADMIN_ORGANIZATION_ID?.trim() || '';
+  if (!isUuid(configuredOrganizationId)) return { response: NextResponse.json({ error: 'Backup administration is not configured.' }, { status: 503 }) } as const;
+  if (sessionOrganizationId.toLowerCase() !== configuredOrganizationId.toLowerCase()) return { response: NextResponse.json({ error: 'You do not have permission to access platform backups.' }, { status: 403 }) } as const;
+  return { organizationId: configuredOrganizationId } as const;
+}
+
 export async function GET(request: Request) {
   const auth = await requireRole(request, ACCESS.leadership);
   if ('response' in auth) return auth.response;
+  const authority = backupAuthority(auth.session.user.organizationId);
+  if ('response' in authority) return authority.response;
   try {
     const result = await query<BackupRow>(
       `SELECT id, status, size_bytes, checksum_sha256, error_message, started_at, completed_at, created_at
@@ -52,6 +61,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const auth = await requireRole(request, ACCESS.leadership);
   if ('response' in auth) return auth.response;
+  const authority = backupAuthority(auth.session.user.organizationId);
+  if ('response' in authority) return authority.response;
   if (!usesS3()) return NextResponse.json({ error: 'R2 backup storage is not enabled. Set STORAGE_DRIVER=s3 and configure the S3 variables.' }, { status: 503 });
   if (!/^[0-9a-f]{64}$/i.test(process.env.BACKUP_ENCRYPTION_KEY?.trim() || '')) return NextResponse.json({ error: 'Backup encryption is not configured. Set BACKUP_ENCRYPTION_KEY to 64 hexadecimal characters.' }, { status: 503 });
   try {
@@ -61,7 +72,6 @@ export async function POST(request: Request) {
     );
     const id = result.rows[0].id;
     await writeAuditLog({ organizationId: auth.session.user.organizationId, actorUserId: auth.session.user.id, action: 'backup.requested', entityType: 'backup_run', entityId: id, request });
-    void executeBackup({ id, organizationId: auth.session.user.organizationId, requestedBy: auth.session.user.id });
     return NextResponse.json({ backup: { id, status: 'pending' } }, { status: 202 });
   } catch (error) {
     const databaseError = error as { constraint?: string; message?: string };

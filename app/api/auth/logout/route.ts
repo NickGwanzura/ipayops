@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     const session = await getSession(request);
     await deleteSession(request);
     if (session) await writeAuditLog({ organizationId: session.user.organizationId, actorUserId: session.user.id, action: 'auth.logout', entityType: 'session', entityId: session.sessionId, request });
-    if (session) void sendNotification({ organizationId: session.user.organizationId, eventType: 'auth.logout', recipientEmail: session.user.email, recipientName: session.user.fullName, subject: 'iPayTech sign-out recorded', eyebrow: 'Security activity', title: 'Your account was signed out', summary: 'A sign-out event was recorded for your iPayTech Operations account.', fields: [{ label: 'Account', value: session.user.email }, { label: 'Time', value: new Date().toLocaleString('en-GB') }] });
+    if (session) await sendNotification({ organizationId: session.user.organizationId, eventType: 'auth.logout', recipientEmail: session.user.email, recipientName: session.user.fullName, subject: 'iPayTech sign-out recorded', eyebrow: 'Security activity', title: 'Your account was signed out', summary: 'A sign-out event was recorded for your iPayTech Operations account.', fields: [{ label: 'Account', value: session.user.email }, { label: 'Time', value: new Date().toLocaleString('en-GB') }] });
     const response = NextResponse.json({ ok: true });
     clearSessionCookie(response);
     return response;
