@@ -19,6 +19,7 @@ import { ALL_OPS_MODULES, canAccessConfiguration, canAccessModule } from '@/lib/
 import './ops.css';
 import './ops-responsive.css';
 import './ops-tokens.css';
+import './dashboard-redesign.css';
 
 const modules: OpsModule[] = [...ALL_OPS_MODULES, 'Audit Logs'];
 type User = { fullName: string; role: string };
