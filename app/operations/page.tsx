@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Boxes, BriefcaseBusiness, Check, ClipboardCheck, FileText, LogOut, Plus, Search, Settings2, ShieldCheck, ScrollText, ShoppingCart, Upload, UserRound, Users, X } from 'lucide-react';
 import { moduleMeta, type OpsModule } from '@/lib/ops-data';
 import ProcurementWorkflows from './procurement-workflows';
@@ -18,6 +18,7 @@ import { useDialogFocus } from '../dialog-focus';
 import { ALL_OPS_MODULES, canAccessConfiguration, canAccessModule } from '@/lib/rbac';
 import './ops.css';
 import './ops-responsive.css';
+import './ops-tokens.css';
 
 const modules: OpsModule[] = [...ALL_OPS_MODULES, 'Audit Logs'];
 type User = { fullName: string; role: string };
@@ -31,6 +32,7 @@ export default function OperationsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [newRecordSignal, setNewRecordSignal] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
   const settings = useOrganizationSettings();
   const meta = moduleMeta[module];
   const visibleModules = useMemo(() => user ? modules.filter(item => canAccessModule(user.role, item)) : [], [user]);
@@ -50,6 +52,18 @@ export default function OperationsPage() {
     window.history.replaceState(null, '', `/operations?module=${encodeURIComponent(fallback)}`);
   }, [user, module, visibleModules]);
 
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        searchRef.current?.focus();
+        searchRef.current?.select();
+      }
+    };
+    window.addEventListener('keydown', handleShortcut);
+    return () => window.removeEventListener('keydown', handleShortcut);
+  }, []);
+
   const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 2500); };
   const goToProfile = () => { window.location.href = '/profile'; };
   const logout = async () => { try { await fetch('/api/auth/logout', { method: 'POST' }); } finally { window.location.href = '/login'; } };
@@ -61,13 +75,13 @@ export default function OperationsPage() {
   const canImport = module === 'Procurement' || module === 'Sales & CRM';
   const canCreateRecord = Boolean(user && module !== 'Products' && ((module !== 'Reports' && canAccessModule(user.role, newRecordTarget)) || (module === 'Reports' && canAccessModule(user.role, 'Sales & CRM'))));
 
-  if (!user) return <div className="ops-shell"><main className="ops-main"><div className="ops-content"><section className="ops-panel role-loading"><p>Loading your workspace…</p></section></div></main></div>;
+  if (!user) return <div className="ops-shell"><main className="ops-main"><div className="ops-content"><section className="ops-skeleton" aria-label="Loading workspace"><div className="ops-skeleton-grid">{Array.from({ length: 4 }, (_, index) => <div className="ops-skeleton-block" key={index}/>)}</div><div className="ops-skeleton-block tall"/></section></div></main></div>;
 
   return <div className="ops-shell">
     <aside className="ops-rail"><Link className="ops-brand" href="/"><Image className="ops-logo" src="/iPaytechLogo.jpg" alt="iPayTech" width={160} height={67} priority /></Link><div className="ops-rail-title">OPERATIONS</div>{visibleModules.map(item => <button key={item} title={item} aria-label={item} className={module === item ? 'ops-nav active' : 'ops-nav'} onClick={() => setModuleAndReset(item)}>{iconFor(item)}<span>{item}</span></button>)}<div className="ops-rail-bottom">{user && canAccessConfiguration(user.role) && <button title="Configuration" aria-label="Configuration" className="ops-nav" onClick={goToConfiguration}><Settings2 size={16}/><span>Configuration</span></button>}<button title="Profile" aria-label="Profile" className="ops-nav" onClick={goToProfile}><UserRound size={16}/><span>Profile</span></button><button title="Sign out" aria-label="Sign out" className="ops-nav" onClick={() => void logout}><LogOut size={16}/><span>Sign out</span></button><Link className="back-dashboard" href="/"><ArrowLeft size={15}/> Dashboard</Link></div></aside>
-    <main className="ops-main"><header className="ops-top"><div className="ops-breadcrumb"><Link href="/">Overview</Link><span>/</span><strong>{meta.title}</strong></div><div className="ops-top-actions"><div className="ops-search"><Search size={16}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search this module..."/><kbd>⌘ K</kbd></div><button className="ops-avatar" onClick={goToProfile} title="Open profile" aria-label="Open profile">{initials(user.fullName)}</button></div></header><div className="ops-content"><div className="ops-heading"><div><span className="ops-kicker">Operations workspace</span><h1>{meta.title}</h1><p>{meta.description}</p></div><div className="ops-heading-actions">{canImport && <button className="ops-btn ghost" onClick={() => setImportOpen(true)}><Upload size={15}/> Import</button>}{canCreateRecord && <button className="ops-btn blue" onClick={handleNewRecord}><Plus size={16}/> {module === 'Finance & HR' && user.role === 'finance' ? 'Submit expense' : module === 'Finance & HR' ? 'Add consultant' : 'New record'}</button>}</div></div>
+    <main className="ops-main"><header className="ops-top"><div className="ops-breadcrumb"><Link href="/">Overview</Link><span>/</span><strong>{meta.title}</strong></div><div className="ops-top-actions"><div className="ops-search"><Search size={16}/><input ref={searchRef} aria-label={`Search ${meta.title}`} value={query} onChange={event => setQuery(event.target.value)} placeholder="Search this module..."/><kbd>{typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform) ? '⌘ K' : 'Ctrl K'}</kbd></div><button className="ops-avatar" onClick={goToProfile} title="Open profile" aria-label="Open profile">{initials(user.fullName)}</button></div></header><div className="ops-content"><div className="ops-heading"><div><span className="ops-kicker">Operations workspace</span><h1>{meta.title}</h1><p>{meta.description}</p></div><div className="ops-heading-actions">{canImport && <button className="ops-btn ghost" onClick={() => setImportOpen(true)}><Upload size={15}/> Import</button>}{canCreateRecord && <button className="ops-btn blue" onClick={handleNewRecord}><Plus size={16}/> {module === 'Finance & HR' && user.role === 'finance' ? 'Submit expense' : module === 'Finance & HR' ? 'Add consultant' : 'New record'}</button>}</div></div>
       {module === 'Procurement' && <ProcurementWorkflows notify={notify} newRecordSignal={newRecordSignal} query={searchableQuery}/>} {module === 'Products' && <ProductsWorkspace query={searchableQuery} notify={notify} role={user?.role || 'sales_consultant'}/>} {module === 'Inventory' && <InventoryWorkspace query={searchableQuery} notify={notify} newRecordSignal={newRecordSignal}/>} {module === 'Sales & CRM' && <CrmWorkspace notify={notify} newRecordSignal={newRecordSignal} role={user?.role || 'sales_consultant'}/>} {module === 'Job cards' && <JobsWorkspace notify={notify} newRecordSignal={newRecordSignal} role={user?.role || 'sales_consultant'}/>} {module === 'Warranty' && <WarrantyWorkspace notify={notify} newRecordSignal={newRecordSignal}/>} {module === 'Finance & HR' && <FinanceWorkspace notify={notify} newRecordSignal={newRecordSignal} role={user?.role || 'finance'}/>} {module === 'Reports' && <ReportsWorkspace notify={notify}/>} {module === 'Audit Logs' && <AuditLogsWorkspace query={searchableQuery}/>}<div className="ops-footer"><span><span className="status-dot"/> Database-sourced view · Last synced just now</span><span>Timezone: {settings.timezone} · Currency: {settings.currency}</span></div></div></main>
-    {importOpen && <ImportDialog module={module} close={() => setImportOpen(false)} imported={count => { setImportOpen(false); notify(`${count} record${count === 1 ? '' : 's'} imported`); window.setTimeout(() => window.location.reload(), 350); }} />}{toast && <div className="ops-toast"><span><Check size={13}/></span>{toast}</div>}
+    {importOpen && <ImportDialog module={module} close={() => setImportOpen(false)} imported={count => { setImportOpen(false); notify(`${count} record${count === 1 ? '' : 's'} imported`); window.setTimeout(() => window.location.reload(), 350); }} />}{toast && <div className="ops-toast" role="status" aria-live="polite"><span><Check size={13}/></span>{toast}</div>}
   </div>;
 }
 

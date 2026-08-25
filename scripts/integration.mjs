@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomUUID } from 'node:crypto';
+import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import net from 'node:net';
@@ -33,7 +33,10 @@ const pool = new Pool({
 const orgAId = '11111111-1111-4111-8111-111111111111';
 const orgBId = '22222222-2222-4222-8222-222222222222';
 const runToken = (process.env.GITHUB_RUN_ID || process.env.INTEGRATION_RUN_ID || 'local').replace(/[^a-z0-9-]/gi, '-').toLowerCase().slice(0, 24);
-const password = 'Luna-UAT-Password-2026!';
+// Generate credentials only for this isolated test run. Never commit reusable
+// UAT/demo passwords that could be mistaken for production credentials.
+const password = `UAT-${randomBytes(24).toString('base64url')}`;
+const invitationPassword = `UAT-${randomBytes(24).toString('base64url')}`;
 const emails = {
   ceo: `luna.uat.ceo.${runToken}@example.test`,
   manager: `luna.uat.manager.${runToken}@example.test`,
@@ -290,7 +293,7 @@ async function runAssertions(data) {
     [orgAId, `luna.uat.invited.${runToken}@example.test`, 'Luna UAT Invited Finance', createHash('sha256').update(invitationToken).digest('hex'), data.users.ceo.id],
   );
   const invitationJar = new CookieJar();
-  const invitationAccepted = await request(invitationJar, 'POST', `/api/auth/invitations/${encodeURIComponent(invitationToken)}`, { password: 'Luna-UAT-Invite-Password-2026!' });
+  const invitationAccepted = await request(invitationJar, 'POST', `/api/auth/invitations/${encodeURIComponent(invitationToken)}`, { password: invitationPassword });
   must('Privileged invitation activation requires MFA and does not create a session', invitationAccepted.status === 202 && invitationAccepted.body.mfaRequired === true && !invitationJar.has('ipaytech_session'));
   must('Privileged invitation activation creates an MFA challenge', invitationJar.has('ipaytech_mfa_challenge'));
   const invitationChallenge = await request(invitationJar, 'GET', '/api/auth/mfa/challenge');

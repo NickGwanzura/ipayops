@@ -15,19 +15,24 @@ export async function GET(request: NextRequest) {
   const auth = await requireRole(request, ACCESS.jobRead);
   if ('response' in auth) return auth.response;
   const { session } = auth;
+  const page = Math.max(1, Number(request.nextUrl.searchParams.get('page') || '1') || 1);
+  const pageSize = Math.min(100, Math.max(10, Number(request.nextUrl.searchParams.get('pageSize') || '50') || 50));
+  const offset = (page - 1) * pageSize;
   const assignmentClause = session.user.role === 'sales_consultant' ? ' AND j.installer_id = $2' : '';
   const parameters = session.user.role === 'sales_consultant' ? [session.user.organizationId, session.user.id] : [session.user.organizationId];
   const result = await query(
     `SELECT j.id, j.number, j.title, j.status, j.scheduled_for, j.notes, j.signoff_name, j.signed_at,
             c.id AS client_id, c.name AS client_name, u.full_name AS installer_name,
             COALESCE(json_agg(json_build_object('id', jci.inventory_item_id, 'serialNumber', jci.serial_number, 'checklist', jci.checklist)
-              ORDER BY jci.serial_number) FILTER (WHERE jci.id IS NOT NULL), '[]'::json) AS items
+              ORDER BY jci.serial_number) FILTER (WHERE jci.id IS NOT NULL), '[]'::json) AS items,
+            COUNT(*) OVER()::int AS total_count
      FROM job_cards j JOIN clients c ON c.id = j.client_id LEFT JOIN users u ON u.id = j.installer_id
      LEFT JOIN job_card_items jci ON jci.job_card_id = j.id
-     WHERE j.organization_id = $1${assignmentClause} GROUP BY j.id, c.id, u.id ORDER BY j.scheduled_for NULLS LAST, j.created_at DESC LIMIT 200`,
-    parameters,
+     WHERE j.organization_id = $1${assignmentClause} GROUP BY j.id, c.id, u.id ORDER BY j.scheduled_for NULLS LAST, j.created_at DESC LIMIT $${parameters.length + 1} OFFSET $${parameters.length + 2}`,
+    [...parameters, pageSize, offset],
   );
-  return NextResponse.json({ jobs: result.rows });
+  const total = result.rows[0]?.total_count || 0;
+  return NextResponse.json({ jobs: result.rows.map(({ total_count: _totalCount, ...job }) => job), pagination: { page, pageSize, total, hasMore: offset + result.rows.length < total } });
 }
 
 export async function POST(request: Request) {

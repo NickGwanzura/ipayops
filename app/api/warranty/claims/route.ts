@@ -11,15 +11,20 @@ export async function GET(request: NextRequest) {
   const auth = await requireRole(request, ACCESS.serviceRead);
   if ('response' in auth) return auth.response;
   const { session } = auth;
+  const page = Math.max(1, Number(request.nextUrl.searchParams.get('page') || '1') || 1);
+  const pageSize = Math.min(100, Math.max(10, Number(request.nextUrl.searchParams.get('pageSize') || '50') || 50));
+  const offset = (page - 1) * pageSize;
   const result = await query(
     `SELECT wc.id, wc.number, wc.status, wc.issue, wc.resolution, wc.created_at, ii.serial_number, ii.sku, ii.description, ii.client_name,
             COALESCE(json_agg(json_build_object('id', rr.id, 'number', rr.number, 'description', rr.description, 'status', rr.status, 'estimatedCost', rr.estimated_cost)
-              ORDER BY rr.created_at DESC) FILTER (WHERE rr.id IS NOT NULL), '[]'::json) AS requisitions
+              ORDER BY rr.created_at DESC) FILTER (WHERE rr.id IS NOT NULL), '[]'::json) AS requisitions,
+            COUNT(*) OVER()::int AS total_count
      FROM warranty_claims wc JOIN inventory_items ii ON ii.id = wc.inventory_item_id LEFT JOIN repair_requisitions rr ON rr.claim_id = wc.id
-     WHERE wc.organization_id = $1 GROUP BY wc.id, ii.id ORDER BY wc.created_at DESC LIMIT 200`,
-    [session.user.organizationId],
+     WHERE wc.organization_id = $1 GROUP BY wc.id, ii.id ORDER BY wc.created_at DESC LIMIT $2 OFFSET $3`,
+    [session.user.organizationId, pageSize, offset],
   );
-  return NextResponse.json({ claims: result.rows });
+  const total = result.rows[0]?.total_count || 0;
+  return NextResponse.json({ claims: result.rows.map(({ total_count: _totalCount, ...claim }) => claim), pagination: { page, pageSize, total, hasMore: offset + result.rows.length < total } });
 }
 
 export async function POST(request: Request) {

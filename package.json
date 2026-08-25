@@ -11,6 +11,7 @@
     "check:env": "node scripts/validate-env.mjs",
     "db:migrate": "node scripts/migrate.mjs",
     "db:create-user": "node scripts/create-user.mjs",
+    "db:wipe-demo-data": "node scripts/wipe-demo-business-data.mjs",
     "test:smoke": "node scripts/smoke.mjs",
     "test:integration": "node scripts/integration.mjs",
     "test:restore": "node scripts/restore-drill.mjs"
