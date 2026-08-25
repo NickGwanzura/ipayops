@@ -48,12 +48,22 @@ export async function POST(request: Request) {
       return response;
     }
     const session = await createSession(authUser, body.remember, false);
-    await query('UPDATE users SET last_login_at = now() WHERE id = $1', [user.id]);
-    await resetRateLimit(`login:${address}`);
-    await writeAuditLog({ organizationId: authUser.organizationId, actorUserId: authUser.id, action: 'auth.login', entityType: 'user', entityId: authUser.id, request });
-    await sendNotification({ organizationId: authUser.organizationId, eventType: 'auth.login', recipientEmail: authUser.email, recipientName: authUser.fullName, subject: 'New iPayTech sign-in', eyebrow: 'Security activity', title: 'A new sign-in was recorded', summary: 'Your iPayTech Operations account was just used to sign in.', fields: [{ label: 'Account', value: authUser.email }, { label: 'IP address', value: address }, { label: 'Time', value: new Date().toLocaleString('en-GB') }], action: { label: 'Review profile', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/profile` } });
     const response = NextResponse.json({ user: authUser });
     setSessionCookie(response, session.token, session.maxAge);
+
+    // Establish the session before running non-critical side effects. A slow or
+    // unavailable notification provider must never turn a successful login into
+    // a 503 response without a session cookie.
+    void Promise.allSettled([
+      query('UPDATE users SET last_login_at = now() WHERE id = $1', [user.id]),
+      resetRateLimit(`login:${address}`),
+      writeAuditLog({ organizationId: authUser.organizationId, actorUserId: authUser.id, action: 'auth.login', entityType: 'user', entityId: authUser.id, request }),
+      sendNotification({ organizationId: authUser.organizationId, eventType: 'auth.login', recipientEmail: authUser.email, recipientName: authUser.fullName, subject: 'New iPayTech sign-in', eyebrow: 'Security activity', title: 'A new sign-in was recorded', summary: 'Your iPayTech Operations account was just used to sign in.', fields: [{ label: 'Account', value: authUser.email }, { label: 'IP address', value: address }, { label: 'Time', value: new Date().toLocaleString('en-GB') }], action: { label: 'Review profile', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/profile` } }),
+    ]).then(results => {
+      for (const result of results) {
+        if (result.status === 'rejected') console.error('Login side effect failed');
+      }
+    }).catch(() => undefined);
     return response;
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: 'Enter a valid email and a password of at least 8 characters.' }, { status: 400 });

@@ -211,13 +211,22 @@ export async function POST(request: Request) {
 
   try {
     const session = await createSession(success.user, success.remember, true);
-    await resetRateLimit(`mfa:${address}`);
-    await resetRateLimit(`login:${address}`);
-    await writeAuditLog({ organizationId: success.user.organizationId, actorUserId: success.user.id, action: 'auth.login', entityType: 'user', entityId: success.user.id, request });
-    await sendNotification({ organizationId: success.user.organizationId, eventType: 'auth.login', recipientEmail: success.user.email, recipientName: success.user.fullName, subject: 'New iPayTech sign-in', eyebrow: 'Security activity', title: 'A new sign-in was recorded', summary: 'Your iPayTech Operations account was just used to sign in.', fields: [{ label: 'Account', value: success.user.email }, { label: 'IP address', value: address }, { label: 'Time', value: new Date().toLocaleString('en-GB') }], action: { label: 'Review profile', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/profile` } });
     const response = NextResponse.json({ user: success.user, ...(success.recoveryCodes ? { recoveryCodes: success.recoveryCodes } : {}) });
     clearMfaChallengeCookie(response);
     setSessionCookie(response, session.token, session.maxAge);
+
+    // The session must be returned even when audit or branded notification
+    // delivery is slow or unavailable.
+    void Promise.allSettled([
+      resetRateLimit(`mfa:${address}`),
+      resetRateLimit(`login:${address}`),
+      writeAuditLog({ organizationId: success.user.organizationId, actorUserId: success.user.id, action: 'auth.login', entityType: 'user', entityId: success.user.id, request }),
+      sendNotification({ organizationId: success.user.organizationId, eventType: 'auth.login', recipientEmail: success.user.email, recipientName: success.user.fullName, subject: 'New iPayTech sign-in', eyebrow: 'Security activity', title: 'A new sign-in was recorded', summary: 'Your iPayTech Operations account was just used to sign in.', fields: [{ label: 'Account', value: success.user.email }, { label: 'IP address', value: address }, { label: 'Time', value: new Date().toLocaleString('en-GB') }], action: { label: 'Review profile', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/profile` } }),
+    ]).then(results => {
+      for (const result of results) {
+        if (result.status === 'rejected') console.error('MFA login side effect failed');
+      }
+    }).catch(() => undefined);
     return response;
   } catch {
     return NextResponse.json({ error: 'Authentication service is unavailable.' }, { status: 503 });

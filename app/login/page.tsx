@@ -3,14 +3,12 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { ArrowRight, Eye, EyeOff, HelpCircle, KeyRound, LockKeyhole, ShieldCheck } from 'lucide-react';
 import styles from './login.module.css';
 
 type MfaKind = 'enroll' | 'verify';
 
 export default function LoginPage() {
-  const router = useRouter();
   const [step, setStep] = useState<'login' | 'mfa' | 'recovery'>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
@@ -27,7 +25,10 @@ export default function LoginPage() {
 
   function finishLogin() {
     const next = new URLSearchParams(window.location.search).get('next');
-    router.push(next?.startsWith('/') && !next.startsWith('//') ? next : '/');
+    const destination = next?.startsWith('/') && !next.startsWith('//') ? next : '/';
+    // Force a full navigation so middleware and server components read the
+    // session cookie immediately after it is set by the login response.
+    window.location.assign(destination);
   }
 
   const loadChallenge = useCallback(async () => {
