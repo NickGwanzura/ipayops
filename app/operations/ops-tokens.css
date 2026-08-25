@@ -249,6 +249,53 @@
 .ops-pagination > div { display:flex; gap:8px; }
 @media (max-width: 520px) { .ops-tabs { width:100%; } .ops-tabs button { flex:1; padding-inline:8px; } .ops-pagination { align-items:flex-start; flex-direction:column; } }
 
+/* Finance & HR workspace: dense operational hierarchy without equal-width dead space. */
+.finance-hr-workspace { display: grid; gap: 20px; }
+.finance-hr-workspace .ops-kpis { margin-bottom: 0; }
+.finance-hr-tabs { display: flex; gap: 4px; overflow-x: auto; padding: 4px; border: 1px solid #dbe3ef; border-radius: 10px; background: #f7f9fc; scrollbar-width: thin; }
+.finance-hr-tabs button { min-height: 44px; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 0; border-radius: 7px; background: transparent; color: #60708c; font: inherit; font-weight: 650; white-space: nowrap; cursor: pointer; }
+.finance-hr-tabs button:hover, .finance-hr-tabs button.active { color: #145fc9; background: #fff; box-shadow: 0 1px 4px rgba(16, 36, 64, .12); }
+.finance-hr-tabs button span { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: #eaf2ff; color: #1769e0; font-size: 12px; }
+.finance-people-panel { margin-bottom: 0; }
+.finance-people-filters { display: grid; grid-template-columns: minmax(240px, 1.5fr) minmax(150px, .7fr) minmax(150px, .7fr) auto; align-items: end; gap: 12px; margin-bottom: 18px; padding: 14px; border: 1px solid #e3e9f2; border-radius: 9px; background: #f8fafd; }
+.finance-people-filters label { display: grid; gap: 6px; color: #60708c; font-size: 12px; font-weight: 600; }
+.finance-people-filters label > span { color: #71809a; }
+.finance-people-filters select, .finance-search { min-height: 44px; border: 1px solid #d8e1ed; border-radius: 7px; background: #fff; color: #1b2a44; }
+.finance-people-filters select { width: 100%; padding: 0 10px; font: inherit; }
+.finance-search { display: flex !important; align-items: center; gap: 8px; padding: 0 11px; color: #8291a8; }
+.finance-search input { width: 100%; min-width: 0; border: 0; outline: 0; color: #1b2a44; font: inherit; }
+.finance-result-count { align-self: center; color: #71809a; font-size: 12px; white-space: nowrap; }
+.finance-people-table .table-head, .finance-people-table .data-row { grid-template-columns: minmax(240px, 1.6fr) minmax(130px, .8fr) minmax(170px, 1.1fr) minmax(130px, .8fr) minmax(170px, 1fr); min-width: 940px; }
+.finance-person { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.finance-person > span:last-child { min-width: 0; }
+.finance-person strong, .finance-person small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.finance-person small { max-width: 260px; }
+.finance-avatar { display: grid; place-items: center; flex: 0 0 38px; width: 38px; height: 38px; border-radius: 50%; background: #eaf2ff; color: #1769e0; font-size: 13px; font-weight: 750; }
+.finance-role { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 9px; border: 1px solid #dbe5f1; border-radius: 999px; background: #f7f9fc; color: #536783; font-size: 12px; font-weight: 650; }
+.finance-progress-cell { display: grid; gap: 8px; color: #536783; }
+.finance-progress { display: block; height: 7px; overflow: hidden; border-radius: 999px; background: #e6edf6; }
+.finance-progress i { display: block; height: 100%; border-radius: inherit; background: #2f7cf6; }
+.finance-status-cell { display: grid; gap: 5px; justify-items: start; }
+.finance-status-cell small { color: #71809a; font-size: 12px; }
+.destructive-action { color: #bd4d4d !important; }
+.destructive-action:hover, .destructive-action:focus-visible { background: #fff1f1 !important; color: #a93636 !important; }
+.ops-content { max-width: 1600px; padding-inline: clamp(24px, 2.5vw, 40px); }
+
+@media (min-width: 701px) and (max-width: 1100px) {
+  .finance-hr-workspace .ops-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .finance-people-filters { grid-template-columns: minmax(200px, 1fr) repeat(2, minmax(140px, .7fr)); }
+  .finance-result-count { grid-column: 1 / -1; }
+}
+@media (max-width: 700px) {
+  .finance-hr-workspace { gap: 14px; }
+  .finance-hr-workspace .ops-kpis { grid-template-columns: 1fr; gap: 10px; }
+  .finance-people-filters { grid-template-columns: 1fr; padding: 12px; }
+  .finance-result-count { justify-self: start; }
+  .finance-people-table .data-row { min-width: 0; }
+  .finance-people-table .finance-person { align-items: flex-start; }
+  .finance-people-table .finance-person small { max-width: calc(100vw - 110px); }
+}
+
 .ops-action-menu summary {
   display: inline-flex;
   align-items: center;
@@ -405,5 +452,101 @@
 @media (prefers-reduced-motion: reduce) {
   .ops-skeleton-block {
     animation: none;
+  }
+}
+
+/* Final responsive pass: labelled records become real cards, while tables
+   without labels remain scrollable and keep their column headings intact. */
+.ops-heading-actions,
+.workflow-actions,
+.product-panel-actions,
+.inventory-panel-actions {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ops-panel-head {
+  gap: 16px;
+}
+
+.ops-panel-head > :first-child {
+  min-width: 0;
+}
+
+.ops-panel-head > :last-child {
+  flex: 0 0 auto;
+}
+
+.data-row > .status {
+  justify-self: start;
+}
+
+@media (max-width: 760px) {
+  .ops-heading-actions,
+  .workflow-actions,
+  .product-panel-actions,
+  .inventory-panel-actions {
+    align-items: stretch;
+  }
+
+  .ops-heading-actions .ops-btn,
+  .workflow-actions .ops-btn,
+  .product-panel-actions .ops-btn,
+  .inventory-panel-actions .ops-btn {
+    justify-content: center;
+  }
+
+  .ops-panel-head {
+    display: grid;
+    gap: 10px;
+  }
+
+  .ops-panel-head > :last-child {
+    justify-self: start;
+    margin-top: 0;
+  }
+
+  /* This override must come after the generic data-row mobile rule above. */
+  .labelled-cards .table-head {
+    display: none !important;
+  }
+
+  .labelled-cards .data-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 18px;
+    min-width: 0 !important;
+    width: 100%;
+    padding: 16px 0;
+  }
+
+  .labelled-cards .data-row > [data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 4px;
+    color: #8191aa;
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+
+  .labelled-cards .data-row > :first-child,
+  .labelled-cards .data-row > .transfer-card-actions {
+    grid-column: 1 / -1;
+  }
+
+  .labelled-cards .data-row > .transfer-card-actions {
+    justify-content: flex-start;
+  }
+
+  .labelled-cards .data-row > [data-label] {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .labelled-cards .data-row > [data-label] > * {
+    max-width: 100%;
   }
 }

@@ -55,16 +55,16 @@ export default function ProductsWorkspace({ query = '', notify, role }: { query?
         <div className="product-panel-actions"><span className="workflow-help"><Search size={13}/> {query || 'All products'}</span>{canEdit && <button className="ops-btn blue" onClick={() => void openAdd()}><Plus size={15}/> Add product</button>}</div>
       </div>
       {error && <p className="workflow-error" role="alert">{error}</p>}
-      <div className="data-table">
+      <div className="data-table labelled-cards">
         <div className="table-head ops-table-head"><span>Product</span><span>Supplier</span><span>Stock</span><span>Cost price</span><span>Selling price</span><span>Margin</span><span>Action</span></div>
         {products.map(product => { const productMargin = margin(product); return <div className="data-row" key={product.id}>
-          <div><strong>{product.product_name}</strong><small>{product.product_type} · {product.sku} · {product.warranty_months} month warranty</small></div>
-          <span>{product.supplier_name}</span>
-          <span>{product.available_count}/{product.stock_count} available</span>
-          <span>{product.cost_price == null ? '—' : formatCurrency(product.cost_price, settings.currency)}</span>
-          <span>{formatCurrency(product.selling_price, settings.currency)}</span>
-          <span>{productMargin ? <><strong className={productMargin.value >= 0 ? 'green-text' : 'amber-text'}>{formatCurrency(productMargin.value, settings.currency)}</strong><small>{productMargin.percent.toFixed(1)}% of selling price</small></> : '—'}</span>
-          {canEdit ? <button className="row-action" onClick={() => setEditing(product)}><Pencil size={13}/> Edit</button> : <span className="workflow-help">Read-only</span>}
+          <div data-label="Product"><strong>{product.product_name}</strong><small>{product.product_type} · {product.sku} · {product.warranty_months} month warranty</small></div>
+          <span data-label="Supplier">{product.supplier_name}</span>
+          <span data-label="Stock">{product.available_count}/{product.stock_count} available</span>
+          <span data-label="Cost price">{product.cost_price == null ? '—' : formatCurrency(product.cost_price, settings.currency)}</span>
+          <span data-label="Selling price">{formatCurrency(product.selling_price, settings.currency)}</span>
+          <span data-label="Margin">{productMargin ? <><strong className={productMargin.value >= 0 ? 'green-text' : 'amber-text'}>{formatCurrency(productMargin.value, settings.currency)}</strong><small>{productMargin.percent.toFixed(1)}% of selling price</small></> : '—'}</span>
+          <span data-label="Action">{canEdit ? <button className="row-action" onClick={() => setEditing(product)}><Pencil size={13}/> Edit</button> : <span className="workflow-help">Read-only</span>}</span>
         </div>; })}
         {!products.length && <div className="empty-state"><Boxes size={22}/><strong>No products found</strong><span>{canEdit ? 'Add a serialized Laptop or POS product to begin.' : 'No active products are available.'}</span></div>}
       </div>
