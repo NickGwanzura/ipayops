@@ -3,6 +3,7 @@ import './globals.css';
 import './font.css';
 import './sitewide-spacing.css';
 import './dashboard-redesign.css';
+import './sidebar-actions.css';
 import { OrganizationSettingsProvider } from './organization-settings';
 
 export const metadata: Metadata = {

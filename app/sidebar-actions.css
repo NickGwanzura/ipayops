@@ -1,0 +1,32 @@
+/* Shared account/navigation actions: keep the three highest-value exits easy to find. */
+.user-card-actions {
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.user-card-action {
+  min-height: 36px;
+  padding: 8px 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ops-rail-bottom .ops-nav,
+.ops-rail-bottom .back-dashboard {
+  min-height: 42px;
+}
+
+.ops-rail-bottom .back-dashboard {
+  color: #dce7f7;
+  background: #192743;
+  border: 1px solid #2b3a55;
+  border-radius: 6px;
+  padding: 0 12px;
+  margin-bottom: 4px;
+}
+
+.ops-rail-bottom .back-dashboard:hover {
+  color: #fff;
+  background: #203455;
+  border-color: #3b5276;
+}

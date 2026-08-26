@@ -135,11 +135,13 @@
   }
 
   .ops-rail-bottom .ops-nav span {
-    display: none;
+    display: inline;
   }
 
   .back-dashboard {
-    display: none;
+    display: flex;
+    min-width: 112px;
+    justify-content: center;
   }
 
   .ops-top {
