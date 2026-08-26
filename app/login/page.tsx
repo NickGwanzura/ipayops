@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { ArrowRight, Eye, EyeOff, HelpCircle, KeyRound, LockKeyhole, ShieldCheck } from 'lucide-react';
+import { Activity, ArrowRight, BadgeCheck, Eye, EyeOff, HelpCircle, KeyRound, LockKeyhole, MapPin, ShieldCheck } from 'lucide-react';
 import styles from './login.module.css';
 
 type MfaKind = 'enroll' | 'verify';
@@ -142,11 +142,11 @@ export default function LoginPage() {
       <section className={styles.visualPanel} aria-label="iPayTech POS operations">
         <div className={styles.visualGlow} aria-hidden="true" />
         <div className={styles.visualGrid} aria-hidden="true" />
-        <div className={styles.visualContent}>
+        <header className={styles.visualHeader}>
           <Link href="/" className={styles.brand} aria-label="iPayTech Ops home">
             <Image className={styles.brandLogo} src="/iPaytechLogo.jpg" alt="iPayTech" width={180} height={76} priority />
           </Link>
-        </div>
+        </header>
         <div className={styles.posStage}>
           <Image
             className={styles.posImage}
@@ -157,20 +157,36 @@ export default function LoginPage() {
             priority
           />
         </div>
+        <div className={styles.visualStory}>
+          <span className={styles.kicker}><Activity size={14} /> Operations control centre</span>
+          <h1>Every operation.<br />One clear view.</h1>
+          <p>Serialized stock, sales, field jobs, warranties and finance—connected for the team serving Zimbabwe.</p>
+          <div className={styles.trustRow}>
+            <span><BadgeCheck size={15} /> Role-based control</span>
+            <span><ShieldCheck size={15} /> Audit-ready activity</span>
+          </div>
+        </div>
+        <footer className={styles.visualFooter}>
+          <span><MapPin size={14} /> Harare, Zimbabwe</span>
+          <span>iPayTech Operations</span>
+        </footer>
       </section>
       <section className={styles.formPanel}>
         <div className={styles.formWrap}>
-          <div className={styles.mobileBrand}>
-            <Link href="/" className={styles.brand} aria-label="iPayTech Ops home">
-              <Image className={styles.brandLogo} src="/iPaytechLogo.jpg" alt="iPayTech" width={180} height={76} priority />
-            </Link>
+          <div className={styles.formHeader}>
+            <div className={styles.mobileBrand}>
+              <Link href="/" className={styles.brand} aria-label="iPayTech Ops home">
+                <Image className={styles.brandLogo} src="/iPaytechLogo.jpg" alt="iPayTech" width={180} height={76} priority />
+              </Link>
+            </div>
+            <span className={styles.environmentBadge}><i aria-hidden="true" /> Production workspace</span>
           </div>
 
           {step === 'login' && <>
             <div className={styles.formIntro}>
-              <span className={styles.eyebrow}><LockKeyhole size={14} /> Secure workspace access</span>
-              <h2>Welcome back</h2>
-              <p>Sign in to continue to your operations workspace.</p>
+              <span className={styles.eyebrow}><LockKeyhole size={14} /> Secure team access</span>
+              <h2>Welcome to Ops 2026</h2>
+              <p>Sign in with your iPayTech work account to continue.</p>
             </div>
 
             <form className={styles.form} onSubmit={handleSubmit} noValidate>
@@ -253,6 +269,7 @@ export default function LoginPage() {
 
           <div className={styles.securityNote}><ShieldCheck size={16} /><span>Your access is protected with encrypted credentials and workspace-level permissions.</span></div>
           <p className={styles.support}>Need help accessing your workspace? <button type="button" onClick={() => setMessage('Contact your workspace administrator for access support.')}>Contact your administrator</button> <HelpCircle size={14} /></p>
+          <div className={styles.buildMark}><span>iPayTech Operations</span><strong>Interface 2026.08</strong></div>
         </div>
       </section>
     </main>
