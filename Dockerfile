@@ -23,6 +23,13 @@ ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
 ENV APP_VERSION=${APP_VERSION}
 ENV DEPLOY_SHA=${DEPLOY_SHA}
+# Safe, non-secret production controls. Deployments may override these in
+# Dokploy; keeping defaults here prevents a newly built image from failing
+# before it can report its health when the control variables are omitted.
+ENV HEALTHCHECK_STORAGE=true
+ENV REQUIRE_PRIVILEGED_MFA=true
+ENV ERROR_MONITORING_WEBHOOK_URL=https://ipaytechops.com/api/monitoring/errors
+ENV BACKUP_ADMIN_ORGANIZATION_ID=913071ae-5d9d-4461-b300-c08056c1d646
 RUN apk add --no-cache postgresql-client
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
