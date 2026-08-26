@@ -12,12 +12,19 @@ const securityHeaders = [
   { key: 'Cross-Origin-Resource-Policy', value: 'same-origin' },
   ...(process.env.NODE_ENV === 'production' ? [{ key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' }] : []),
 ];
+const applicationNoStoreHeaders = [{ key: 'Cache-Control', value: 'no-store, max-age=0' }];
 
 const nextConfig = {
   output: 'standalone',
   poweredByHeader: false,
   async headers() {
-    return [{ source: '/:path*', headers: securityHeaders }];
+    return [
+      { source: '/login', headers: [...securityHeaders, ...applicationNoStoreHeaders] },
+      { source: '/operations', headers: [...securityHeaders, ...applicationNoStoreHeaders] },
+      { source: '/profile', headers: [...securityHeaders, ...applicationNoStoreHeaders] },
+      { source: '/configuration', headers: [...securityHeaders, ...applicationNoStoreHeaders] },
+      { source: '/:path*', headers: securityHeaders },
+    ];
   },
 };
 export default nextConfig;
