@@ -42,3 +42,64 @@
   background: #203455;
   border-color: #3b5276;
 }
+
+/* CEO HR oversight uses the same readable card rhythm as Manager controls. */
+.finance-ceo-people {
+  display: grid;
+  gap: 10px;
+}
+
+.finance-ceo-people .table-head {
+  display: none;
+}
+
+.finance-ceo-people .data-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.45fr) minmax(85px, .7fr) minmax(110px, .9fr) minmax(180px, 1.4fr);
+  gap: 14px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #dfe7f1;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.finance-ceo-people .data-row > [data-label]::before {
+  content: attr(data-label);
+  display: block;
+  margin-bottom: 5px;
+  color: #8191aa;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.finance-ceo-people .data-row > [data-label] {
+  min-width: 0;
+}
+
+.finance-ceo-people .data-row > [data-label] > * {
+  max-width: 100%;
+}
+
+.finance-ceo-people .transfer-card-actions {
+  align-items: center;
+  gap: 9px;
+}
+
+@media (max-width: 760px) {
+  .finance-ceo-people .data-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .finance-ceo-people .data-row > [data-label]:first-child,
+  .finance-ceo-people .data-row > .transfer-card-actions {
+    grid-column: 1 / -1;
+  }
+
+  .finance-ceo-people .transfer-card-actions {
+    justify-content: flex-start;
+  }
+}
