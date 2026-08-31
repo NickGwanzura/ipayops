@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       }
       return { rule: rule.rows[0], created, amount };
     });
-    await notifyOrganizationRoles({ organizationId: session.user.organizationId, roles: ['ceo', 'manager', 'finance'], excludeUserId: session.user.id, eventType: 'commission.run', subject: `Commission run completed: ${result.rule.name}`, eyebrow: 'Commission engine', title: 'Commission run completed', summary: 'The commission engine has processed eligible confirmed sales.', fields: [{ label: 'Rule', value: result.rule.name }, { label: 'Entries', value: String(result.created) }, { label: 'Total', value: String(result.amount) }], action: { label: 'Open Finance & HR', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Finance%20%26%20HR` } });
+    await notifyOrganizationRoles({ organizationId: session.user.organizationId, roles: ['ceo', 'manager', 'finance'], excludeUserId: session.user.id, eventType: 'commission.run', subject: `Commission run completed: ${result.rule.name}`, eyebrow: 'Commission engine', title: 'Commission run completed', summary: 'The commission engine has processed eligible confirmed sales.', fields: [{ label: 'Rule', value: result.rule.name }, { label: 'Entries', value: String(result.created) }, { label: 'Total', value: String(result.amount) }], action: { label: 'Open commissions', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Finance%20%26%20HR&view=commissions` } });
     return NextResponse.json({ run: result }, { status: 201 });
   } catch (error) {
     const code = (error as { code?: string }).code;

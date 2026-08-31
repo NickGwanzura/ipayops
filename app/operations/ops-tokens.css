@@ -252,6 +252,137 @@
 /* Finance & HR workspace: dense operational hierarchy without equal-width dead space. */
 .finance-hr-workspace { display: grid; gap: 20px; }
 .finance-hr-workspace .ops-kpis { margin-bottom: 0; }
+
+/* Finance is a collection of focused pages, not one endlessly scrolling board. */
+.finance-pages { display: grid; gap: 20px; }
+.finance-page-nav { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px; border: 1px solid #dbe3ef; border-radius: 12px; background: #eef3f9; }
+.finance-page-nav button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 14px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #536783; font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; transition: color 180ms ease, background 180ms ease, border-color 180ms ease, box-shadow 180ms ease; }
+.finance-page-nav button:hover { color: #1769e0; background: rgba(255, 255, 255, .7); }
+.finance-page-nav button:focus-visible { outline: 3px solid rgba(47, 124, 246, .25); outline-offset: 2px; }
+.finance-page-nav button.active { border-color: #cbdcf5; background: #fff; color: #145fc9; box-shadow: 0 2px 8px rgba(16, 36, 64, .08); }
+
+.finance-pages > .ops-kpis,
+.finance-pages .finance-priority-grid,
+.finance-pages .finance-ledger-grid,
+.finance-pages .finance-primary-actions,
+.finance-pages .finance-deliveries-page-panel,
+.finance-pages .finance-returns-page-panel,
+.finance-pages .finance-controls-page-panel { display: none; }
+.finance-page-overview > .ops-kpis { display: grid; margin-bottom: 0; }
+.finance-page-commissions .finance-priority-grid { display: grid; grid-template-columns: minmax(0, 1fr); }
+.finance-page-expenses .finance-primary-actions { display: flex; }
+.finance-page-expenses .finance-ledger-grid,
+.finance-page-invoices .finance-ledger-grid { display: grid; grid-template-columns: minmax(0, 1fr); }
+.finance-page-expenses .finance-invoices-page-panel,
+.finance-page-invoices .finance-expenses-page-panel { display: none; }
+.finance-page-deliveries .finance-deliveries-page-panel,
+.finance-page-returns .finance-returns-page-panel,
+.finance-page-controls .finance-controls-page-panel { display: block; }
+
+.finance-overview { display: grid; gap: 16px; padding: 22px; border: 1px solid #dbe3ef; border-radius: 12px; background: #fff; box-shadow: 0 8px 24px rgba(16, 36, 64, .05); }
+.finance-overview-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.finance-overview-heading h2 { margin: 5px 0 4px; color: #17253d; font-size: 20px; line-height: 1.2; }
+.finance-overview-heading p { margin: 0; color: #60708c; font-size: 13px; line-height: 1.5; }
+.finance-overview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.finance-overview-card { min-width: 0; min-height: 112px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 13px; padding: 17px; border: 1px solid #dfe7f1; border-radius: 10px; background: #fbfcfe; color: #1b2a44; font: inherit; text-align: left; cursor: pointer; transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease; }
+.finance-overview-card:hover { border-color: #a9c9f7; background: #fff; box-shadow: 0 8px 20px rgba(20, 72, 145, .08); }
+.finance-overview-card:focus-visible { outline: 3px solid rgba(47, 124, 246, .25); outline-offset: 2px; }
+.finance-overview-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 9px; background: #eaf2ff; color: #1769e0; }
+.finance-overview-icon.purple { background: #f1eaff; color: #7b4bd4; }
+.finance-overview-icon.amber { background: #fff1d6; color: #b8790b; }
+.finance-overview-icon.green { background: #e2f7f0; color: #078966; }
+.finance-overview-icon.red { background: #feebeb; color: #bd4d4d; }
+.finance-overview-icon.slate { background: #eaf0f7; color: #536783; }
+.finance-overview-copy { min-width: 0; display: grid; gap: 5px; }
+.finance-overview-copy strong { font-size: 14px; }
+.finance-overview-copy > span { color: #60708c; font-size: 12px; line-height: 1.45; }
+.finance-overview-count { display: grid; min-width: 45px; justify-items: end; color: #8191aa; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
+.finance-overview-count strong { color: #17253d; font-size: 20px; line-height: 1; letter-spacing: 0; }
+.finance-overview-arrow { color: #8191aa; transition: color 180ms ease, transform 180ms ease; }
+.finance-overview-card:hover .finance-overview-arrow { color: #1769e0; transform: translateX(2px); }
+
+/* Sales & CRM uses the same progressive-disclosure model as Finance. */
+.crm-pages { display: grid; gap: 20px; }
+.crm-page-nav { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px; border: 1px solid #dbe3ef; border-radius: 12px; background: #eef3f9; }
+.crm-page-nav button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 14px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #536783; font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; transition: color 180ms ease, background 180ms ease, border-color 180ms ease, box-shadow 180ms ease; }
+.crm-page-nav button:hover { color: #1769e0; background: rgba(255, 255, 255, .7); }
+.crm-page-nav button:focus-visible { outline: 3px solid rgba(47, 124, 246, .25); outline-offset: 2px; }
+.crm-page-nav button.active { border-color: #cbdcf5; background: #fff; color: #145fc9; box-shadow: 0 2px 8px rgba(16, 36, 64, .08); }
+.crm-pages > .ops-kpis,
+.crm-pages .crm-actions,
+.crm-pages .crm-directory-grid,
+.crm-pages .crm-opportunities-panel,
+.crm-pages .crm-sales-panel,
+.crm-pages .crm-returns-panel { display: none; }
+.crm-page-overview > .ops-kpis,
+.crm-page-overview .crm-actions { display: grid; }
+.crm-page-clients .crm-directory-grid,
+.crm-page-leads .crm-directory-grid { display: grid; grid-template-columns: minmax(0, 1fr); }
+.crm-page-clients .crm-leads-panel,
+.crm-page-leads .crm-clients-panel { display: none; }
+.crm-page-opportunities .crm-opportunities-panel,
+.crm-page-sales .crm-sales-panel,
+.crm-page-returns .crm-returns-panel { display: block; }
+.crm-page-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.crm-overview { display: grid; gap: 16px; padding: 22px; border: 1px solid #dbe3ef; border-radius: 12px; background: #fff; box-shadow: 0 8px 24px rgba(16, 36, 64, .05); }
+.crm-overview h2 { margin: 5px 0 4px; color: #17253d; font-size: 20px; line-height: 1.2; }
+.crm-overview p { margin: 0; color: #60708c; font-size: 13px; line-height: 1.5; }
+.crm-overview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.crm-overview-card { min-width: 0; min-height: 112px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 13px; padding: 17px; border: 1px solid #dfe7f1; border-radius: 10px; background: #fbfcfe; color: #1b2a44; font: inherit; text-align: left; cursor: pointer; transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease; }
+.crm-overview-card:hover { border-color: #a9c9f7; background: #fff; box-shadow: 0 8px 20px rgba(20, 72, 145, .08); }
+.crm-overview-card:focus-visible { outline: 3px solid rgba(47, 124, 246, .25); outline-offset: 2px; }
+.crm-overview-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 9px; background: #eaf2ff; color: #1769e0; }
+.crm-overview-icon.purple { background: #f1eaff; color: #7b4bd4; }
+.crm-overview-icon.amber { background: #fff1d6; color: #b8790b; }
+.crm-overview-icon.green { background: #e2f7f0; color: #078966; }
+.crm-overview-icon.red { background: #feebeb; color: #bd4d4d; }
+.crm-overview-copy { min-width: 0; display: grid; gap: 5px; }
+.crm-overview-copy strong { font-size: 14px; }
+.crm-overview-copy > span { color: #60708c; font-size: 12px; line-height: 1.45; }
+.crm-overview-count { display: grid; min-width: 52px; justify-items: end; color: #8191aa; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
+.crm-overview-count strong { color: #17253d; font-size: 20px; line-height: 1; letter-spacing: 0; }
+.crm-overview-arrow { color: #8191aa; transition: color 180ms ease, transform 180ms ease; }
+.crm-overview-card:hover .crm-overview-arrow { color: #1769e0; transform: translateX(2px); }
+
+/* Procurement uses focused queues so buying work stays scannable on desktop and mobile. */
+.procurement-pages { display: grid; gap: 20px; }
+.procurement-page-nav { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px; border: 1px solid #dbe3ef; border-radius: 12px; background: #eef3f9; }
+.procurement-page-nav button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 14px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #536783; font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; transition: color 180ms ease, background 180ms ease, border-color 180ms ease, box-shadow 180ms ease; }
+.procurement-page-nav button:hover { color: #1769e0; background: rgba(255, 255, 255, .7); }
+.procurement-page-nav button:focus-visible { outline: 3px solid rgba(47, 124, 246, .25); outline-offset: 2px; }
+.procurement-page-nav button.active { border-color: #cbdcf5; background: #fff; color: #145fc9; box-shadow: 0 2px 8px rgba(16, 36, 64, .08); }
+.procurement-pages > .ops-kpis,
+.procurement-pages > .workflow-panel,
+.procurement-pages > .ops-grid-two,
+.procurement-pages > .ops-panel { display: none; }
+.procurement-page-overview > .ops-kpis { display: grid; }
+.procurement-page-overview > .workflow-panel { display: block; }
+.procurement-page-purchase-orders > .ops-grid-two,
+.procurement-page-suppliers > .ops-grid-two { display: grid; grid-template-columns: minmax(0, 1fr); }
+.procurement-page-purchase-orders > .ops-grid-two > section:nth-child(2),
+.procurement-page-suppliers > .ops-grid-two > section:first-child { display: none; }
+.procurement-page-receiving > .ops-grid-two { display: none; }
+.procurement-page-receiving > .ops-grid-two + .ops-panel { display: block; }
+.procurement-overview { display: grid; gap: 16px; padding: 22px; border: 1px solid #dbe3ef; border-radius: 12px; background: #fff; box-shadow: 0 8px 24px rgba(16, 36, 64, .05); }
+.procurement-overview-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.procurement-overview-heading h2 { margin: 5px 0 4px; color: #17253d; font-size: 20px; line-height: 1.2; }
+.procurement-overview-heading p { margin: 0; color: #60708c; font-size: 13px; line-height: 1.5; }
+.procurement-overview-total { flex: 0 0 auto; padding: 8px 11px; border: 1px solid #dbe5f1; border-radius: 999px; background: #f7f9fc; color: #536783; font-size: 12px; font-weight: 650; }
+.procurement-overview-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.procurement-overview-card { min-width: 0; min-height: 112px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 13px; padding: 17px; border: 1px solid #dfe7f1; border-radius: 10px; background: #fbfcfe; color: #1b2a44; font: inherit; text-align: left; cursor: pointer; transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease; }
+.procurement-overview-card:hover { border-color: #a9c9f7; background: #fff; box-shadow: 0 8px 20px rgba(20, 72, 145, .08); }
+.procurement-overview-card:focus-visible { outline: 3px solid rgba(47, 124, 246, .25); outline-offset: 2px; }
+.procurement-overview-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 9px; background: #eaf2ff; color: #1769e0; }
+.procurement-overview-icon.purple { background: #f1eaff; color: #7b4bd4; }
+.procurement-overview-icon.amber { background: #fff1d6; color: #b8790b; }
+.procurement-overview-copy { min-width: 0; display: grid; gap: 5px; }
+.procurement-overview-copy strong { font-size: 14px; }
+.procurement-overview-copy > span { color: #60708c; font-size: 12px; line-height: 1.45; }
+.procurement-overview-count { display: grid; min-width: 42px; justify-items: end; color: #8191aa; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
+.procurement-overview-count strong { color: #17253d; font-size: 20px; line-height: 1; letter-spacing: 0; }
+.procurement-overview-arrow { color: #8191aa; }
+.procurement-overview-card:hover .procurement-overview-arrow { color: #1769e0; }
+
 .finance-hr-tabs { display: flex; gap: 4px; overflow-x: auto; padding: 4px; border: 1px solid #dbe3ef; border-radius: 10px; background: #f7f9fc; scrollbar-width: thin; }
 .finance-hr-tabs button { min-height: 44px; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 0; border-radius: 7px; background: transparent; color: #60708c; font: inherit; font-weight: 650; white-space: nowrap; cursor: pointer; }
 .finance-hr-tabs button:hover, .finance-hr-tabs button.active { color: #145fc9; background: #fff; box-shadow: 0 1px 4px rgba(16, 36, 64, .12); }
@@ -302,6 +433,33 @@
   .finance-result-count { grid-column: 1 / -1; }
 }
 @media (max-width: 700px) {
+  .procurement-pages { gap: 14px; }
+  .procurement-page-nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 5px; }
+  .procurement-page-nav button { justify-content: flex-start; min-width: 0; padding-inline: 11px; }
+  .procurement-overview { padding: 16px; }
+  .procurement-overview-heading { align-items: flex-start; flex-direction: column; }
+  .procurement-overview-grid { grid-template-columns: 1fr; }
+  .procurement-overview-card { min-height: 104px; padding: 14px; }
+  .procurement-overview-total { align-self: flex-start; }
+}
+
+@media (max-width: 430px) {
+  .procurement-page-nav { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .procurement-page-nav button, .procurement-overview-card { transition: none; }
+}
+
+@media (max-width: 700px) {
+  .finance-pages { gap: 14px; }
+  .finance-page-nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 5px; }
+  .finance-page-nav button { justify-content: flex-start; min-width: 0; padding-inline: 11px; }
+  .finance-overview { padding: 16px; }
+  .finance-overview-grid { grid-template-columns: 1fr; }
+  .finance-overview-card { grid-template-columns: auto minmax(0, 1fr) auto; min-height: 104px; padding: 14px; }
+  .finance-overview-count { grid-row: 2; grid-column: 2; justify-items: start; display: flex; align-items: baseline; gap: 5px; }
+  .finance-overview-arrow { grid-column: 3; grid-row: 1 / span 2; }
   .finance-hr-workspace { gap: 14px; }
   .finance-hr-workspace .ops-kpis { grid-template-columns: 1fr; gap: 10px; }
   .finance-people-filters { grid-template-columns: 1fr; padding: 12px; }
@@ -313,6 +471,28 @@
   .finance-user-card-details { grid-template-columns: 1fr 1fr; gap: 14px; }
   .finance-user-progress { grid-column: 1 / -1; }
   .finance-user-card .finance-person small { max-width: calc(100vw - 150px); }
+}
+
+@media (max-width: 430px) {
+  .finance-page-nav { grid-template-columns: 1fr; }
+  .finance-overview-card { grid-template-columns: auto minmax(0, 1fr) auto; }
+}
+
+@media (max-width: 700px) {
+  .crm-pages { gap: 14px; }
+  .crm-page-nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 5px; }
+  .crm-page-nav button { justify-content: flex-start; min-width: 0; padding-inline: 11px; }
+  .crm-overview { padding: 16px; }
+  .crm-overview-grid { grid-template-columns: 1fr; }
+  .crm-overview-card { grid-template-columns: auto minmax(0, 1fr) auto; min-height: 104px; padding: 14px; }
+  .crm-overview-count { grid-row: 2; grid-column: 2; display: flex; align-items: baseline; justify-items: start; gap: 5px; }
+  .crm-overview-arrow { grid-column: 3; grid-row: 1 / span 2; }
+  .crm-page-actions { align-items: stretch; }
+  .crm-page-actions .ops-btn, .crm-page-actions .link-btn { min-height: 44px; }
+}
+
+@media (max-width: 430px) {
+  .crm-page-nav { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 460px) {
@@ -480,6 +660,18 @@
   .ops-skeleton-block {
     animation: none;
   }
+  .finance-page-nav button,
+  .finance-overview-card,
+  .finance-overview-arrow {
+    transition: none;
+  }
+  .finance-overview-card:hover .finance-overview-arrow {
+    transform: none;
+  }
+  .crm-page-nav button,
+  .crm-overview-card,
+  .crm-overview-arrow { transition: none; }
+  .crm-overview-card:hover .crm-overview-arrow { transform: none; }
 }
 
 /* Final responsive pass: labelled records become real cards, while tables

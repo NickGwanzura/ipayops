@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { Boxes, Laptop, PackageCheck, Plus, RefreshCw, ShoppingCart, Users, X } from 'lucide-react';
+import { ArrowRight, Boxes, Laptop, LayoutGrid, PackageCheck, Plus, RefreshCw, ShoppingCart, Truck, Users, X } from 'lucide-react';
 import { ActionMenu, ActionMenuItem } from './action-menu';
 import { formatOrganizationDate, useOrganizationSettings } from '../organization-settings';
 import { useDialogFocus } from '../dialog-focus';
@@ -12,6 +12,7 @@ type PurchaseOrder = { id: string; number: string; supplier_name: string; destin
 type PurchaseOrderItem = { id: string; productId?: string; productType?: string; sku: string; description: string; quantity: number; receivedQuantity: number };
 type Receipt = { id: string; number: string; receivedAt: string; notes?: string; receivedBy?: string };
 type PurchaseOrderDetail = PurchaseOrder & { supplier_id?: string; items: PurchaseOrderItem[]; receipts?: Receipt[] };
+type ProcurementPage = 'overview' | 'purchase-orders' | 'suppliers' | 'receiving';
 
 export default function ProcurementWorkflows({ notify, newRecordSignal = 0, query = '' }: { notify: (message: string) => void; newRecordSignal?: number; query?: string }) {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -22,6 +23,18 @@ export default function ProcurementWorkflows({ notify, newRecordSignal = 0, quer
   const [dialog, setDialog] = useState<'supplier' | 'supplierEdit' | 'order' | 'orderEdit' | 'receive' | 'orderDetail' | 'supplierDetail' | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrderDetail | null>(null);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [procurementPage, setProcurementPage] = useState<ProcurementPage>('overview');
+  const requestedProcurementPage = (): ProcurementPage => {
+    if (typeof window === 'undefined') return 'overview';
+    const value = new URLSearchParams(window.location.search).get('view');
+    return value === 'purchase-orders' || value === 'suppliers' || value === 'receiving' ? value : 'overview';
+  };
+  const openProcurementPage = (page: ProcurementPage) => {
+    setProcurementPage(page);
+    const params = new URLSearchParams(window.location.search);
+    if (page === 'overview') params.delete('view'); else params.set('view', page);
+    window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`);
+  };
   const load = async () => {
     setBusy(true);
     setError('');
@@ -46,7 +59,13 @@ export default function ProcurementWorkflows({ notify, newRecordSignal = 0, quer
   };
 
   useEffect(() => { void load(); }, [query]);
-  useEffect(() => { if (newRecordSignal > 0) setDialog('order'); }, [newRecordSignal]);
+  useEffect(() => {
+    setProcurementPage(requestedProcurementPage());
+    const handlePopState = () => setProcurementPage(requestedProcurementPage());
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+  useEffect(() => { if (newRecordSignal > 0) setDialog(procurementPage === 'suppliers' ? 'supplier' : 'order'); }, [newRecordSignal, procurementPage]);
 
   const openReceive = async (orderId: string) => {
     setError('');
@@ -74,14 +93,35 @@ export default function ProcurementWorkflows({ notify, newRecordSignal = 0, quer
   const outstandingUnits = visibleOrders.reduce((sum, order) => sum + Math.max(0, order.ordered_quantity - order.received_quantity), 0);
   const averageLeadTime = suppliers.length ? Math.round(suppliers.reduce((sum, supplier) => sum + Number(supplier.lead_time_days || 0), 0) / suppliers.length) : 0;
 
-  return <>
+  return <div className={`procurement-pages procurement-page-${procurementPage}`}>
+    <ProcurementSectionNav active={procurementPage} onOpen={openProcurementPage}/>
     <div className="ops-kpis"><LiveKpi label="Open purchase orders" value={String(visibleOrders.filter(order => !['Closed', 'Received'].includes(order.status)).length)} note={`${visibleOrders.filter(order => order.received_quantity < order.ordered_quantity).length} with outstanding units`} icon={<ShoppingCart size={16}/>} tone="blue"/><LiveKpi label="Units outstanding" value={String(outstandingUnits)} note="Partial receipts preserved" icon={<PackageCheck size={16}/>} tone="amber"/><LiveKpi label="Suppliers" value={String(suppliers.length)} note="Live supplier directory" icon={<Users size={16}/>} tone="purple"/><LiveKpi label="Avg. lead time" value={`${averageLeadTime} days`} note="From supplier records" icon={<Boxes size={16}/>} tone="green"/></div>
+    {procurementPage === 'overview' && <ProcurementOverview orders={visibleOrders.length} outstandingUnits={outstandingUnits} suppliers={suppliers.length} receiving={visibleOrders.filter(order => order.received_quantity < order.ordered_quantity).length} onOpen={openProcurementPage}/>}
     <section className="ops-panel workflow-panel"><div className="ops-panel-head"><div><h2>Connected procurement workflows</h2><p>Suppliers, product types, and serialized receiving are linked end to end.</p></div><button className="link-btn" onClick={() => void load()} disabled={busy}><RefreshCw size={14} className={busy ? 'spin' : ''}/> Refresh</button></div><div className="workflow-actions"><button className="ops-btn ghost" onClick={() => setDialog('supplier')}><Plus size={15}/> Add supplier</button><button className="ops-btn blue" onClick={() => setDialog('order')} disabled={!suppliers.length || !products.length}><Plus size={15}/> Create purchase order</button>{suppliers.length > 0 && !products.length && <span className="workflow-help">Add a Laptop or POS product before creating an order.</span>}</div>{error && <p className="workflow-error" role="alert">{error}</p>}</section>
     <div className="ops-grid-two"><section className="ops-panel"><div className="ops-panel-head"><div><h2>Purchase orders</h2><p>Live approvals, receiving, and delivery commitments.</p></div></div><div className="data-table labelled-cards"><div className="table-head ops-table-head"><span>Order</span><span>Supplier</span><span>Received</span><span>Status</span><span>Action</span></div>{visibleOrders.map(order => <div className="data-row" key={order.id}><button className="row-action" data-label="Order" onClick={() => void openOrder(order.id)}>{order.number}</button><span data-label="Supplier">{order.supplier_name}</span><span data-label="Received">{order.received_quantity}/{order.ordered_quantity}</span><span data-label="Status"><Status value={order.status}/></span><div className="transfer-card-actions" data-label="Action"><button className="row-action" onClick={() => void openOrder(order.id)}>Details</button><ActionMenu label={`More actions for ${order.number}`}>{order.received_quantity < order.ordered_quantity && <ActionMenuItem onClick={() => void openReceive(order.id)}><PackageCheck size={13}/> Receive goods</ActionMenuItem>}<ActionMenuItem className="destructive-action" onClick={() => void archiveOrder(order)}>Cancel order</ActionMenuItem></ActionMenu></div></div>)}{!visibleOrders.length && <div className="empty-state"><ShoppingCart size={22}/><strong>No purchase orders</strong><span>Create a live purchase order to begin receiving.</span></div>}</div></section><section className="ops-panel"><div className="ops-panel-head"><div><h2>Supplier directory</h2><p>Live supplier relationships and delivery terms.</p></div></div><div className="data-table labelled-cards"><div className="table-head ops-table-head"><span>Supplier</span><span>Contact</span><span>Lead time</span><span>Status</span><span>Action</span></div>{suppliers.map(supplier => <div className="data-row" key={supplier.id}><strong data-label="Supplier">{supplier.name}<small>{supplier.code}</small></strong><span data-label="Contact">{supplier.contact_name || supplier.phone || '—'}</span><span data-label="Lead time">{supplier.lead_time_days || 0} days</span><span data-label="Status"><Status value={supplier.status}/></span><div className="transfer-card-actions" data-label="Action"><button className="row-action" onClick={() => { setSelectedSupplier(supplier); setDialog('supplierDetail'); }}>Details</button><ActionMenu label={`More actions for ${supplier.name}`}><ActionMenuItem onClick={() => { setSelectedSupplier(supplier); setDialog('supplierEdit'); }}>Edit</ActionMenuItem>{supplier.status === 'Active' && <ActionMenuItem className="destructive-action" onClick={() => void archiveSupplier(supplier)}>Archive</ActionMenuItem>}</ActionMenu></div></div>)}{!suppliers.length && <div className="empty-state"><Users size={22}/><strong>No suppliers</strong><span>Add a supplier to create purchase orders.</span></div>}</div></section></div>
     <section className="ops-panel"><div className="ops-panel-head"><div><h2>Receiving queue</h2><p>Partial deliveries preserve the outstanding balance.</p></div></div><div className="workflow-receiving"><div>{visibleOrders.filter(order => order.received_quantity < order.ordered_quantity).map(order => <button key={order.id} className="workflow-order" onClick={() => void openReceive(order.id)}><span>{order.number} · {order.supplier_name}</span><small>{order.received_quantity}/{order.ordered_quantity} received <PackageCheck size={13}/></small></button>)}</div>{!visibleOrders.some(order => order.received_quantity < order.ordered_quantity) && <p className="workflow-help">No outstanding receipts.</p>}</div></section>
     {dialog === 'supplier' && <SupplierDialog close={() => setDialog(null)} onSaved={() => { setDialog(null); notify('Supplier and product catalog created'); void load(); }}/>} {dialog === 'supplierEdit' && selectedSupplier && <SupplierEditDialog supplier={selectedSupplier} close={() => { setDialog(null); setSelectedSupplier(null); }} onSaved={() => { setDialog(null); setSelectedSupplier(null); notify('Supplier updated'); void load(); }}/>} {dialog === 'order' && <OrderDialog suppliers={suppliers} products={products} close={() => setDialog(null)} onSaved={() => { setDialog(null); notify('Purchase order created'); void load(); }}/>} {dialog === 'receive' && selectedOrder && <ReceiveDialog order={selectedOrder} close={() => { setDialog(null); setSelectedOrder(null); }} onSaved={() => { setDialog(null); setSelectedOrder(null); notify('Goods receipt posted and serial inventory created'); void load(); }}/>} {dialog === 'orderDetail' && selectedOrder && <OrderDetailDialog order={selectedOrder} close={() => { setDialog(null); setSelectedOrder(null); }}/>} {dialog === 'supplierDetail' && selectedSupplier && <SupplierDetailDialog supplier={selectedSupplier} products={products.filter(product => product.supplier_id === selectedSupplier.id)} close={() => { setDialog(null); setSelectedSupplier(null); }}/>}
     {dialog === 'orderEdit' && selectedOrder && <OrderEditDialog order={selectedOrder} suppliers={suppliers} products={products} close={() => { setDialog(null); setSelectedOrder(null); }} onApprove={() => void approveOrder(selectedOrder)} onSaved={() => { setDialog(null); setSelectedOrder(null); notify('Purchase order updated'); void load(); }}/>}
-  </>;
+  </div>;
+}
+
+function ProcurementSectionNav({ active, onOpen }: { active: ProcurementPage; onOpen: (page: ProcurementPage) => void }) {
+  const items: Array<{ page: ProcurementPage; label: string; icon: typeof LayoutGrid }> = [
+    { page: 'overview', label: 'Overview', icon: LayoutGrid },
+    { page: 'purchase-orders', label: 'Purchase orders', icon: ShoppingCart },
+    { page: 'suppliers', label: 'Suppliers', icon: Users },
+    { page: 'receiving', label: 'Receiving', icon: Truck },
+  ];
+  return <nav className="procurement-page-nav" aria-label="Procurement workspace pages">{items.map(item => { const Icon = item.icon; return <button key={item.page} type="button" className={active === item.page ? 'active' : ''} aria-current={active === item.page ? 'page' : undefined} onClick={() => onOpen(item.page)}><Icon size={16}/><span>{item.label}</span></button>; })}</nav>;
+}
+
+function ProcurementOverview({ orders, outstandingUnits, suppliers, receiving, onOpen }: { orders: number; outstandingUnits: number; suppliers: number; receiving: number; onOpen: (page: ProcurementPage) => void }) {
+  const items: Array<{ page: ProcurementPage; title: string; detail: string; count: number; icon: typeof ShoppingCart; tone: string }> = [
+    { page: 'purchase-orders', title: 'Purchase orders', detail: 'Review approvals, delivery commitments, and order lines.', count: orders, icon: ShoppingCart, tone: 'blue' },
+    { page: 'suppliers', title: 'Supplier directory', detail: 'Manage supplier terms and serialized product catalogs.', count: suppliers, icon: Users, tone: 'purple' },
+    { page: 'receiving', title: 'Receiving queue', detail: 'Post partial deliveries with one serial per unit.', count: receiving, icon: PackageCheck, tone: 'amber' },
+  ];
+  return <section className="procurement-overview" aria-labelledby="procurement-work-queues"><div className="procurement-overview-heading"><div><span className="ops-kicker">Workspace directory</span><h2 id="procurement-work-queues">Choose a procurement workflow</h2><p>Keep buying, supplier management, and serialized receiving focused and easy to scan.</p></div><span className="procurement-overview-total">{outstandingUnits} units outstanding</span></div><div className="procurement-overview-grid">{items.map(item => { const Icon = item.icon; return <button type="button" className="procurement-overview-card" key={item.page} onClick={() => onOpen(item.page)}><span className={`procurement-overview-icon ${item.tone}`}><Icon size={18}/></span><span className="procurement-overview-copy"><strong>{item.title}</strong><span>{item.detail}</span></span><span className="procurement-overview-count"><strong>{item.count}</strong><span>records</span></span><ArrowRight size={16} className="procurement-overview-arrow"/></button>; })}</div></section>;
 }
 
 function LiveKpi({ label, value, note, icon, tone }: { label: string; value: string; note: string; icon: React.ReactNode; tone: string }) { return <div className="ops-kpi"><span className={`kpi-icon ${tone}`}>{icon}</span><strong>{value}</strong><span>{label}</span><small>{note}</small></div>; }

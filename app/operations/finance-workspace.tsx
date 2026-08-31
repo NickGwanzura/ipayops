@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import { Check, CircleDollarSign, FileText, Paperclip, Plus, RotateCcw, Search, Upload, UserRound, Users, X } from 'lucide-react';
+import { ArrowRight, Check, CircleDollarSign, FileText, LayoutGrid, Paperclip, Plus, ReceiptText, RotateCcw, Search, Settings2, Truck, Upload, UserRound, Users, WalletCards, X } from 'lucide-react';
 import { formatCurrency, formatOrganizationDate, useOrganizationSettings } from '../organization-settings';
 import { normalizeRole } from '@/lib/rbac';
 import { useDialogFocus } from '../dialog-focus';
@@ -22,6 +22,15 @@ type Invitation = { id: string; full_name: string; email: string; role: string; 
 type EmployeeEvent = { id: string; event_type: string; status: string; effective_at: string; notes?: string; created_at: string; created_by_name?: string };
 type OnboardingTask = { id: string; user_id: string; user_name: string; title: string; category: string; due_at?: string; status: string };
 type FinanceDialog = 'expense' | 'expenseDetail' | 'expenseEdit' | 'payment' | 'invoiceDetail' | 'deliveryDetail' | 'invite' | 'employeeEdit' | 'employeeHistory' | 'rule' | 'ruleEdit' | 'target' | 'targetEdit' | 'onboarding' | null;
+type FinancePage = 'overview' | 'commissions' | 'expenses' | 'invoices' | 'deliveries' | 'returns' | 'controls';
+
+const financePages: FinancePage[] = ['overview', 'commissions', 'expenses', 'invoices', 'deliveries', 'returns', 'controls'];
+
+function requestedFinancePage(): FinancePage {
+  if (typeof window === 'undefined') return 'overview';
+  const requested = new URLSearchParams(window.location.search).get('view') as FinancePage | null;
+  return requested && financePages.includes(requested) ? requested : 'overview';
+}
 
 export default function FinanceWorkspace({ notify, newRecordSignal = 0, role = 'finance', section = 'all' }: { notify: (message: string) => void; newRecordSignal?: number; role?: string; section?: 'all' | 'hr' }) {
   const [expenses, setExpenses] = useState<Expense[]>([]); const [rules, setRules] = useState<Rule[]>([]); const [targets, setTargets] = useState<Target[]>([]); const [users, setUsers] = useState<User[]>([]); const [commissions, setCommissions] = useState<Commission[]>([]);
@@ -33,6 +42,7 @@ export default function FinanceWorkspace({ notify, newRecordSignal = 0, role = '
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [selectedRule, setSelectedRule] = useState<Rule | null>(null); const [selectedTarget, setSelectedTarget] = useState<Target | null>(null);
   const [error, setError] = useState('');
+  const [financePage, setFinancePage] = useState<FinancePage>(requestedFinancePage);
   const settings = useOrganizationSettings();
   const normalizedRole = normalizeRole(role);
   const canFinance = normalizedRole === 'ceo' || normalizedRole === 'finance';
@@ -66,7 +76,20 @@ export default function FinanceWorkspace({ notify, newRecordSignal = 0, role = '
   useEffect(() => { void load(); }, []);
   const loadReturns = async () => { const response = await fetch('/api/crm/returns', { cache: 'no-store' }); if (!response.ok) return; const data = await response.json(); setReturns(data.returns || []); };
   useEffect(() => { if (canFinance) void loadReturns(); }, [canFinance]);
-  useEffect(() => { if (newRecordSignal > 0) setDialog(canManagePeople ? 'invite' : 'expense'); }, [newRecordSignal, canManagePeople]);
+  useEffect(() => { if (newRecordSignal > 0) setDialog(section === 'hr' ? 'invite' : 'expense'); }, [newRecordSignal, section]);
+  useEffect(() => {
+    const syncFromHistory = () => setFinancePage(requestedFinancePage());
+    window.addEventListener('popstate', syncFromHistory);
+    return () => window.removeEventListener('popstate', syncFromHistory);
+  }, []);
+
+  const openFinancePage = (page: FinancePage) => {
+    setFinancePage(page);
+    const url = new URL(window.location.href);
+    if (page === 'overview') url.searchParams.delete('view'); else url.searchParams.set('view', page);
+    window.history.pushState(null, '', `${url.pathname}${url.search}`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const updateExpense = async (expense: Expense, status: 'Approved' | 'Rejected' | 'Paid') => {
     const response = await fetch(`/api/finance/expenses/${expense.id}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
@@ -88,23 +111,33 @@ export default function FinanceWorkspace({ notify, newRecordSignal = 0, role = '
   const pendingTotal = expenses.filter(expense => expense.status === 'Pending').reduce((sum, expense) => sum + Number(expense.amount), 0);
   const outstandingTotal = invoices.reduce((sum, invoice) => sum + Number(invoice.outstanding || 0), 0);
   if (section === 'hr' && canManagePeople) return <ManagerControlView employees={employees} invitations={invitations} tasks={tasks} rules={rules} targets={targets} users={users} dialog={dialog} setDialog={setDialog} selectedEmployee={selectedEmployee} setSelectedEmployee={setSelectedEmployee} selectedRule={selectedRule} setSelectedRule={setSelectedRule} selectedTarget={selectedTarget} setSelectedTarget={setSelectedTarget} completeTask={completeTask} offboard={offboard} resendInvitation={resendInvitation} revokeInvitation={revokeInvitation} saved={saved} notify={notify}/>;
-  if (normalizedRole === 'finance') return <FinanceOnlyView expenses={expenses} invoices={invoices} returns={returns} commissions={commissions} pendingTotal={pendingTotal} outstandingTotal={outstandingTotal} settings={settings} dialog={dialog} setDialog={setDialog} selectedExpense={selectedExpense} setSelectedExpense={setSelectedExpense} selectedInvoice={selectedInvoice} setSelectedInvoice={setSelectedInvoice} updateExpense={updateExpense} processRefund={processRefund} saved={saved}/>;
   if (normalizedRole === 'manager') return <ManagerControlView employees={employees} invitations={invitations} tasks={tasks} rules={rules} targets={targets} users={users} dialog={dialog} setDialog={setDialog} selectedEmployee={selectedEmployee} setSelectedEmployee={setSelectedEmployee} selectedRule={selectedRule} setSelectedRule={setSelectedRule} selectedTarget={selectedTarget} setSelectedTarget={setSelectedTarget} completeTask={completeTask} offboard={offboard} resendInvitation={resendInvitation} revokeInvitation={revokeInvitation} saved={saved} notify={notify}/>;
-  return <>
+  return <div className={`finance-pages finance-page-${financePage}`}>
+    <FinanceSectionNav active={financePage} onOpen={openFinancePage} showControls={canManageCommissionSettings}/>
     <div className="ops-kpis">
       <LiveKpi label="Pending expenses" value={formatCurrency(pendingTotal, settings.currency)} note={`${expenses.filter(expense => expense.status === 'Pending').length} awaiting review`} icon={<CircleDollarSign size={16}/>} tone="amber"/>
       <LiveKpi label="Outstanding invoices" value={formatCurrency(outstandingTotal, settings.currency)} note={`${invoices.filter(invoice => Number(invoice.outstanding) > 0).length} accounts receivable`} icon={<FileText size={16}/>} tone="blue"/>
       <LiveKpi label="Recorded invoices" value={invoices.length.toString()} note="Payment lifecycle enabled" icon={<Check size={16}/>} tone="green"/>
       <LiveKpi label="Provisional commissions" value={commissions.filter(commission => commission.status === 'Provisional').length.toString()} note="Awaiting manager approval" icon={<Paperclip size={16}/>} tone="purple"/>
     </div>
+    {financePage === 'overview' && <FinanceOverview
+      pendingExpenses={expenses.filter(expense => expense.status === 'Pending').length}
+      openInvoices={invoices.filter(invoice => Number(invoice.outstanding) > 0).length}
+      provisionalCommissions={commissions.filter(commission => commission.status === 'Provisional').length}
+      deliveryNotes={deliveryNotes.length}
+      returns={returns.filter(record => record.refund_status === 'Pending').length}
+      rules={rules.length}
+      onOpen={openFinancePage}
+      showControls={canManageCommissionSettings}
+    />}
     <div className="ops-grid-two finance-priority-grid">
-      <LivePanel title="Commission run" subtitle="Run active rules, then approve and pay entries"><div className="workflow-actions"><button className="ops-btn blue" onClick={() => void runCommissions()}><CircleDollarSign size={15}/> Run commissions</button><span className="workflow-help">{commissions.length} entries · {formatCurrency(commissions.reduce((sum, commission) => sum + Number(commission.amount), 0), settings.currency)} total</span></div><div className="data-table labelled-cards"><TableHead labels={['Sale','Consultant','Rate','Amount','Action']}/>{commissions.map(commission => <div className="data-row" key={commission.id}><div data-label="Sale"><strong>{commission.sale_number}</strong><small>{commission.client_name}</small></div><span data-label="Consultant">{commission.consultant_name || 'Unassigned'}</span><span data-label="Rate">{Number(commission.rate).toFixed(2)}%</span><span data-label="Amount">{formatCurrency(commission.amount, settings.currency)}</span><div className="transfer-card-actions" data-label="Action"><Status value={commission.status}/>{commission.status === 'Provisional' && <><button className="row-action" onClick={() => void updateCommission(commission, 'Approved')}><Check size={13}/> Approve</button><button className="row-action" onClick={() => void updateCommission(commission, 'Voided')}><X size={13}/> Void</button></>}{commission.status === 'Approved' && <button className="row-action" onClick={() => void updateCommission(commission, 'Paid')}><CircleDollarSign size={13}/> Paid</button>}</div></div>)}{!commissions.length && <Empty title="No commission entries" detail="Run an active rule after confirmed sales are assigned to consultants." icon={<CircleDollarSign size={22}/>}/>}</div></LivePanel>
+      <LivePanel className="finance-commissions-panel" title="Commission run" subtitle="Run active rules, then approve and pay entries"><div className="workflow-actions"><button className="ops-btn blue" onClick={() => void runCommissions()}><CircleDollarSign size={15}/> Run commissions</button><span className="workflow-help">{commissions.length} entries · {formatCurrency(commissions.reduce((sum, commission) => sum + Number(commission.amount), 0), settings.currency)} total</span></div><div className="data-table labelled-cards"><TableHead labels={['Sale','Consultant','Rate','Amount','Action']}/>{commissions.map(commission => <div className="data-row" key={commission.id}><div data-label="Sale"><strong>{commission.sale_number}</strong><small>{commission.client_name}</small></div><span data-label="Consultant">{commission.consultant_name || 'Unassigned'}</span><span data-label="Rate">{Number(commission.rate).toFixed(2)}%</span><span data-label="Amount">{formatCurrency(commission.amount, settings.currency)}</span><div className="transfer-card-actions" data-label="Action"><Status value={commission.status}/>{commission.status === 'Provisional' && <><button className="row-action" onClick={() => void updateCommission(commission, 'Approved')}><Check size={13}/> Approve</button><button className="row-action" onClick={() => void updateCommission(commission, 'Voided')}><X size={13}/> Void</button></>}{commission.status === 'Approved' && <button className="row-action" onClick={() => void updateCommission(commission, 'Paid')}><CircleDollarSign size={13}/> Paid</button>}</div></div>)}{!commissions.length && <Empty title="No commission entries" detail="Run an active rule after confirmed sales are assigned to consultants." icon={<CircleDollarSign size={22}/>}/>}</div></LivePanel>
       <LivePanel className="finance-ceo-hr-panel" title="HR lifecycle" subtitle="Employee accounts, invitations, onboarding, and auditable lifecycle history"><div className="workflow-actions"><button className="ops-btn blue" onClick={() => setDialog('invite')}><Plus size={15}/> Invite employee</button><button className="ops-btn ghost" onClick={() => setDialog('onboarding')}><Plus size={15}/> Add onboarding task</button><span className="workflow-help">{employees.filter(employee => employee.is_active).length} active employees</span></div><div className="data-table labelled-cards finance-ceo-people"><TableHead labels={['Employee','Role','Tasks','Account']}/>{employees.map(employee => <div className="data-row" key={employee.id}><div data-label="Employee"><strong>{employee.full_name}</strong><small>{employee.email} · {employee.last_event || 'No lifecycle event'}</small></div><span data-label="Role">{employee.role}</span><span data-label="Tasks">{employee.completed_tasks} done · {employee.pending_tasks} pending</span><div className="transfer-card-actions" data-label="Account"><Status value={employee.is_active ? 'Active' : 'Inactive'}/><button className="row-action" onClick={() => { setSelectedEmployee(employee); setDialog('employeeHistory'); }}>History</button><button className="row-action" onClick={() => { setSelectedEmployee(employee); setDialog('employeeEdit'); }}>Edit</button>{employee.is_active && <button className="row-action destructive-action" onClick={() => void offboard(employee)}><Users size={13}/> Delete user</button>}</div></div>)}</div><InvitationTable invitations={invitations} resendInvitation={resendInvitation} revokeInvitation={revokeInvitation}/><div className="data-table labelled-cards"><TableHead labels={['Onboarding task','Employee','Due','Action']}/>{tasks.filter(task => task.status === 'Pending').map(task => <div className="data-row" key={task.id}><strong data-label="Onboarding task">{task.title}</strong><span data-label="Employee">{task.user_name}</span><span data-label="Due">{task.due_at || 'No due date'}</span><button className="row-action" data-label="Action" onClick={() => void completeTask(task)}><Check size={13}/> Complete</button></div>)}{!tasks.some(task => task.status === 'Pending') && <p className="workflow-help">No pending onboarding tasks.</p>}</div></LivePanel>
     </div>
     <div className="workflow-actions finance-primary-actions"><button className="ops-btn blue" onClick={() => setDialog('expense')}><Plus size={15}/> Submit expense</button><button className="link-btn" onClick={() => void load()}>Refresh</button></div>
     {error && <p className="workflow-error" role="alert">{error}</p>}
-    <div className="ops-grid-two">
-      <LivePanel title="Expenses & approvals" subtitle="Receipt-backed claims with controlled status transitions">
+    <div className="ops-grid-two finance-ledger-grid">
+      <LivePanel className="finance-expenses-page-panel" title="Expenses & approvals" subtitle="Receipt-backed claims with controlled status transitions">
         <div className="data-table"><TableHead labels={['Expense','Submitter','Amount','Status','Action']}/>
           {expenses.map(expense => <div className="data-row" key={expense.id}>
             <div><strong>{expense.number}</strong><small>{expense.category} · {expense.description}</small></div><span>{expense.submitter_name || 'Current user'}</span><span>{formatCurrency(expense.amount, expense.currency || settings.currency)}</span><Status value={expense.status}/>
@@ -113,21 +146,21 @@ export default function FinanceWorkspace({ notify, newRecordSignal = 0, role = '
           {!expenses.length && <Empty title="No expense claims" detail="Submit the first live expense claim." icon={<CircleDollarSign size={22}/>}/>}
         </div>
       </LivePanel>
-      <LivePanel title="Invoices & payments" subtitle="Open invoice details, download PDFs, and record partial payments">
+      <LivePanel className="finance-invoices-page-panel" title="Invoices & payments" subtitle="Open invoice details, download PDFs, and record partial payments">
         <div className="data-table"><TableHead labels={['Invoice','Client','Total','Outstanding','Action']}/>
           {invoices.map(invoice => <div className="data-row" key={invoice.id}><div><strong>{invoice.number}</strong><small>{invoice.sale_number}</small></div><span>{invoice.client_name}</span><span>{formatCurrency(invoice.total, settings.currency)}</span><Status value={Number(invoice.outstanding) <= 0 ? 'Paid' : invoice.status}/><div className="transfer-card-actions"><button className="row-action" onClick={() => { setSelectedInvoice(invoice); setDialog('invoiceDetail'); }}><FileText size={14}/> Details</button><button className="row-action" onClick={() => window.open(`/api/crm/invoices/${invoice.id}/pdf`, '_blank', 'noopener,noreferrer')}><FileText size={14}/> PDF</button><button className="row-action" disabled={invoice.status === 'Void' || Number(invoice.outstanding) <= 0} onClick={() => { setSelectedInvoice(invoice); setDialog('payment'); }}><CircleDollarSign size={14}/> Record payment</button></div></div>)}
           {!invoices.length && <Empty title="No invoices" detail="Invoices generated from confirmed sales will appear here." icon={<FileText size={22}/>}/>}
         </div>
       </LivePanel>
     </div>
-    <LivePanel title="Delivery notes" subtitle="Review delivery records and open the generated PDF">
+    <LivePanel className="finance-deliveries-page-panel" title="Delivery notes" subtitle="Review delivery records and open the generated PDF">
       <div className="data-table"><TableHead labels={['Delivery note','Client','Address','Status','Action']}/>
         {deliveryNotes.map(note => <div className="data-row" key={note.id}><div><strong>{note.number}</strong><small>{note.sale_number} · {formatOrganizationDate(note.created_at, settings)}</small></div><span>{note.client_name}</span><span>{note.delivery_address || 'No address recorded'}</span><Status value={note.status}/><div className="transfer-card-actions"><button className="row-action" onClick={() => { setSelectedDeliveryNote(note); setDialog('deliveryDetail'); }}><FileText size={14}/> Details</button><button className="row-action" onClick={() => window.open(`/api/crm/delivery-notes/${note.id}/pdf`, '_blank', 'noopener,noreferrer')}><FileText size={14}/> PDF</button></div></div>)}
         {!deliveryNotes.length && <Empty title="No delivery notes" detail="Delivery notes generated from confirmed sales will appear here." icon={<FileText size={22}/>}/>}
       </div>
     </LivePanel>
-    <LivePanel title="Returns and refunds" subtitle="Process pending refunds and credit notes with a traceable history"><div className="data-table"><TableHead labels={['Return','Client / sale','Amount','Status','Action']}/>{returns.map(returnRecord => <div className="data-row" key={returnRecord.id}><div><strong>{returnRecord.number}</strong><small>{returnRecord.reason}</small></div><span>{returnRecord.client_name} · {returnRecord.sale_number}</span><span>{formatCurrency(returnRecord.refund_amount, settings.currency)}</span><Status value={returnRecord.refund_status}/><div className="transfer-card-actions">{returnRecord.credit_note_number ? <span className="workflow-help">{returnRecord.credit_note_number}</span> : null}{returnRecord.refund_status === 'Pending' && <button className="row-action" onClick={() => void processRefund(returnRecord)}>Process refund</button>}</div></div>)}{!returns.length && <Empty title="No returns" detail="Completed sales returns will appear here." icon={<RotateCcw size={22}/>}/>}</div></LivePanel>
-    <LivePanel title="Finance controls" subtitle="Commission rules and consultant targets are configured per organization"><div className="workflow-summary"><div><Users size={14}/><strong>{rules.length} commission rules</strong><button className="link-btn" onClick={() => setDialog('rule')}><Plus size={12}/> Add rule</button></div><div><Check size={14}/><strong>{targets.length} consultant targets</strong><button className="link-btn" onClick={() => setDialog('target')}><Plus size={12}/> Add target</button></div><div><Paperclip size={14}/><strong>Receipt storage</strong>Cloudflare R2 or local adapter</div></div>{rules.length > 0 && <div className="data-table"><TableHead labels={['Rule','Rate','Trigger','Status']}/>{rules.map(rule => <div className="data-row" key={rule.id}><strong>{rule.name}</strong><span>{Number(rule.rate).toFixed(2)}%</span><span>{rule.trigger_status}</span><div className="transfer-card-actions"><Status value={rule.is_active ? 'Active' : 'Inactive'}/><button className="row-action" onClick={() => { setSelectedRule(rule); setDialog('ruleEdit'); }}>Edit</button></div></div>)}</div>}{targets.length > 0 && <div className="data-table"><TableHead labels={['Consultant','Period','Target','Achieved']}/>{targets.map(target => <div className="data-row" key={target.id}><strong>{target.consultant_name}</strong><span>{target.period_start} → {target.period_end}</span><span>{formatCurrency(target.target_amount, settings.currency)}</span><span className="green-text">{formatCurrency(target.achieved, settings.currency)}</span><button className="row-action" onClick={() => { setSelectedTarget(target); setDialog('targetEdit'); }}>Edit</button></div>)}</div>}{!rules.length && !targets.length && <p className="workflow-help">Add the first commission rule or consultant target to make the finance controls visible.</p>}</LivePanel>
+    <LivePanel className="finance-returns-page-panel" title="Returns and refunds" subtitle="Process pending refunds and credit notes with a traceable history"><div className="data-table"><TableHead labels={['Return','Client / sale','Amount','Status','Action']}/>{returns.map(returnRecord => <div className="data-row" key={returnRecord.id}><div><strong>{returnRecord.number}</strong><small>{returnRecord.reason}</small></div><span>{returnRecord.client_name} · {returnRecord.sale_number}</span><span>{formatCurrency(returnRecord.refund_amount, settings.currency)}</span><Status value={returnRecord.refund_status}/><div className="transfer-card-actions">{returnRecord.credit_note_number ? <span className="workflow-help">{returnRecord.credit_note_number}</span> : null}{returnRecord.refund_status === 'Pending' && <button className="row-action" onClick={() => void processRefund(returnRecord)}>Process refund</button>}</div></div>)}{!returns.length && <Empty title="No returns" detail="Completed sales returns will appear here." icon={<RotateCcw size={22}/>}/>}</div></LivePanel>
+    <LivePanel className="finance-controls-page-panel" title="Finance controls" subtitle="Commission rules and consultant targets are configured per organization"><div className="workflow-summary"><div><Users size={14}/><strong>{rules.length} commission rules</strong><button className="link-btn" onClick={() => setDialog('rule')}><Plus size={12}/> Add rule</button></div><div><Check size={14}/><strong>{targets.length} consultant targets</strong><button className="link-btn" onClick={() => setDialog('target')}><Plus size={12}/> Add target</button></div><div><Paperclip size={14}/><strong>Receipt storage</strong>Cloudflare R2 or local adapter</div></div>{rules.length > 0 && <div className="data-table"><TableHead labels={['Rule','Rate','Trigger','Status']}/>{rules.map(rule => <div className="data-row" key={rule.id}><strong>{rule.name}</strong><span>{Number(rule.rate).toFixed(2)}%</span><span>{rule.trigger_status}</span><div className="transfer-card-actions"><Status value={rule.is_active ? 'Active' : 'Inactive'}/><button className="row-action" onClick={() => { setSelectedRule(rule); setDialog('ruleEdit'); }}>Edit</button></div></div>)}</div>}{targets.length > 0 && <div className="data-table"><TableHead labels={['Consultant','Period','Target','Achieved']}/>{targets.map(target => <div className="data-row" key={target.id}><strong>{target.consultant_name}</strong><span>{target.period_start} → {target.period_end}</span><span>{formatCurrency(target.target_amount, settings.currency)}</span><span className="green-text">{formatCurrency(target.achieved, settings.currency)}</span><button className="row-action" onClick={() => { setSelectedTarget(target); setDialog('targetEdit'); }}>Edit</button></div>)}</div>}{!rules.length && !targets.length && <p className="workflow-help">Add the first commission rule or consultant target to make the finance controls visible.</p>}</LivePanel>
     {dialog === 'expense' && <ExpenseDialog close={() => setDialog(null)} saved={() => saved('Expense submitted')}/>}
     {dialog === 'expenseDetail' && selectedExpense && <ExpenseDetailDialog expense={selectedExpense} close={() => setDialog(null)}/>}
     {dialog === 'expenseEdit' && selectedExpense && <ExpenseEditDialog expense={selectedExpense} close={() => setDialog(null)} saved={() => saved('Expense updated')}/>}
@@ -142,7 +175,50 @@ export default function FinanceWorkspace({ notify, newRecordSignal = 0, role = '
     {dialog === 'target' && <TargetDialog users={users} close={() => setDialog(null)} saved={() => saved('Consultant target created')}/>}
     {dialog === 'targetEdit' && selectedTarget && <TargetEditDialog target={selectedTarget} users={users} close={() => setDialog(null)} saved={() => saved('Consultant target updated')}/>}
     {dialog === 'onboarding' && <OnboardingDialog users={users} close={() => setDialog(null)} saved={() => saved('Onboarding task created')}/>}
-  </>;
+  </div>;
+}
+
+function FinanceSectionNav({ active, onOpen, showControls }: { active: FinancePage; onOpen: (page: FinancePage) => void; showControls: boolean }) {
+  const items: Array<{ page: FinancePage; label: string; icon: typeof LayoutGrid }> = [
+    { page: 'overview', label: 'Overview', icon: LayoutGrid },
+    { page: 'commissions', label: 'Commissions', icon: CircleDollarSign },
+    { page: 'expenses', label: 'Expenses', icon: ReceiptText },
+    { page: 'invoices', label: 'Invoices & payments', icon: WalletCards },
+    { page: 'deliveries', label: 'Delivery notes', icon: Truck },
+    { page: 'returns', label: 'Returns', icon: RotateCcw },
+  ];
+  if (showControls) items.push({ page: 'controls', label: 'Controls', icon: Settings2 });
+  return <nav className="finance-page-nav" aria-label="Finance workspace pages">
+    {items.map(item => {
+      const Icon = item.icon;
+      return <button key={item.page} type="button" className={active === item.page ? 'active' : ''} aria-current={active === item.page ? 'page' : undefined} onClick={() => onOpen(item.page)}><Icon size={16}/><span>{item.label}</span></button>;
+    })}
+  </nav>;
+}
+
+function FinanceOverview({ pendingExpenses, openInvoices, provisionalCommissions, deliveryNotes, returns, rules, onOpen, showControls }: { pendingExpenses: number; openInvoices: number; provisionalCommissions: number; deliveryNotes: number; returns: number; rules: number; onOpen: (page: FinancePage) => void; showControls: boolean }) {
+  const items: Array<{ page: FinancePage; title: string; detail: string; count: number; icon: typeof CircleDollarSign; tone: string }> = [
+    { page: 'commissions', title: 'Commissions', detail: 'Run, approve and settle consultant commission entries.', count: provisionalCommissions, icon: CircleDollarSign, tone: 'purple' },
+    { page: 'expenses', title: 'Expenses', detail: 'Review receipt-backed claims and approval status.', count: pendingExpenses, icon: ReceiptText, tone: 'amber' },
+    { page: 'invoices', title: 'Invoices & payments', detail: 'Manage debtors, PDFs and partial payment history.', count: openInvoices, icon: WalletCards, tone: 'blue' },
+    { page: 'deliveries', title: 'Delivery notes', detail: 'Open delivery records and branded documents.', count: deliveryNotes, icon: Truck, tone: 'green' },
+    { page: 'returns', title: 'Returns & refunds', detail: 'Process pending refunds and credit notes.', count: returns, icon: RotateCcw, tone: 'red' },
+  ];
+  if (showControls) items.push({ page: 'controls', title: 'Finance controls', detail: 'Maintain commission rules and consultant targets.', count: rules, icon: Settings2, tone: 'slate' });
+  return <section className="finance-overview" aria-labelledby="finance-work-queues">
+    <div className="finance-overview-heading"><div><span className="ops-kicker">Workspace directory</span><h2 id="finance-work-queues">Choose a finance workflow</h2><p>Each operational queue now opens as a focused page with its own actions and records.</p></div></div>
+    <div className="finance-overview-grid">
+      {items.map(item => {
+        const Icon = item.icon;
+        return <button type="button" className="finance-overview-card" key={item.page} onClick={() => onOpen(item.page)}>
+          <span className={`finance-overview-icon ${item.tone}`}><Icon size={18}/></span>
+          <span className="finance-overview-copy"><strong>{item.title}</strong><span>{item.detail}</span></span>
+          <span className="finance-overview-count"><strong>{item.count}</strong><span>open</span></span>
+          <ArrowRight className="finance-overview-arrow" size={17}/>
+        </button>;
+      })}
+    </div>
+  </section>;
 }
 
 function ExpenseDetailDialog({ expense, close }: { expense: Expense; close: () => void }) {
