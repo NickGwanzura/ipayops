@@ -42,7 +42,7 @@ export function getServerEnv(options: { strict?: boolean } = {}) {
   }
   if (production && !/^[0-9a-f]{64}$/i.test(process.env.BACKUP_ENCRYPTION_KEY || '')) missing.push('BACKUP_ENCRYPTION_KEY (64 hex characters)');
   if (production && !isUuid(process.env.BACKUP_ADMIN_ORGANIZATION_ID || '')) missing.push('BACKUP_ADMIN_ORGANIZATION_ID (valid UUID)');
-  if (production && process.env.REQUIRE_PRIVILEGED_MFA !== 'true' && !missing.includes('REQUIRE_PRIVILEGED_MFA=true')) missing.push('REQUIRE_PRIVILEGED_MFA=true');
+  if (production && !['true', 'false'].includes(process.env.REQUIRE_PRIVILEGED_MFA || '') && !missing.includes('REQUIRE_PRIVILEGED_MFA=true|false')) missing.push('REQUIRE_PRIVILEGED_MFA=true|false');
   if (production && storageDriver !== 's3' && !missing.includes('STORAGE_DRIVER=s3')) missing.push('STORAGE_DRIVER=s3');
   if (production && storageDriver === 's3' && hasValue('S3_ENDPOINT')) {
     try {

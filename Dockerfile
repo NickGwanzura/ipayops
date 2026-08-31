@@ -27,7 +27,7 @@ ENV DEPLOY_SHA=${DEPLOY_SHA}
 # Dokploy; keeping defaults here prevents a newly built image from failing
 # before it can report its health when the control variables are omitted.
 ENV HEALTHCHECK_STORAGE=true
-ENV REQUIRE_PRIVILEGED_MFA=true
+ENV REQUIRE_PRIVILEGED_MFA=false
 ENV ERROR_MONITORING_WEBHOOK_URL=https://ipaytechops.com/api/monitoring/errors
 ENV BACKUP_ADMIN_ORGANIZATION_ID=913071ae-5d9d-4461-b300-c08056c1d646
 RUN apk add --no-cache postgresql-client

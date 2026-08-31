@@ -19,7 +19,7 @@ ADMIN_EMAIL=manager@example.com ADMIN_PASSWORD='use-a-strong-password' ADMIN_ROL
 1. Create a PostgreSQL database service and keep it on the private Dokploy network.
 2. Create an Application from the repository and use the repository root as the build context.
 3. Set the application port to `3000` and health check path to `/api/health`.
-4. Configure the environment variables from `.env.example`; use a generated `AUTH_SECRET` of at least 32 characters, set `HEALTHCHECK_DATABASE=true` and `HEALTHCHECK_STORAGE=true`, use an HTTPS `APP_URL` and `ERROR_MONITORING_WEBHOOK_URL`, set `REQUIRE_PRIVILEGED_MFA=true`, and set `BACKUP_ADMIN_ORGANIZATION_ID` to the platform organization UUID that is allowed to view and request whole-database backups. These are required in production; they are never returned by the application.
+4. Configure the environment variables from `.env.example`; use a generated `AUTH_SECRET` of at least 32 characters, set `HEALTHCHECK_DATABASE=true` and `HEALTHCHECK_STORAGE=true`, use an HTTPS `APP_URL` and `ERROR_MONITORING_WEBHOOK_URL`, explicitly set `REQUIRE_PRIVILEGED_MFA=true` or `false`, and set `BACKUP_ADMIN_ORGANIZATION_ID` to the platform organization UUID that is allowed to view and request whole-database backups. These are required in production; they are never returned by the application.
 5. Run migrations as a single release step before starting multiple application replicas. The migration runner uses a PostgreSQL advisory lock, but only one migration-enabled container should be active during a release. Ensure Dokploy has `DATABASE_URL` configured; for a non-Docker deployment, run `npm run db:migrate` once before starting the app, then provision a manager or CEO with `npm run db:create-user`.
 6. Set `STORAGE_DRIVER=s3`, configure all S3-compatible endpoint, bucket, region, and credential variables, and configure `RESEND_API_KEY` plus `EMAIL_FROM` before enabling production workflows. Generate `BACKUP_ENCRYPTION_KEY` with `openssl rand -hex 32`; keep it in the deployment secret store and never in the database or repository. `ERROR_MONITORING_WEBHOOK_URL` must be an HTTPS endpoint; telemetry contains only error class, request ID, revision, runtime/source, and timestamp. `npm run check:env` fails fast if any are missing.
    With `HEALTHCHECK_STORAGE=true`, `/api/health` performs an authenticated S3-compatible `HeadBucket`; production returns HTTP 503 when the configured bucket cannot be reached. Requests receive a generated or validated `x-request-id`, and the ID is also applied to database transaction context when a request reaches server auth/database code.
@@ -58,7 +58,7 @@ The restore target must already exist, be empty, and use a different local/test 
 ## Release checklist
 
 - Run `npm run check:env` with `NODE_ENV=production`.
-- Confirm the production environment check fails when `REQUIRE_PRIVILEGED_MFA` is missing or not exactly `true`, then passes after it is set to `true`.
+- Confirm the production environment check fails when `REQUIRE_PRIVILEGED_MFA` is missing or invalid, then passes when it is explicitly set to `true` or `false`.
 - Run `npm run typecheck`.
 - Build the image with `docker build --build-arg APP_VERSION=<release-version> --build-arg DEPLOY_SHA=<source-commit> .`.
 - Confirm `/api/health` returns `ok: true` and includes the expected `version` and `revision` values, for example `curl -fsS https://your-host.example/api/health`.

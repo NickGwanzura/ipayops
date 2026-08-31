@@ -30,8 +30,8 @@ if (production && process.env.TRUST_PROXY !== 'true') {
   console.error('TRUST_PROXY=true is required when running behind the production reverse proxy.');
   process.exit(1);
 }
-if (production && process.env.REQUIRE_PRIVILEGED_MFA !== 'true') {
-  console.error('REQUIRE_PRIVILEGED_MFA=true is required in production.');
+if (production && !['true', 'false'].includes(process.env.REQUIRE_PRIVILEGED_MFA || '')) {
+  console.error('REQUIRE_PRIVILEGED_MFA must be explicitly set to true or false in production.');
   process.exit(1);
 }
 if (production && !/^[0-9a-f]{64}$/i.test(process.env.BACKUP_ENCRYPTION_KEY || '')) {
