@@ -16,6 +16,7 @@ import {
 } from '@/lib/mfa';
 import { consumeRateLimit, requestAddress, resetRateLimit } from '@/lib/rate-limit';
 import { sendNotification } from '@/lib/notifications';
+import { isPrivilegedMfaRequired } from '@/lib/server-env';
 
 export const runtime = 'nodejs';
 
@@ -51,11 +52,18 @@ function invalidChallengeResponse() {
   return response;
 }
 
+function disabledMfaResponse() {
+  const response = NextResponse.json({ error: 'Two-factor authentication is disabled.' }, { status: 404 });
+  clearMfaChallengeCookie(response);
+  return response;
+}
+
 function parseRecoveryHashes(value: unknown) {
   return Array.isArray(value) && value.every(item => typeof item === 'string') ? value as string[] : [];
 }
 
 export async function GET(request: Request) {
+  if (!isPrivilegedMfaRequired()) return disabledMfaResponse();
   const address = requestAddress(request);
   const limit = await consumeRateLimit(`mfa:${address}`, MFA_LIMIT, MFA_WINDOW_MS);
   if (!limit.allowed) return NextResponse.json({ error: 'Too many MFA attempts. Try again later.' }, { status: 429, headers: { 'Retry-After': String(limit.retryAfter), 'X-RateLimit-Remaining': '0' } });
@@ -93,6 +101,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if (!isPrivilegedMfaRequired()) return disabledMfaResponse();
   const address = requestAddress(request);
   const limit = await consumeRateLimit(`mfa:${address}`, MFA_LIMIT, MFA_WINDOW_MS);
   if (!limit.allowed) return NextResponse.json({ error: 'Too many MFA attempts. Try again later.' }, { status: 429, headers: { 'Retry-After': String(limit.retryAfter), 'X-RateLimit-Remaining': '0' } });
