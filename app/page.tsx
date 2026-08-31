@@ -11,7 +11,7 @@ import { canAccessConfiguration, canAccessModule, isLeadershipRole, modulesForRo
 import type { OpsModule } from '@/lib/ops-data';
 
 const moduleNav: Array<{ label: OpsModule; icon: React.ElementType }> = [
-  { label:'Sales & CRM', icon:BriefcaseBusiness }, { label:'Products', icon:Boxes }, { label:'Inventory', icon:Boxes }, { label:'Procurement', icon:ShoppingCart }, { label:'Job cards', icon:ClipboardCheck }, { label:'Warranty', icon:ShieldCheck }, { label:'Finance & HR', icon:Users }, { label:'Reports', icon:FileText }, { label:'Audit Logs', icon:ScrollText },
+  { label:'Sales & CRM', icon:BriefcaseBusiness }, { label:'Products', icon:Boxes }, { label:'Inventory', icon:Boxes }, { label:'Procurement', icon:ShoppingCart }, { label:'Job cards', icon:ClipboardCheck }, { label:'Warranty', icon:ShieldCheck }, { label:'Finance & HR', icon:Users }, { label:'People & HR', icon:Users }, { label:'Reports', icon:FileText }, { label:'Audit Logs', icon:ScrollText },
 ];
 type User = { fullName: string; role: string };
 type DashboardData = {

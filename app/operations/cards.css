@@ -67,6 +67,12 @@
   min-height: 36px;
 }
 
+/* HR has its own People & HR workspace; keep the finance desk focused on
+   payments, expenses, returns, and commission settlement. */
+.finance-ceo-hr-panel {
+  display: none;
+}
+
 @media (min-width: 1101px) {
   .ops-grid-two > .ops-panel .labelled-cards:not(.report-drilldown) .data-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -1,6 +1,6 @@
 import type { OpsModule } from './ops-data';
 
-export const ALL_OPS_MODULES: OpsModule[] = ['Procurement', 'Products', 'Inventory', 'Sales & CRM', 'Job cards', 'Warranty', 'Finance & HR', 'Reports'];
+export const ALL_OPS_MODULES: OpsModule[] = ['Procurement', 'Products', 'Inventory', 'Sales & CRM', 'Job cards', 'Warranty', 'Finance & HR', 'People & HR', 'Reports'];
 export const CEO_ONLY_MODULES: OpsModule[] = ['Audit Logs'];
 
 export const ROLE_LABELS = {
