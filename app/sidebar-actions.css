@@ -23,6 +23,37 @@
   font-weight: 600;
 }
 
+/* Keep account and workspace exits in one predictable utility group, matching
+   the operations rail and keeping the dashboard entry easy to rediscover. */
+.sidebar-utility {
+  display: grid;
+  gap: 4px;
+  padding-top: 14px;
+  margin-bottom: 8px;
+}
+
+.sidebar-utility .nav-item {
+  min-height: 44px;
+}
+
+.sidebar-utility .sidebar-dashboard {
+  color: #dce7f7;
+  background: #192743;
+  border: 1px solid #2b3a55;
+}
+
+.sidebar-utility .sidebar-dashboard:hover,
+.sidebar-utility .sidebar-dashboard.active {
+  color: #fff;
+  background: #294778;
+  border-color: #3b6ab0;
+}
+
+.sidebar-utility .sidebar-signout:hover {
+  color: #ffb2b2;
+  background: #39283a;
+}
+
 .ops-rail-bottom .ops-nav,
 .ops-rail-bottom .back-dashboard {
   min-height: 42px;
