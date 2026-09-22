@@ -41,6 +41,6 @@ export async function GET(request: Request) {
     }
   }
   const unhealthy = database === 'unavailable' || (production && (configurationError || !env.configured || env.storageDriver !== 's3' || storageUnavailable));
-  if (storageUnavailable) console.error('Health storage check failed');
+  if (storageUnavailable) console.error('Health storage check failed', { reason: storage.reason || 'unknown' });
   return Response.json({ ok: !unhealthy, service: 'ipaytech-ops', ...provenance, storage: env.storageDriver, storageHealth: storage, database, configuration: configurationError ? 'invalid' : env.configured ? 'complete' : 'partial', timestamp: new Date().toISOString() }, { status: unhealthy ? 503 : 200, headers: { 'Cache-Control': 'no-store', 'x-request-id': requestId } });
 }

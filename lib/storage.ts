@@ -35,7 +35,19 @@ export function usesS3() {
 export type StorageHealth = {
   driver: string;
   state: 'ok' | 'unavailable' | 'skipped';
+  reason?: string;
 };
+
+function healthFailureReason(error: unknown) {
+  if (error instanceof Error) return error.name || 'storage_error';
+  if (typeof error === 'object' && error !== null) {
+    const candidate = error as { name?: unknown; Code?: unknown; $metadata?: { httpStatusCode?: unknown } };
+    const code = typeof candidate.Code === 'string' ? candidate.Code : typeof candidate.name === 'string' ? candidate.name : 'storage_error';
+    const status = typeof candidate.$metadata?.httpStatusCode === 'number' ? `:${candidate.$metadata.httpStatusCode}` : '';
+    return `${code}${status}`;
+  }
+  return 'storage_error';
+}
 
 export async function checkStorageHealth(): Promise<StorageHealth> {
   const driver = (process.env.STORAGE_DRIVER || 'local').toLowerCase();
@@ -44,8 +56,8 @@ export async function checkStorageHealth(): Promise<StorageHealth> {
     const values = config();
     await getClient().send(new HeadBucketCommand({ Bucket: values.bucket }));
     return { driver, state: 'ok' };
-  } catch {
-    return { driver, state: 'unavailable' };
+  } catch (error) {
+    return { driver, state: 'unavailable', reason: healthFailureReason(error) };
   }
 }
 

@@ -1,9 +1,9 @@
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
@@ -13,7 +13,7 @@ COPY . /app/
 RUN npm run typecheck
 RUN npm run build
 
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 ARG APP_VERSION=0.1.0
 ARG DEPLOY_SHA=unknown
@@ -23,13 +23,9 @@ ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
 ENV APP_VERSION=${APP_VERSION}
 ENV DEPLOY_SHA=${DEPLOY_SHA}
-# Safe, non-secret production controls. Deployments may override these in
-# Dokploy; keeping defaults here prevents a newly built image from failing
-# before it can report its health when the control variables are omitted.
-ENV HEALTHCHECK_STORAGE=true
-ENV REQUIRE_PRIVILEGED_MFA=false
-ENV ERROR_MONITORING_WEBHOOK_URL=https://ipaytechops.com/api/monitoring/errors
-ENV BACKUP_ADMIN_ORGANIZATION_ID=913071ae-5d9d-4461-b300-c08056c1d646
+# Production controls and all deployment-specific values must be supplied by
+# Dokploy at runtime. Never bake organization identifiers or endpoints into
+# the image; missing values must fail the environment contract explicitly.
 RUN apk add --no-cache postgresql-client
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
