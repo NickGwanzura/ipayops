@@ -17,6 +17,7 @@ import { formatCurrency, type OrganizationSettings } from './organization-settin
 import { normalizeRole, roleLabel } from '@/lib/rbac';
 import type { OpsModule } from '@/lib/ops-data';
 import { DashboardQuickActions } from './dashboard-guidance';
+import { StatCard } from '@/components/ui/stat-card';
 
 type Props = { role: string; settings: OrganizationSettings; query: string; onNavigate: (module: OpsModule) => void };
 type Payload = Record<string, unknown>;
@@ -143,7 +144,7 @@ function ManagerDashboard({
       error={error}
     >
       <div className="stats-grid">
-        <RoleStat
+        <StatCard
           label="Active people"
           value={String(employees.filter((employee) => employee.is_active).length)}
           note="Consultants and staff"
@@ -151,7 +152,7 @@ function ManagerDashboard({
           tone="purple"
           onClick={() => onNavigate('Finance & HR')}
         />
-        <RoleStat
+        <StatCard
           label="Pending onboarding"
           value={String(tasks.filter((task) => task.status === 'Pending').length)}
           note="Tasks requiring follow-up"
@@ -159,7 +160,7 @@ function ManagerDashboard({
           tone="amber"
           onClick={() => onNavigate('Finance & HR')}
         />
-        <RoleStat
+        <StatCard
           label="Available stock"
           value={String(inventory.available || 0)}
           note={`${inventory.reserved || 0} reserved`}
@@ -167,7 +168,7 @@ function ManagerDashboard({
           tone="blue"
           onClick={() => onNavigate('Inventory')}
         />
-        <RoleStat
+        <StatCard
           label="Open jobs"
           value={String(jobs.filter((job) => ['Scheduled', 'In progress'].includes(job.status)).length)}
           note="Installation workload"
@@ -258,7 +259,7 @@ function FinanceDashboard({
       error={error}
     >
       <div className="stats-grid">
-        <RoleStat
+        <StatCard
           label="Outstanding debtors"
           value={formatCurrency(outstanding, settings.currency, 0)}
           note="Open invoice balances"
@@ -266,7 +267,7 @@ function FinanceDashboard({
           tone="amber"
           onClick={() => onNavigate('Finance & HR')}
         />
-        <RoleStat
+        <StatCard
           label="Overdue debtors"
           value={String(overdueCount)}
           note={formatCurrency(overdueAmount, settings.currency, 0)}
@@ -274,7 +275,7 @@ function FinanceDashboard({
           tone="red"
           onClick={() => onNavigate('Finance & HR')}
         />
-        <RoleStat
+        <StatCard
           label="Pending expenses"
           value={String(expenses.filter((expense) => expense.status === 'Pending').length)}
           note="Awaiting review"
@@ -282,7 +283,7 @@ function FinanceDashboard({
           tone="purple"
           onClick={() => onNavigate('Finance & HR')}
         />
-        <RoleStat
+        <StatCard
           label="Commission entries"
           value={String(commissions.length)}
           note="Visible finance ledger"
@@ -366,7 +367,7 @@ function SalesDashboard({
       error={error}
     >
       <div className="stats-grid">
-        <RoleStat
+        <StatCard
           label="Open opportunities"
           value={String(opportunities.length)}
           note="Active pipeline"
@@ -374,7 +375,7 @@ function SalesDashboard({
           tone="blue"
           onClick={() => onNavigate('Sales & CRM')}
         />
-        <RoleStat
+        <StatCard
           label="Pre-sales"
           value={String(quotations.length)}
           note="Quotes in progress"
@@ -382,7 +383,7 @@ function SalesDashboard({
           tone="purple"
           onClick={() => onNavigate('Sales & CRM')}
         />
-        <RoleStat
+        <StatCard
           label="Confirmed sales"
           value={String(sales.length)}
           note="Converted transactions"
@@ -390,7 +391,7 @@ function SalesDashboard({
           tone="green"
           onClick={() => onNavigate('Sales & CRM')}
         />
-        <RoleStat
+        <StatCard
           label="My commission"
           value={formatCurrency(
             commissions.reduce((sum, commission) => sum + netCommission(commission), 0),
@@ -484,40 +485,6 @@ function RoleFrame({
   );
 }
 
-function RoleStat({
-  label,
-  value,
-  note,
-  icon,
-  tone,
-  onClick,
-}: {
-  label: string;
-  value: string;
-  note: string;
-  icon: React.ReactNode;
-  tone: string;
-  onClick?: () => void;
-}) {
-  const content = (
-    <>
-      <div className="stat-top">
-        <span className={`icon-box ${tone}`}>{icon}</span>
-        <span className="change">Live</span>
-      </div>
-      <div className="stat-value">{value}</div>
-      <div className="stat-label">{label}</div>
-      <div className="stat-note">{note}</div>
-    </>
-  );
-  return onClick ? (
-    <button className="stat-card role-stat-action" onClick={onClick}>
-      {content}
-    </button>
-  ) : (
-    <div className="stat-card">{content}</div>
-  );
-}
 function RolePanel({
   title,
   subtitle,

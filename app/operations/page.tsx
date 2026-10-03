@@ -41,6 +41,7 @@ import './ops-tokens.css';
 import './dashboard-redesign.css';
 import './cards.css';
 import { CommandPalette } from '@/components/ui/command-palette';
+import { useCurrentUser } from '@/components/ui/current-user';
 
 const modules: OpsModule[] = [...ALL_OPS_MODULES, 'Audit Logs'];
 type User = { fullName: string; role: string };
@@ -51,7 +52,7 @@ export default function OperationsPage() {
   const [module, setModule] = useState<OpsModule>(requested && modules.includes(requested) ? requested : 'Inventory');
   const [query, setQuery] = useState(params?.get('q') || '');
   const [toast, setToast] = useState('');
-  const [user, setUser] = useState<User | null>(null);
+  const user = useCurrentUser<User>();
   const [newRecordSignal, setNewRecordSignal] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -61,21 +62,6 @@ export default function OperationsPage() {
     () => (user ? modules.filter((item) => canAccessModule(user.role, item)) : []),
     [user],
   );
-
-  useEffect(() => {
-    void fetch('/api/auth/me', { cache: 'no-store' })
-      .then(async (response) => {
-        if (!response.ok) {
-          window.location.href = '/login';
-          return;
-        }
-        const data = await response.json();
-        setUser(data.user);
-      })
-      .catch(() => {
-        window.location.href = '/login';
-      });
-  }, []);
 
   useEffect(() => {
     if (!user || canAccessModule(user.role, module)) return;

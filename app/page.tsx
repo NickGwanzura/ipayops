@@ -44,6 +44,8 @@ import type { OpsModule } from '@/lib/ops-data';
 import { useRouter } from 'next/navigation';
 import { useThemePreference } from '@/components/ui/theme';
 import { CommandPalette } from '@/components/ui/command-palette';
+import { useCurrentUser } from '@/components/ui/current-user';
+import { StatCard } from '@/components/ui/stat-card';
 
 const moduleNav: Array<{ label: OpsModule; icon: React.ElementType }> = [
   { label: 'Sales & CRM', icon: BriefcaseBusiness },
@@ -100,47 +102,6 @@ function initials(name: string) {
   );
 }
 
-function StatCard({
-  label,
-  value,
-  change,
-  note,
-  icon: Icon,
-  tone = 'blue',
-}: {
-  label: string;
-  value: string;
-  change: string;
-  note: string;
-  icon: React.ElementType;
-  tone?: string;
-}) {
-  return (
-    <div className="stat-card">
-      <div className="stat-top">
-        <span className={`icon-box ${tone}`}>
-          <Icon size={17} />
-        </span>
-        {change && (
-          <span className={change.startsWith('-') ? 'change down' : 'change'}>
-            {change === 'Live' ? (
-              'Live'
-            ) : (
-              <>
-                {change.startsWith('-') ? <ArrowDownRight size={13} /> : <ArrowUpRight size={13} />}{' '}
-                {change.replace('-', '')}
-              </>
-            )}
-          </span>
-        )}
-      </div>
-      <div className="stat-value">{value}</div>
-      <div className="stat-label">{label}</div>
-      <div className="stat-note">{note}</div>
-    </div>
-  );
-}
-
 export default function Home() {
   const [active, setActive] = useState('Overview');
   const [dark, setDark] = useThemePreference();
@@ -148,7 +109,7 @@ export default function Home() {
   const [menu, setMenu] = useState(false);
   const [query, setQuery] = useState('');
   const [toast, setToast] = useState('');
-  const [user, setUser] = useState<User | null>(null);
+  const user = useCurrentUser<User>();
   const [dashboard, setDashboard] = useState<DashboardData>(emptyDashboard);
   const searchRef = useRef<HTMLInputElement>(null);
   const settings = useOrganizationSettings();
@@ -167,20 +128,6 @@ export default function Home() {
     setToast(message);
     setTimeout(() => setToast(''), 2800);
   };
-  useEffect(() => {
-    void fetch('/api/auth/me', { cache: 'no-store' })
-      .then(async (response) => {
-        if (!response.ok) {
-          window.location.href = '/login';
-          return;
-        }
-        const data = await response.json();
-        setUser(data.user);
-      })
-      .catch(() => {
-        window.location.href = '/login';
-      });
-  }, []);
   useEffect(() => {
     if (!user || !isLeadershipRole(user.role)) return;
     void fetch('/api/dashboard/summary', { cache: 'no-store' })
@@ -368,14 +315,14 @@ export default function Home() {
                   value={formatCurrency(dashboard.summary.revenue, settings.currency, 0)}
                   change="Live"
                   note="Confirmed sales · current month"
-                  icon={CircleDollarSign}
+                  icon={<CircleDollarSign size={17} />}
                 />
                 <StatCard
                   label="Confirmed sales"
                   value={String(dashboard.summary.confirmed_sales)}
                   change="Live"
                   note="Database-backed transactions"
-                  icon={Activity}
+                  icon={<Activity size={17} />}
                   tone="green"
                 />
                 <StatCard
@@ -383,7 +330,7 @@ export default function Home() {
                   value={String(dashboard.summary.units_in_stock)}
                   change="Live"
                   note="Available and reserved inventory"
-                  icon={Boxes}
+                  icon={<Boxes size={17} />}
                   tone="amber"
                 />
                 <StatCard
@@ -391,7 +338,7 @@ export default function Home() {
                   value={String(dashboard.summary.open_jobs)}
                   change="Live"
                   note="Scheduled and in progress"
-                  icon={ClipboardCheck}
+                  icon={<ClipboardCheck size={17} />}
                   tone="purple"
                 />
               </div>
@@ -602,7 +549,7 @@ export default function Home() {
         </div>
       </main>
       {toast && (
-        <div className="toast">
+        <div className="toast" role="status" aria-live="polite">
           <span className="toast-check">✓</span>
           {toast}
         </div>
