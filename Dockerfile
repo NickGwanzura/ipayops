@@ -1,9 +1,11 @@
-FROM node:22-alpine AS deps
+# Pinned to a specific Alpine release for reproducible builds; override with --build-arg NODE_IMAGE=... when upgrading.
+ARG NODE_IMAGE=node:22-alpine3.22
+FROM ${NODE_IMAGE} AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-FROM node:22-alpine AS builder
+FROM ${NODE_IMAGE} AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
@@ -13,7 +15,7 @@ COPY . /app/
 RUN npm run typecheck
 RUN npm run build
 
-FROM node:22-alpine AS runner
+FROM ${NODE_IMAGE} AS runner
 WORKDIR /app
 ARG APP_VERSION=0.1.0
 ARG DEPLOY_SHA=unknown
@@ -41,5 +43,6 @@ COPY --from=deps --chown=nextjs:nodejs /app/node_modules/@img ./node_modules/@im
 RUN mkdir -p /app/uploads && chown nextjs:nodejs /app/uploads
 USER nextjs
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD wget -qO- http://127.0.0.1:${PORT}/api/health || exit 1
-CMD ["sh","-c","npm run check:env && node scripts/migrate.mjs && exec node server.js"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD wget -qO- "http://127.0.0.1:${PORT}/api/health?probe=live" || exit 1
+# Set RUN_MIGRATIONS=false when migrations run as a separate release step (Dokploy pre-deploy command: node scripts/migrate.mjs).
+CMD ["sh","-c","npm run check:env && { [ \"$RUN_MIGRATIONS\" = \"false\" ] || node scripts/migrate.mjs; } && exec node server.js"]

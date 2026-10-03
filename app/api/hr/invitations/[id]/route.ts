@@ -4,6 +4,7 @@ import { writeAuditLog } from '@/lib/audit';
 import { createInvitationToken, invitationUrl, INVITATION_TTL_HOURS } from '@/lib/invitations';
 import { withTransaction } from '@/lib/db';
 import { sendNotification } from '@/lib/notifications';
+import { roleLabel } from '@/lib/rbac';
 
 export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -37,7 +38,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       eyebrow: 'Account invitation',
       title: 'Your secure invitation link is ready',
       summary: 'Use the renewed link below to set your password and activate your iPayTech Operations account.',
-      fields: [{ label: 'Role', value: invitation.role }, { label: 'Link expires', value: `${INVITATION_TTL_HOURS} hours` }],
+      fields: [{ label: 'Role', value: roleLabel(invitation.role) }, { label: 'Link expires', value: `${INVITATION_TTL_HOURS} hours` }],
       action: { label: 'Accept invitation', url: invitationUrl(token.token) },
     });
     await writeAuditLog({ organizationId: auth.session.user.organizationId, actorUserId: auth.session.user.id, action: 'employee.invite_resent', entityType: 'user_invitation', entityId: invitation.id, metadata: { email: invitation.email, emailStatus: notification.status }, request });

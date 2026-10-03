@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { ACCESS, requireRole } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/db';
+import { resolveLocation, UnknownLocationError, unknownLocationMessage } from '@/lib/locations';
 
 const transferSchema = z.object({
   sourceLocation: z.string().trim().min(1).max(160),
@@ -34,6 +35,8 @@ export async function POST(request: Request) {
     const { session } = auth;
     const body = transferSchema.parse(await request.json());
     const transfer = await withTransaction(async client => {
+      const destination = await resolveLocation(client, session.user.organizationId, body.destinationLocation);
+      if (destination === body.sourceLocation) throw Object.assign(new Error('Transfer locations must be different.'), { code: 'SAME_LOCATION' });
       const items = await client.query(
         `SELECT id, serial_number, sku, description, location, status
          FROM inventory_items WHERE organization_id = $1 AND id = ANY($2::uuid[]) FOR UPDATE`,
@@ -46,7 +49,7 @@ export async function POST(request: Request) {
       const header = await client.query(
         `INSERT INTO stock_transfers (organization_id, number, source_location, destination_location, created_by)
          VALUES ($1, $2, $3, $4, $5) RETURNING id, number, status, source_location, destination_location, dispatched_at`,
-        [session.user.organizationId, number, body.sourceLocation, body.destinationLocation, session.user.id],
+        [session.user.organizationId, number, body.sourceLocation, destination, session.user.id],
       );
       for (const item of items.rows) {
         await client.query(
@@ -65,6 +68,8 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: 'Source, destination, and at least one inventory item are required.' }, { status: 400 });
     const code = (error as { code?: string }).code;
+    if (error instanceof UnknownLocationError) return NextResponse.json({ error: unknownLocationMessage(error) }, { status: 422 });
+    if (code === 'SAME_LOCATION') return NextResponse.json({ error: 'Transfer locations must be different.' }, { status: 400 });
     if (code === 'ITEM_NOT_FOUND') return NextResponse.json({ error: 'One or more inventory items were not found.' }, { status: 404 });
     if (code === 'WRONG_LOCATION') return NextResponse.json({ error: 'All items must be at the source location.' }, { status: 409 });
     if (code === 'ITEM_UNAVAILABLE') return NextResponse.json({ error: 'Only available inventory can be transferred.' }, { status: 409 });

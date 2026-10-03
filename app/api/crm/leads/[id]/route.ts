@@ -7,7 +7,7 @@ const updateSchema = z.object({
   name: z.string().trim().min(2).max(160).optional(),
   clientId: z.string().uuid().nullable().optional(),
   source: z.string().trim().max(100).optional(),
-  status: z.enum(['New', 'Qualified', 'Converted', 'Lost']).optional(),
+  status: z.enum(['New', 'Qualified', 'Lost']).optional(), // 'Converted' is only reachable through the convert endpoint, which creates the opportunity.
   notes: z.string().trim().max(500).optional(),
 });
 
@@ -27,7 +27,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     const result = await query(
       `UPDATE leads SET
         name = COALESCE($1, name), client_id = COALESCE($2, client_id), source = COALESCE($3, source),
-        status = COALESCE($4, status), notes = COALESCE($5, notes), updated_at = now()
+        status = CASE WHEN status = 'Converted' THEN status ELSE COALESCE($4, status) END, notes = COALESCE($5, notes), updated_at = now()
        WHERE id = $6 AND organization_id = $7${ownershipClause}
        RETURNING id, name, client_id, source, status, notes, updated_at`,
       parameters,

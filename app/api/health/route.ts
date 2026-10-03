@@ -14,6 +14,8 @@ function deployProvenance() {
 }
 
 export async function GET(request: Request) {
+  // Liveness: answers without touching the database or storage, so a dependency outage never gets the container restarted.
+  if (new URL(request.url).searchParams.get('probe') === 'live') return Response.json({ ok: true, service: 'ipaytech-ops' }, { headers: { 'Cache-Control': 'no-store' } });
   const requestId = getOrCreateRequestId(request);
   setDbRequestId(requestId);
   const production = process.env.NODE_ENV === 'production';

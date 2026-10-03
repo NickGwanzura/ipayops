@@ -30,7 +30,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         if (refundAmount > paidFunds - Number(priorRefunds.rows[0].amount)) throw Object.assign(new Error('Refund exceeds paid invoice funds.'), { code: 'OVER_REFUND' });
       }
       const creditNote = body.method === 'Credit note' ? `CN-${new Date().getFullYear()}-${randomUUID().slice(0, 6).toUpperCase()}` : null;
-      const updated = await client.query(`UPDATE returns SET refund_status = 'Processed', refund_method = $1, refund_reference = NULLIF($2, ''), credit_note_number = COALESCE($3, credit_note_number), refunded_at = now() WHERE id = $4 AND refund_status = 'Pending' RETURNING id, number, refund_amount, refund_status, refund_method, refund_reference, credit_note_number, refunded_at`, [body.method, body.reference, creditNote, params.id]);
+      const updated = await client.query(`UPDATE returns SET refund_status = 'Processed', refund_method = $1, refund_reference = NULLIF($2, ''), credit_note_number = COALESCE(credit_note_number, $3), refunded_at = now() WHERE id = $4 AND refund_status = 'Pending' RETURNING id, number, refund_amount, refund_status, refund_method, refund_reference, credit_note_number, refunded_at`, [body.method, body.reference, creditNote, params.id]);
       if (!updated.rows[0]) throw Object.assign(new Error('Refund is not pending.'), { code: 'INVALID_STATUS' });
       return updated.rows[0];
     });

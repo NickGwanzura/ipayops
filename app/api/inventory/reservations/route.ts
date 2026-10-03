@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { withTransaction } from '@/lib/db';
+import { query, withTransaction } from '@/lib/db';
 import { ACCESS, requireRole } from '@/lib/auth';
 
 export async function GET(request: Request) {
@@ -30,6 +30,15 @@ export async function POST(request: Request) {
     if ('response' in auth) return auth.response;
     const { session } = auth;
     const body = reservationSchema.parse(await request.json());
+    // A quotation hold is keyed by the quotation id so conversion can tell whose stock it is.
+    let referenceType = body.referenceType;
+    let referenceId = body.referenceId;
+    if (referenceType.trim().toLowerCase() === 'quotation') {
+      const quote = await query(`SELECT id FROM quotations WHERE organization_id = $1 AND status IN ('Draft', 'Sent', 'Accepted') AND (id::text = $2 OR lower(number) = lower($2))`, [session.user.organizationId, referenceId.trim()]);
+      if (!quote.rows[0]) return NextResponse.json({ error: 'Quotation not found or no longer open.' }, { status: 404 });
+      referenceType = 'quotation';
+      referenceId = quote.rows[0].id;
+    }
     const reservation = await withTransaction(async client => {
       const itemResult = await client.query(
         `SELECT id, status FROM inventory_items
@@ -44,7 +53,7 @@ export async function POST(request: Request) {
         `INSERT INTO inventory_reservations (organization_id, inventory_item_id, reference_type, reference_id, reserved_by, expires_at)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id, inventory_item_id, reference_type, reference_id, expires_at, status, created_at`,
-        [session.user.organizationId, body.inventoryItemId, body.referenceType, body.referenceId, session.user.id, body.expiresAt || null],
+        [session.user.organizationId, body.inventoryItemId, referenceType, referenceId, session.user.id, body.expiresAt || null],
       );
       await client.query('UPDATE inventory_items SET status = \'Reserved\', updated_at = now() WHERE id = $1', [body.inventoryItemId]);
       return result.rows[0];

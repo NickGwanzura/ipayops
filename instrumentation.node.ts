@@ -23,6 +23,10 @@ export function registerNodeInstrumentation() {
     void reportError(error, { requestId, source: 'uncaughtException', runtime: 'nodejs' }).then(exitAfterReport, exitAfterReport);
   });
 
+  process.on('SIGTERM', () => {
+    void import('@/lib/background-worker').then(({ stopBackgroundWorker }) => stopBackgroundWorker()).catch(() => undefined);
+  });
+
   process.on('unhandledRejection', reason => {
     const requestId = getRequestId();
     console.error('Unhandled promise rejection', { errorClass: errorClass(reason), requestId: requestId || 'unavailable' });

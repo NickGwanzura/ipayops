@@ -21,6 +21,13 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     const auth = await requireRole(request, ACCESS.productManage);
     if ('response' in auth) return auth.response;
     const body = productSchema.parse(await request.json());
+    if (body.sku) {
+      const current = await query('SELECT sku FROM supplier_products WHERE id = $1 AND organization_id = $2', [params.id, auth.session.user.organizationId]);
+      if (current.rows[0] && current.rows[0].sku !== body.sku) {
+        const stocked = await query('SELECT 1 FROM inventory_items WHERE supplier_product_id = $1 AND organization_id = $2 LIMIT 1', [params.id, auth.session.user.organizationId]);
+        if (stocked.rows[0]) return NextResponse.json({ error: 'The SKU cannot change once stock has been received against this product. Create a new product instead.' }, { status: 409 });
+      }
+    }
     const result = await query(`UPDATE supplier_products SET product_name = COALESCE($1, product_name), manufacturer = COALESCE($2, manufacturer), model = COALESCE($3, model), sku = COALESCE($4, sku), warranty_months = COALESCE($5, warranty_months), cost_price = COALESCE($6, cost_price), unit_cost = COALESCE($6, unit_cost), selling_price = COALESCE($7, selling_price), currency = COALESCE($8, currency), updated_at = now() WHERE id = $9 AND organization_id = $10 RETURNING id, supplier_id, product_type, product_name, manufacturer, model, sku, warranty_months, cost_price, selling_price, currency, serial_required, status`, [body.productName ?? null, body.manufacturer ?? null, body.model ?? null, body.sku ?? null, body.warrantyMonths ?? null, body.costPrice ?? null, body.sellingPrice ?? null, body.currency?.toUpperCase() ?? null, params.id, auth.session.user.organizationId]);
     if (!result.rows[0]) return NextResponse.json({ error: 'Product not found.' }, { status: 404 });
     await writeAuditLog({ organizationId: auth.session.user.organizationId, actorUserId: auth.session.user.id, action: 'product.updated', entityType: 'supplier_product', entityId: result.rows[0].id, metadata: { sku: result.rows[0].sku, costPrice: body.costPrice, sellingPrice: body.sellingPrice }, request });

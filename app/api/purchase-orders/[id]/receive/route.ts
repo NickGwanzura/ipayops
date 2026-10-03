@@ -5,6 +5,7 @@ import { ACCESS, requireRole } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/db';
 import { notifyOrganizationRoles, sendNotification } from '@/lib/notifications';
 import { writeAuditLog } from '@/lib/audit';
+import { resolveLocation, UnknownLocationError, unknownLocationMessage } from '@/lib/locations';
 
 const receiptSchema = z.object({
   notes: z.string().trim().max(500).optional().default(''),
@@ -64,7 +65,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
           : null;
         const orderItem = orderItemBase && {
           ...orderItemBase,
-          cost_price: supplierProduct?.cost_price ?? orderItemBase.unit_cost,
+          // Stock is costed at the price agreed on the purchase order, not the current catalogue cost.
+          cost_price: orderItemBase.unit_cost,
           selling_price: supplierProduct?.selling_price ?? 0,
         };
         if (!orderItem) throw Object.assign(new Error('Purchase order line not found.'), { code: 'LINE_NOT_FOUND' });
@@ -77,11 +79,12 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
           'UPDATE purchase_order_items SET received_quantity = received_quantity + $1 WHERE id = $2',
           [item.quantity, item.purchaseOrderItemId],
         );
+        const resolvedLocation = await resolveLocation(client, session.user.organizationId, item.location);
         for (const serialNumber of item.serialNumbers) {
           await client.query(
             `INSERT INTO inventory_items (organization_id, purchase_order_item_id, supplier_product_id, product_type, serial_number, sku, description, location, cost_price, selling_price)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-            [session.user.organizationId, item.purchaseOrderItemId, orderItem.supplier_product_id, orderItem.product_type, serialNumber.trim(), orderItem.sku, orderItem.description, item.location, orderItem.cost_price, orderItem.selling_price],
+            [session.user.organizationId, item.purchaseOrderItemId, orderItem.supplier_product_id, orderItem.product_type, serialNumber.trim(), orderItem.sku, orderItem.description, resolvedLocation, orderItem.cost_price, orderItem.selling_price],
           );
         }
       }
@@ -106,6 +109,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   } catch (error) {
     if (error instanceof z.ZodError || ['Each received unit requires one serial number.', 'Serial numbers must be unique within a receipt.'].includes((error as Error).message)) return NextResponse.json({ error: 'Receipt lines and one unique serial number per unit are required.' }, { status: 400 });
     const code = (error as { code?: string }).code;
+    if (error instanceof UnknownLocationError) return NextResponse.json({ error: unknownLocationMessage(error) }, { status: 422 });
     if (code === 'ORDER_NOT_FOUND' || code === 'LINE_NOT_FOUND') return NextResponse.json({ error: 'Purchase order or line not found.' }, { status: 404 });
     if (code === 'ORDER_NOT_APPROVED') return NextResponse.json({ error: 'Purchase order must be approved before receiving.' }, { status: 409 });
     if (code === 'OVER_RECEIPT') return NextResponse.json({ error: 'Receipt exceeds the outstanding quantity.' }, { status: 409 });

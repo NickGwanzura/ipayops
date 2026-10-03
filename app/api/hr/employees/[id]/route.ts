@@ -18,6 +18,8 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     const body = updateSchema.parse(await request.json());
     const existing = await query<{ role: string }>('SELECT role FROM users WHERE id = $1 AND organization_id = $2', [params.id, auth.session.user.organizationId]);
     if (!existing.rows[0]) return NextResponse.json({ error: 'Employee not found.' }, { status: 404 });
+    // Anyone other than the account owner needs authority over the target: otherwise a manager could edit a CEO's email and take the account over via password reset.
+    if (params.id !== auth.session.user.id && !canManageEmployee(auth.session, existing.rows[0].role, body.role, params.id)) return NextResponse.json({ error: 'You cannot modify this account.' }, { status: 403 });
     if (body.isActive === false && !canManageEmployee(auth.session, existing.rows[0].role, undefined, params.id)) return NextResponse.json({ error: 'You cannot deactivate this account.' }, { status: 403 });
     if (body.role && !canManageEmployee(auth.session, existing.rows[0].role, body.role, params.id)) return NextResponse.json({ error: 'Managers cannot create or assign CEO accounts.' }, { status: 403 });
     const result = await query(

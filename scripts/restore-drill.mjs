@@ -7,6 +7,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import pg from 'pg';
+import { databaseSsl } from './pg-ssl.mjs';
 
 const { Pool } = pg;
 const exec = promisify(execFile);
@@ -33,8 +34,8 @@ const sourceKey = `${source.protocol}//${source.hostname}:${source.port || '5432
 const targetKey = `${target.protocol}//${target.hostname}:${target.port || '5432'}${target.pathname}`;
 if (sourceKey === targetKey) throw new Error('Refusing restore drill: source and restore database URLs identify the same database.');
 
-const sourcePool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined });
-const targetPool = new Pool({ connectionString: process.env.RESTORE_DATABASE_URL, ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined });
+const sourcePool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: databaseSsl() });
+const targetPool = new Pool({ connectionString: process.env.RESTORE_DATABASE_URL, ssl: databaseSsl() });
 const requiredTables = ['schema_migrations', 'organizations', 'users', 'clients', 'inventory_items', 'quotations', 'sales', 'warranty_claims', 'repair_requisitions', 'audit_logs', 'mfa_login_challenges', 'notification_deliveries', 'backup_runs'];
 let temporaryDirectory;
 

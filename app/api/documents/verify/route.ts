@@ -4,7 +4,7 @@ import { query } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
-const validTypes = new Set(['invoice', 'delivery-note', 'client-statement', 'payment-receipt', 'job-card']);
+const validTypes = new Set(['invoice', 'credit-note', 'delivery-note', 'client-statement', 'payment-receipt', 'job-card']);
 
 function isValidSignature(type: string, id: string, documentTimestamp: string, generatedAt: string, signature: string) {
   const secret = process.env.AUTH_SECRET;
@@ -24,7 +24,9 @@ export async function GET(request: Request) {
   if (!validTypes.has(type) || !id || !documentTimestamp || !generatedAt || !signature || !isValidSignature(type, id, documentTimestamp, generatedAt, signature)) {
     return NextResponse.json({ valid: false, error: 'Invalid verification code.' }, { status: 400 });
   }
-  const result = type === 'invoice'
+  const result = type === 'credit-note'
+    ? await query(`SELECT r.credit_note_number AS number, r.refund_status AS status, r.created_at AS issued_at, c.name AS client_name FROM returns r JOIN sales s ON s.id = r.sale_id JOIN clients c ON c.id = s.client_id WHERE r.id = $1 AND r.credit_note_number IS NOT NULL`, [id])
+    : type === 'invoice'
     ? await query(`SELECT i.number, i.status, i.issued_at, c.name AS client_name FROM invoices i JOIN clients c ON c.id = i.client_id WHERE i.id = $1`, [id])
     : type === 'delivery-note'
       ? await query(`SELECT d.number, d.status, d.created_at AS issued_at, c.name AS client_name FROM delivery_notes d JOIN clients c ON c.id = d.client_id WHERE d.id = $1`, [id])

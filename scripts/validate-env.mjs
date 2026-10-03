@@ -72,4 +72,6 @@ if (production && process.env.APP_URL) {
     process.exit(1);
   }
 }
+if (production && !process.env.MONITORING_INGEST_TOKEN?.trim()) console.warn('MONITORING_INGEST_TOKEN is not set: POST /api/monitoring/errors is disabled.');
+if (production && process.env.DATABASE_SSL === 'true' && process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === 'false') console.warn('DATABASE_SSL_REJECT_UNAUTHORIZED=false: database certificates are not being verified.');
 console.log(`Environment contract OK (${production ? 'production' : 'development'}).`);

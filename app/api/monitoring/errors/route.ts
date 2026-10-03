@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { writeAuditLog } from '@/lib/audit';
@@ -16,7 +17,19 @@ const payloadSchema = z.object({
 
 export const runtime = 'nodejs';
 
+function tokenMatches(request: Request, expected: string) {
+  const header = request.headers.get('authorization') || '';
+  const provided = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 export async function POST(request: Request) {
+  // Unauthenticated writes to the platform audit log are not acceptable: intake is off until a token is configured.
+  const ingestToken = process.env.MONITORING_INGEST_TOKEN?.trim();
+  if (!ingestToken) return NextResponse.json({ error: 'Monitoring intake is not enabled.' }, { status: 404 });
+  if (!tokenMatches(request, ingestToken)) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
   const address = requestAddress(request);
   const rateLimit = await consumeRateLimit(`monitoring:error:${address}`, 120, 60_000);
   if (!rateLimit.allowed) {
