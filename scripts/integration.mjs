@@ -494,6 +494,30 @@ async function runAssertions(data) {
   const consultantTasks = await pool.query(`SELECT COUNT(*)::int AS count FROM onboarding_tasks t JOIN users u ON u.id = t.user_id WHERE u.email = $1`, [`new.consultant.${runToken}@example.test`]);
   must('Accepting a sales-consultant invitation creates the default onboarding checklist', consultantAccept.status === 200 && consultantTasks.rows[0]?.count === 4);
 
+  // ---- Global search and quotation reservations ----
+  const searchSales = await request(sales.jar, 'GET', '/api/search?q=UAT');
+  must('Search for a consultant never returns finance or procurement results', searchSales.status === 200 && searchSales.body.results.length > 0 && searchSales.body.results.every(hit => !['Invoice', 'Purchase order'].includes(hit.type)));
+  const searchPo = await request(manager.jar, 'GET', `/api/search?q=${encodeURIComponent(purchaseOrder.body.purchaseOrder?.number)}`);
+  must('A manager can find a purchase order by number', searchPo.status === 200 && searchPo.body.results.some(hit => hit.type === 'Purchase order'));
+  const searchWildcard = await request(manager.jar, 'GET', '/api/search?q=%25%25');
+  must('LIKE wildcards in search input are matched literally', searchWildcard.status === 200 && searchWildcard.body.results.length === 0);
+  const searchAnonymous = await request(new CookieJar(), 'GET', '/api/search?q=UAT');
+  must('Search requires a session', searchAnonymous.status === 401);
+
+  const intakeUnit = await pool.query('SELECT id FROM inventory_items WHERE serial_number = $1', [`UAT-INTAKE-1-${runToken}`]);
+  const reserveQuote = await request(sales.jar, 'POST', '/api/crm/quotations', { clientId: createdClientId, items: [{ sku: 'UAT-LINE-1', quantity: 1 }] });
+  const reserveQuoteId = reserveQuote.body.quotation?.id;
+  const reserveOk = await request(sales.jar, 'POST', `/api/crm/quotations/${reserveQuoteId}/reserve`, { inventoryItemIds: [intakeUnit.rows[0]?.id] });
+  must('A consultant can reserve stock for their own quotation', reserveOk.status === 201 && reserveOk.body.reserved === 1);
+  const reserveExtra = await request(sales.jar, 'POST', `/api/crm/quotations/${reserveQuoteId}/reserve`, { inventoryItemIds: [holdUnit.rows[0].id] });
+  must('Stock that is not available cannot be reserved', reserveExtra.status === 409);
+  const reserveHeld = await request(sales.jar, 'GET', `/api/crm/quotations/${reserveQuoteId}/reserve`);
+  must('Held units for the quotation can be listed', reserveHeld.status === 200 && reserveHeld.body.reserved?.length === 1);
+  const reserveRelease = await request(sales.jar, 'DELETE', `/api/crm/quotations/${reserveQuoteId}/reserve`);
+  const reserveAfter = await request(sales.jar, 'GET', `/api/crm/quotations/${reserveQuoteId}/reserve`);
+  const unitAfter = await pool.query('SELECT status FROM inventory_items WHERE id = $1', [intakeUnit.rows[0]?.id]);
+  must('Releasing a quotation reservation frees the unit', reserveRelease.status === 200 && reserveAfter.body.reserved?.length === 0 && unitAfter.rows[0]?.status === 'Available');
+
   await pool.query('DELETE FROM organizations WHERE id = $1', [orgBId]);
   const cascadeState = await pool.query(`SELECT
     (SELECT COUNT(*)::int FROM organizations WHERE id = $1) AS organizations,
