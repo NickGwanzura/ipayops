@@ -18,6 +18,7 @@ import { normalizeRole } from '@/lib/rbac';
 import { useDialogFocus } from '../dialog-focus';
 import { ActionMenu, ActionMenuItem } from './action-menu';
 import { Field, Panel, TableHead, Status, LiveKpi } from '@/components/ui';
+import { confirmAction } from '@/components/ui/confirm';
 
 type Job = {
   id: string;
@@ -100,7 +101,7 @@ export function JobsWorkspace({
     if (newRecordSignal > 0) setDialog('job');
   }, [newRecordSignal]);
   const archiveJob = async (job: Job) => {
-    if (!window.confirm(`Cancel ${job.number}?`)) return;
+    if (!(await confirmAction(`Cancel ${job.number}?`))) return;
     const response = await fetch(`/api/jobs/${job.id}`, { method: 'DELETE' });
     const data = await response.json();
     if (!response.ok) {
@@ -834,7 +835,7 @@ function AttachmentDialog({
     saved();
   };
   const remove = async (attachment: { id: string; file_name: string }) => {
-    if (!window.confirm(`Delete ${attachment.file_name}?`)) return;
+    if (!(await confirmAction(`Delete ${attachment.file_name}?`))) return;
     const response = await fetch(`/api/attachments/${attachment.id}`, { method: 'DELETE' });
     const data = await response.json();
     if (!response.ok) {

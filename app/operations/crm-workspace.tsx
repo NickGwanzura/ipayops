@@ -21,6 +21,7 @@ import { normalizeRole } from '@/lib/rbac';
 import { useDialogFocus } from '../dialog-focus';
 import { ActionMenu, ActionMenuItem } from './action-menu';
 import { Field, Panel, TableHead, Status, LiveKpi } from '@/components/ui';
+import { confirmAction } from '@/components/ui/confirm';
 
 type Client = {
   id: string;
@@ -272,7 +273,8 @@ export default function CrmWorkspace({
     void load();
   };
   const archiveRecord = async (kind: 'clients' | 'leads' | 'opportunities', record: { id: string; name: string }) => {
-    if (!window.confirm(`Archive ${record.name}? It will remain in history but stop appearing as active.`)) return;
+    if (!(await confirmAction(`Archive ${record.name}? It will remain in history but stop appearing as active.`)))
+      return;
     const response = await fetch(`/api/crm/${kind}/${record.id}`, { method: 'DELETE' });
     const data = await response.json();
     if (!response.ok) {
@@ -283,7 +285,7 @@ export default function CrmWorkspace({
     void load();
   };
   const archiveQuote = async (quote: Quote) => {
-    if (!window.confirm(`Cancel ${quote.number}?`)) return;
+    if (!(await confirmAction(`Cancel ${quote.number}?`))) return;
     const response = await fetch(`/api/crm/quotations/${quote.id}`, { method: 'DELETE' });
     const data = await response.json();
     if (!response.ok) {

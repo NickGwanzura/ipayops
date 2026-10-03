@@ -18,6 +18,7 @@ import { ActionMenu, ActionMenuItem } from './action-menu';
 import { formatOrganizationDate, useOrganizationSettings } from '../organization-settings';
 import { useDialogFocus } from '../dialog-focus';
 import { Field, Status, LiveKpi } from '@/components/ui';
+import { confirmAction } from '@/components/ui/confirm';
 
 type Supplier = {
   id: string;
@@ -164,7 +165,8 @@ export default function ProcurementWorkflows({
   };
 
   const archiveSupplier = async (supplier: Supplier) => {
-    if (!window.confirm(`Archive ${supplier.name}? It will no longer be available for new purchase orders.`)) return;
+    if (!(await confirmAction(`Archive ${supplier.name}? It will no longer be available for new purchase orders.`)))
+      return;
     const response = await fetch(`/api/suppliers/${supplier.id}`, { method: 'DELETE' });
     const data = await response.json();
     if (!response.ok) {
@@ -175,7 +177,7 @@ export default function ProcurementWorkflows({
     void load();
   };
   const archiveOrder = async (order: PurchaseOrder) => {
-    if (!window.confirm(`Cancel ${order.number}?`)) return;
+    if (!(await confirmAction(`Cancel ${order.number}?`))) return;
     const response = await fetch(`/api/purchase-orders/${order.id}`, { method: 'DELETE' });
     const data = await response.json();
     if (!response.ok) {

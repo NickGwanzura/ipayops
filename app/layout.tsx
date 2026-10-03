@@ -5,6 +5,7 @@ import './sitewide-spacing.css';
 import './dashboard-redesign.css';
 import './sidebar-actions.css';
 import { OrganizationSettingsProvider } from './organization-settings';
+import { ConfirmHost } from '@/components/ui/confirm';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://ipaytechops.com'),
@@ -50,6 +51,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en">
       <body>
         <OrganizationSettingsProvider>{children}</OrganizationSettingsProvider>
+        <ConfirmHost />
       </body>
     </html>
   );

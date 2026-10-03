@@ -25,6 +25,7 @@ import { normalizeRole } from '@/lib/rbac';
 import { useDialogFocus } from '../dialog-focus';
 import { ActionMenu, ActionMenuItem } from './action-menu';
 import { Field, TableHead, Status, LiveKpi, Empty } from '@/components/ui';
+import { confirmAction, promptText } from '@/components/ui/confirm';
 
 type Expense = {
   id: string;
@@ -348,9 +349,9 @@ export default function FinanceWorkspace({
   };
   const offboard = async (employee: Employee) => {
     if (
-      !window.confirm(
+      !(await confirmAction(
         `Delete user ${employee.full_name}? Their account will be disabled and archived from active HR records; lifecycle history will be retained.`,
-      )
+      ))
     )
       return;
     const response = await fetch(`/api/hr/employees/${employee.id}/offboard`, {
@@ -383,7 +384,7 @@ export default function FinanceWorkspace({
     void load();
   };
   const revokeInvitation = async (invitation: Invitation) => {
-    if (!window.confirm(`Revoke the invitation for ${invitation.email}?`)) return;
+    if (!(await confirmAction(`Revoke the invitation for ${invitation.email}?`))) return;
     const response = await fetch(`/api/hr/invitations/${invitation.id}`, { method: 'DELETE' });
     const data = await response.json();
     if (!response.ok) {
@@ -395,7 +396,7 @@ export default function FinanceWorkspace({
   };
   const processRefund = async (returnRecord: ReturnRecord) => {
     const method = returnRecord.refund_method || 'Credit note';
-    const reference = window.prompt(`Reference for ${returnRecord.number} (${method})`, '');
+    const reference = await promptText(`Reference for ${returnRecord.number} (${method})`);
     if (reference === null) return;
     const response = await fetch(`/api/crm/returns/${returnRecord.id}/refund`, {
       method: 'POST',
@@ -1229,7 +1230,7 @@ function ExpenseDetailDialog({ expense, close }: { expense: Expense; close: () =
       );
   }, [expense.id]);
   const removeAttachment = async (attachment: ExpenseAttachment) => {
-    if (!window.confirm(`Delete ${attachment.fileName}?`)) return;
+    if (!(await confirmAction(`Delete ${attachment.fileName}?`))) return;
     const response = await fetch(`/api/attachments/${attachment.id}`, { method: 'DELETE' });
     const data = await response.json();
     if (!response.ok) {
