@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, Boxes, Check, CircleDollarSign, Download, FileText, Filter, ShieldCheck } from 'lucide-react';
 import { formatCurrency, useOrganizationSettings } from '../organization-settings';
+import { LiveKpi } from '@/components/ui';
 
 type Summary = { revenue: string; devices_delivered: number; jobs_completed: number; warranty_claims: number };
 type Period = { period: string; revenue: string; units: number; jobs: number };
@@ -320,28 +321,6 @@ export default function ReportsWorkspace({ notify }: { notify: (message: string)
   );
 }
 
-function LiveKpi({
-  label,
-  value,
-  note,
-  icon,
-  tone,
-}: {
-  label: string;
-  value: string;
-  note: string;
-  icon: React.ReactNode;
-  tone: string;
-}) {
-  return (
-    <div className="ops-kpi">
-      <span className={`kpi-icon ${tone}`}>{icon}</span>
-      <strong>{value}</strong>
-      <span>{label}</span>
-      <small>{note}</small>
-    </div>
-  );
-}
 function ReportCard({
   title,
   detail,

@@ -5,6 +5,7 @@ import { Boxes, Laptop, Pencil, Plus, Save, Search, X } from 'lucide-react';
 import { formatCurrency, useOrganizationSettings } from '../organization-settings';
 import { normalizeRole } from '@/lib/rbac';
 import { useDialogFocus } from '../dialog-focus';
+import { Field } from '@/components/ui';
 
 type Product = {
   id: string;
@@ -409,14 +410,6 @@ function ProductDialog({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="workflow-field">
-      <span>{label}</span>
-      {children}
-    </label>
-  );
-}
 function Kpi({
   label,
   value,

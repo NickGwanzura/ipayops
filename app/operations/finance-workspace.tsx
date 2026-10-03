@@ -24,6 +24,7 @@ import { formatCurrency, formatOrganizationDate, useOrganizationSettings } from 
 import { normalizeRole } from '@/lib/rbac';
 import { useDialogFocus } from '../dialog-focus';
 import { ActionMenu, ActionMenuItem } from './action-menu';
+import { Field, TableHead, Status, LiveKpi, Empty } from '@/components/ui';
 
 type Expense = {
   id: string;
@@ -2967,14 +2968,6 @@ function Dialog({ title, children, close }: { title: string; children: React.Rea
     </div>
   );
 }
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="workflow-field">
-      <span>{label}</span>
-      {children}
-    </label>
-  );
-}
 function Actions({ close, label, disabled }: { close: () => void; label: string; disabled?: boolean }) {
   return (
     <div className="workflow-dialog-actions">
@@ -3008,49 +3001,5 @@ function LivePanel({
       </div>
       {children}
     </section>
-  );
-}
-function TableHead({ labels }: { labels: string[] }) {
-  return (
-    <div className="table-head ops-table-head">
-      {labels.map((label) => (
-        <span key={label}>{label}</span>
-      ))}
-    </div>
-  );
-}
-function Status({ value }: { value: string }) {
-  const key = value.toLowerCase().replaceAll(' ', '-');
-  return <span className={`status ${key}`}>{value}</span>;
-}
-function LiveKpi({
-  label,
-  value,
-  note,
-  icon,
-  tone,
-}: {
-  label: string;
-  value: string | number;
-  note: string;
-  icon: React.ReactNode;
-  tone: string;
-}) {
-  return (
-    <div className="ops-kpi">
-      <span className={`kpi-icon ${tone}`}>{icon}</span>
-      <strong>{value}</strong>
-      <span>{label}</span>
-      <small>{note}</small>
-    </div>
-  );
-}
-function Empty({ title, detail, icon }: { title: string; detail: string; icon: React.ReactNode }) {
-  return (
-    <div className="empty-state">
-      {icon}
-      <strong>{title}</strong>
-      <span>{detail}</span>
-    </div>
   );
 }

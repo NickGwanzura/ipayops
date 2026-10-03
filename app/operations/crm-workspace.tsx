@@ -20,6 +20,7 @@ import { formatCurrency, formatOrganizationDate, useOrganizationSettings } from 
 import { normalizeRole } from '@/lib/rbac';
 import { useDialogFocus } from '../dialog-focus';
 import { ActionMenu, ActionMenuItem } from './action-menu';
+import { Field, Panel, TableHead, Status, LiveKpi } from '@/components/ui';
 
 type Client = {
   id: string;
@@ -903,72 +904,6 @@ function Dialog({ title, children, close }: { title: string; children: React.Rea
         </div>
         {children}
       </div>
-    </div>
-  );
-}
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="workflow-field">
-      <span>{label}</span>
-      {children}
-    </label>
-  );
-}
-function Panel({
-  title,
-  subtitle,
-  children,
-  className = '',
-}: {
-  title: string;
-  subtitle: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <section className={`ops-panel ${className}`.trim()}>
-      <div className="ops-panel-head">
-        <div>
-          <h2>{title}</h2>
-          <p>{subtitle}</p>
-        </div>
-      </div>
-      {children}
-    </section>
-  );
-}
-function TableHead({ labels }: { labels: string[] }) {
-  return (
-    <div className="table-head ops-table-head">
-      {labels.map((label) => (
-        <span key={label}>{label}</span>
-      ))}
-    </div>
-  );
-}
-function Status({ value }: { value: string }) {
-  const key = value.toLowerCase().replaceAll(' ', '-');
-  return <span className={`status ${key}`}>{value}</span>;
-}
-function LiveKpi({
-  label,
-  value,
-  note,
-  icon,
-  tone,
-}: {
-  label: string;
-  value: number;
-  note: string;
-  icon: React.ReactNode;
-  tone: string;
-}) {
-  return (
-    <div className="ops-kpi">
-      <span className={`kpi-icon ${tone}`}>{icon}</span>
-      <strong>{value}</strong>
-      <span>{label}</span>
-      <small>{note}</small>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { Panel, TableHead, Status, LiveKpi } from '@/components/ui';
 import {
   Boxes,
   Check,
@@ -569,66 +570,6 @@ export default function InventoryWorkspace({
       )}
     </>
   );
-}
-
-function LiveKpi({
-  label,
-  value,
-  note,
-  icon,
-  tone,
-}: {
-  label: string;
-  value: number;
-  note: string;
-  icon: React.ReactNode;
-  tone: string;
-}) {
-  return (
-    <div className="ops-kpi">
-      <span className={`kpi-icon ${tone}`}>{icon}</span>
-      <strong>{value.toLocaleString()}</strong>
-      <span>{label}</span>
-      <small>{note}</small>
-    </div>
-  );
-}
-function Panel({
-  title,
-  subtitle,
-  actions,
-  children,
-}: {
-  title: string;
-  subtitle: string;
-  actions?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="ops-panel">
-      <div className="ops-panel-head">
-        <div>
-          <h2>{title}</h2>
-          <p>{subtitle}</p>
-        </div>
-        {actions}
-      </div>
-      {children}
-    </section>
-  );
-}
-function TableHead({ labels }: { labels: string[] }) {
-  return (
-    <div className="table-head ops-table-head">
-      {labels.map((label) => (
-        <span key={label}>{label}</span>
-      ))}
-    </div>
-  );
-}
-function Status({ value }: { value: string }) {
-  const key = value.toLowerCase().replaceAll(' ', '-');
-  return <span className={`status ${key}`}>{value}</span>;
 }
 
 function StockIntakeDialog({ close, saved }: { close: () => void; saved: (count: number) => Promise<void> }) {

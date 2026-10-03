@@ -17,6 +17,7 @@ import {
 import { ActionMenu, ActionMenuItem } from './action-menu';
 import { formatOrganizationDate, useOrganizationSettings } from '../organization-settings';
 import { useDialogFocus } from '../dialog-focus';
+import { Field, Status, LiveKpi } from '@/components/ui';
 
 type Supplier = {
   id: string;
@@ -644,31 +645,6 @@ function ProcurementOverview({
   );
 }
 
-function LiveKpi({
-  label,
-  value,
-  note,
-  icon,
-  tone,
-}: {
-  label: string;
-  value: string;
-  note: string;
-  icon: React.ReactNode;
-  tone: string;
-}) {
-  return (
-    <div className="ops-kpi">
-      <span className={`kpi-icon ${tone}`}>{icon}</span>
-      <strong>{value}</strong>
-      <span>{label}</span>
-      <small>{note}</small>
-    </div>
-  );
-}
-function Status({ value }: { value: string }) {
-  return <span className={`status ${value.toLowerCase().replaceAll(' ', '-')}`}>{value}</span>;
-}
 function OrderEditDialog({
   order,
   suppliers,
@@ -1050,14 +1026,6 @@ function Dialog({ title, children, close }: { title: string; children: React.Rea
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="workflow-field">
-      <span>{label}</span>
-      {children}
-    </label>
-  );
-}
 function Actions({ close, label }: { close: () => void; label: string }) {
   return (
     <div className="workflow-dialog-actions">

@@ -322,13 +322,11 @@ function FinanceDashboard({
           action={{ label: 'View all expenses', onClick: () => onNavigate('Finance & HR') }}
         >
           <RoleList
-            items={expenses
-              .slice(0, 6)
-              .map((expense) => ({
-                title: expense.number,
-                detail: `${expense.description} · ${formatCurrency(expense.amount, settings.currency)} · ${expense.status}`,
-                module: 'Finance & HR' as OpsModule,
-              }))}
+            items={expenses.slice(0, 6).map((expense) => ({
+              title: expense.number,
+              detail: `${expense.description} · ${formatCurrency(expense.amount, settings.currency)} · ${expense.status}`,
+              module: 'Finance & HR' as OpsModule,
+            }))}
             empty="No expenses recorded."
             onNavigate={onNavigate}
           />
@@ -433,12 +431,10 @@ function SalesDashboard({
           action={{ label: 'Open reports', onClick: () => onNavigate('Reports') }}
         >
           <RoleList
-            items={commissions
-              .slice(0, 6)
-              .map((commission) => ({
-                title: commission.sale_number || 'Sale',
-                detail: `${formatCurrency(commission.amount, settings.currency)} · ${commission.status}`,
-              }))}
+            items={commissions.slice(0, 6).map((commission) => ({
+              title: commission.sale_number || 'Sale',
+              detail: `${formatCurrency(commission.amount, settings.currency)} · ${commission.status}`,
+            }))}
             empty="No commission entries yet."
           />
         </RolePanel>
