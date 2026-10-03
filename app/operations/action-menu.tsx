@@ -29,6 +29,29 @@ export function ActionMenu({ label = 'More actions', children }: { label?: strin
   );
 }
 
-export function ActionMenuItem({ children, onClick, disabled = false, className = '' }: { children: ReactNode; onClick?: () => void; disabled?: boolean; className?: string }) {
-  return <button type="button" role="menuitem" className={`ops-action-menu-item ${className}`} onClick={event => { onClick?.(); event.currentTarget.closest('details')?.removeAttribute('open'); }} disabled={disabled}>{children}</button>;
+export function ActionMenuItem({
+  children,
+  onClick,
+  disabled = false,
+  className = '',
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      className={`ops-action-menu-item ${className}`}
+      onClick={(event) => {
+        onClick?.();
+        event.currentTarget.closest('details')?.removeAttribute('open');
+      }}
+      disabled={disabled}
+    >
+      {children}
+    </button>
+  );
 }

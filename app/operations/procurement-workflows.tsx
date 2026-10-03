@@ -1,26 +1,91 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { ArrowRight, Boxes, Laptop, LayoutGrid, PackageCheck, Plus, RefreshCw, ShoppingCart, Truck, Users, X } from 'lucide-react';
+import {
+  ArrowRight,
+  Boxes,
+  Laptop,
+  LayoutGrid,
+  PackageCheck,
+  Plus,
+  RefreshCw,
+  ShoppingCart,
+  Truck,
+  Users,
+  X,
+} from 'lucide-react';
 import { ActionMenu, ActionMenuItem } from './action-menu';
 import { formatOrganizationDate, useOrganizationSettings } from '../organization-settings';
 import { useDialogFocus } from '../dialog-focus';
 
-type Supplier = { id: string; code: string; name: string; contact_name?: string; phone?: string; payment_terms?: string; lead_time_days?: number; status: string };
-type SupplierProduct = { id: string; supplier_id: string; supplier_name?: string; product_type: 'Laptop' | 'POS'; product_name: string; manufacturer?: string; model?: string; sku: string; warranty_months: number; unit_cost: string | number; cost_price: string | number; selling_price: string | number; currency: string; serial_required: boolean; status: string };
-type PurchaseOrder = { id: string; number: string; supplier_name: string; destination?: string; status: string; total?: string | number; expected_at?: string; ordered_quantity: number; received_quantity: number };
-type PurchaseOrderItem = { id: string; productId?: string; productType?: string; sku: string; description: string; quantity: number; receivedQuantity: number };
+type Supplier = {
+  id: string;
+  code: string;
+  name: string;
+  contact_name?: string;
+  phone?: string;
+  payment_terms?: string;
+  lead_time_days?: number;
+  status: string;
+};
+type SupplierProduct = {
+  id: string;
+  supplier_id: string;
+  supplier_name?: string;
+  product_type: 'Laptop' | 'POS';
+  product_name: string;
+  manufacturer?: string;
+  model?: string;
+  sku: string;
+  warranty_months: number;
+  unit_cost: string | number;
+  cost_price: string | number;
+  selling_price: string | number;
+  currency: string;
+  serial_required: boolean;
+  status: string;
+};
+type PurchaseOrder = {
+  id: string;
+  number: string;
+  supplier_name: string;
+  destination?: string;
+  status: string;
+  total?: string | number;
+  expected_at?: string;
+  ordered_quantity: number;
+  received_quantity: number;
+};
+type PurchaseOrderItem = {
+  id: string;
+  productId?: string;
+  productType?: string;
+  sku: string;
+  description: string;
+  quantity: number;
+  receivedQuantity: number;
+};
 type Receipt = { id: string; number: string; receivedAt: string; notes?: string; receivedBy?: string };
 type PurchaseOrderDetail = PurchaseOrder & { supplier_id?: string; items: PurchaseOrderItem[]; receipts?: Receipt[] };
 type ProcurementPage = 'overview' | 'purchase-orders' | 'suppliers' | 'receiving';
 
-export default function ProcurementWorkflows({ notify, newRecordSignal = 0, query = '' }: { notify: (message: string) => void; newRecordSignal?: number; query?: string }) {
+export default function ProcurementWorkflows({
+  notify,
+  newRecordSignal = 0,
+  query = '',
+}: {
+  notify: (message: string) => void;
+  newRecordSignal?: number;
+  query?: string;
+}) {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<SupplierProduct[]>([]);
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
-  const [dialog, setDialog] = useState<'supplier' | 'supplierEdit' | 'order' | 'orderEdit' | 'receive' | 'orderDetail' | 'supplierDetail' | null>(null);
+  const [dialog, setDialog] = useState<
+    'supplier' | 'supplierEdit' | 'order' | 'orderEdit' | 'receive' | 'orderDetail' | 'supplierDetail' | null
+  >(null);
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrderDetail | null>(null);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [procurementPage, setProcurementPage] = useState<ProcurementPage>('overview');
@@ -32,7 +97,8 @@ export default function ProcurementWorkflows({ notify, newRecordSignal = 0, quer
   const openProcurementPage = (page: ProcurementPage) => {
     setProcurementPage(page);
     const params = new URLSearchParams(window.location.search);
-    if (page === 'overview') params.delete('view'); else params.set('view', page);
+    if (page === 'overview') params.delete('view');
+    else params.set('view', page);
     window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`);
   };
   const load = async () => {
@@ -44,7 +110,8 @@ export default function ProcurementWorkflows({ notify, newRecordSignal = 0, quer
         fetch('/api/supplier-products', { cache: 'no-store' }),
         fetch('/api/purchase-orders', { cache: 'no-store' }),
       ]);
-      if (!supplierResponse.ok || !productResponse.ok || !orderResponse.ok) throw new Error('Live procurement data is unavailable.');
+      if (!supplierResponse.ok || !productResponse.ok || !orderResponse.ok)
+        throw new Error('Live procurement data is unavailable.');
       const supplierData = await supplierResponse.json();
       const productData = await productResponse.json();
       const orderData = await orderResponse.json();
@@ -58,19 +125,26 @@ export default function ProcurementWorkflows({ notify, newRecordSignal = 0, quer
     }
   };
 
-  useEffect(() => { void load(); }, [query]);
+  useEffect(() => {
+    void load();
+  }, [query]);
   useEffect(() => {
     setProcurementPage(requestedProcurementPage());
     const handlePopState = () => setProcurementPage(requestedProcurementPage());
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
-  useEffect(() => { if (newRecordSignal > 0) setDialog(procurementPage === 'suppliers' ? 'supplier' : 'order'); }, [newRecordSignal, procurementPage]);
+  useEffect(() => {
+    if (newRecordSignal > 0) setDialog(procurementPage === 'suppliers' ? 'supplier' : 'order');
+  }, [newRecordSignal, procurementPage]);
 
   const openReceive = async (orderId: string) => {
     setError('');
     const response = await fetch(`/api/purchase-orders/${orderId}`, { cache: 'no-store' });
-    if (!response.ok) { setError('Could not load purchase order lines.'); return; }
+    if (!response.ok) {
+      setError('Could not load purchase order lines.');
+      return;
+    }
     const data = await response.json();
     setSelectedOrder(data.purchaseOrder);
     setDialog('receive');
@@ -79,103 +153,1470 @@ export default function ProcurementWorkflows({ notify, newRecordSignal = 0, quer
   const openOrder = async (orderId: string) => {
     setError('');
     const response = await fetch(`/api/purchase-orders/${orderId}`, { cache: 'no-store' });
-    if (!response.ok) { setError('Could not load purchase order details.'); return; }
+    if (!response.ok) {
+      setError('Could not load purchase order details.');
+      return;
+    }
     const data = await response.json();
     setSelectedOrder(data.purchaseOrder);
     setDialog('orderEdit');
   };
 
-  const archiveSupplier = async (supplier: Supplier) => { if (!window.confirm(`Archive ${supplier.name}? It will no longer be available for new purchase orders.`)) return; const response = await fetch(`/api/suppliers/${supplier.id}`, { method: 'DELETE' }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to archive supplier.'); return; } notify(`${supplier.name} archived`); void load(); };
-  const archiveOrder = async (order: PurchaseOrder) => { if (!window.confirm(`Cancel ${order.number}?`)) return; const response = await fetch(`/api/purchase-orders/${order.id}`, { method: 'DELETE' }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to cancel purchase order.'); return; } notify(`${order.number} cancelled`); void load(); };
-  const approveOrder = async (order: PurchaseOrderDetail) => { const response = await fetch(`/api/purchase-orders/${order.id}/approve`, { method: 'POST' }); const data = await response.json(); if (!response.ok) { notify(data.error || 'Unable to approve purchase order.'); return; } notify(`${order.number} approved`); setDialog(null); setSelectedOrder(null); void load(); };
+  const archiveSupplier = async (supplier: Supplier) => {
+    if (!window.confirm(`Archive ${supplier.name}? It will no longer be available for new purchase orders.`)) return;
+    const response = await fetch(`/api/suppliers/${supplier.id}`, { method: 'DELETE' });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to archive supplier.');
+      return;
+    }
+    notify(`${supplier.name} archived`);
+    void load();
+  };
+  const archiveOrder = async (order: PurchaseOrder) => {
+    if (!window.confirm(`Cancel ${order.number}?`)) return;
+    const response = await fetch(`/api/purchase-orders/${order.id}`, { method: 'DELETE' });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to cancel purchase order.');
+      return;
+    }
+    notify(`${order.number} cancelled`);
+    void load();
+  };
+  const approveOrder = async (order: PurchaseOrderDetail) => {
+    const response = await fetch(`/api/purchase-orders/${order.id}/approve`, { method: 'POST' });
+    const data = await response.json();
+    if (!response.ok) {
+      notify(data.error || 'Unable to approve purchase order.');
+      return;
+    }
+    notify(`${order.number} approved`);
+    setDialog(null);
+    setSelectedOrder(null);
+    void load();
+  };
 
-  const visibleOrders = orders.filter(order => !query || [order.number, order.supplier_name, order.destination, order.status].join(' ').toLowerCase().includes(query.toLowerCase()));
-  const outstandingUnits = visibleOrders.reduce((sum, order) => sum + Math.max(0, order.ordered_quantity - order.received_quantity), 0);
-  const averageLeadTime = suppliers.length ? Math.round(suppliers.reduce((sum, supplier) => sum + Number(supplier.lead_time_days || 0), 0) / suppliers.length) : 0;
+  const visibleOrders = orders.filter(
+    (order) =>
+      !query ||
+      [order.number, order.supplier_name, order.destination, order.status]
+        .join(' ')
+        .toLowerCase()
+        .includes(query.toLowerCase()),
+  );
+  const outstandingUnits = visibleOrders.reduce(
+    (sum, order) => sum + Math.max(0, order.ordered_quantity - order.received_quantity),
+    0,
+  );
+  const averageLeadTime = suppliers.length
+    ? Math.round(suppliers.reduce((sum, supplier) => sum + Number(supplier.lead_time_days || 0), 0) / suppliers.length)
+    : 0;
 
-  return <div className={`procurement-pages procurement-page-${procurementPage}`}>
-    <ProcurementSectionNav active={procurementPage} onOpen={openProcurementPage}/>
-    <div className="ops-kpis"><LiveKpi label="Open purchase orders" value={String(visibleOrders.filter(order => !['Closed', 'Received'].includes(order.status)).length)} note={`${visibleOrders.filter(order => order.received_quantity < order.ordered_quantity).length} with outstanding units`} icon={<ShoppingCart size={16}/>} tone="blue"/><LiveKpi label="Units outstanding" value={String(outstandingUnits)} note="Partial receipts preserved" icon={<PackageCheck size={16}/>} tone="amber"/><LiveKpi label="Suppliers" value={String(suppliers.length)} note="Live supplier directory" icon={<Users size={16}/>} tone="purple"/><LiveKpi label="Avg. lead time" value={`${averageLeadTime} days`} note="From supplier records" icon={<Boxes size={16}/>} tone="green"/></div>
-    {procurementPage === 'overview' && <ProcurementOverview orders={visibleOrders.length} outstandingUnits={outstandingUnits} suppliers={suppliers.length} receiving={visibleOrders.filter(order => order.received_quantity < order.ordered_quantity).length} onOpen={openProcurementPage}/>}
-    <section className="ops-panel workflow-panel"><div className="ops-panel-head"><div><h2>Connected procurement workflows</h2><p>Suppliers, product types, and serialized receiving are linked end to end.</p></div><button className="link-btn" onClick={() => void load()} disabled={busy}><RefreshCw size={14} className={busy ? 'spin' : ''}/> Refresh</button></div><div className="workflow-actions"><button className="ops-btn ghost" onClick={() => setDialog('supplier')}><Plus size={15}/> Add supplier</button><button className="ops-btn blue" onClick={() => setDialog('order')} disabled={!suppliers.length || !products.length}><Plus size={15}/> Create purchase order</button>{suppliers.length > 0 && !products.length && <span className="workflow-help">Add a Laptop or POS product before creating an order.</span>}</div>{error && <p className="workflow-error" role="alert">{error}</p>}</section>
-    <div className="ops-grid-two"><section className="ops-panel"><div className="ops-panel-head"><div><h2>Purchase orders</h2><p>Live approvals, receiving, and delivery commitments.</p></div></div><div className="data-table labelled-cards"><div className="table-head ops-table-head"><span>Order</span><span>Supplier</span><span>Received</span><span>Status</span><span>Action</span></div>{visibleOrders.map(order => <div className="data-row" key={order.id}><button className="row-action" data-label="Order" onClick={() => void openOrder(order.id)}>{order.number}</button><span data-label="Supplier">{order.supplier_name}</span><span data-label="Received">{order.received_quantity}/{order.ordered_quantity}</span><span data-label="Status"><Status value={order.status}/></span><div className="transfer-card-actions" data-label="Action"><button className="row-action" onClick={() => void openOrder(order.id)}>Details</button><ActionMenu label={`More actions for ${order.number}`}>{order.received_quantity < order.ordered_quantity && <ActionMenuItem onClick={() => void openReceive(order.id)}><PackageCheck size={13}/> Receive goods</ActionMenuItem>}<ActionMenuItem className="destructive-action" onClick={() => void archiveOrder(order)}>Cancel order</ActionMenuItem></ActionMenu></div></div>)}{!visibleOrders.length && <div className="empty-state"><ShoppingCart size={22}/><strong>No purchase orders</strong><span>Create a live purchase order to begin receiving.</span></div>}</div></section><section className="ops-panel"><div className="ops-panel-head"><div><h2>Supplier directory</h2><p>Live supplier relationships and delivery terms.</p></div></div><div className="data-table labelled-cards"><div className="table-head ops-table-head"><span>Supplier</span><span>Contact</span><span>Lead time</span><span>Status</span><span>Action</span></div>{suppliers.map(supplier => <div className="data-row" key={supplier.id}><strong data-label="Supplier">{supplier.name}<small>{supplier.code}</small></strong><span data-label="Contact">{supplier.contact_name || supplier.phone || '—'}</span><span data-label="Lead time">{supplier.lead_time_days || 0} days</span><span data-label="Status"><Status value={supplier.status}/></span><div className="transfer-card-actions" data-label="Action"><button className="row-action" onClick={() => { setSelectedSupplier(supplier); setDialog('supplierDetail'); }}>Details</button><ActionMenu label={`More actions for ${supplier.name}`}><ActionMenuItem onClick={() => { setSelectedSupplier(supplier); setDialog('supplierEdit'); }}>Edit</ActionMenuItem>{supplier.status === 'Active' && <ActionMenuItem className="destructive-action" onClick={() => void archiveSupplier(supplier)}>Archive</ActionMenuItem>}</ActionMenu></div></div>)}{!suppliers.length && <div className="empty-state"><Users size={22}/><strong>No suppliers</strong><span>Add a supplier to create purchase orders.</span></div>}</div></section></div>
-    <section className="ops-panel"><div className="ops-panel-head"><div><h2>Receiving queue</h2><p>Partial deliveries preserve the outstanding balance.</p></div></div><div className="workflow-receiving"><div>{visibleOrders.filter(order => order.received_quantity < order.ordered_quantity).map(order => <button key={order.id} className="workflow-order" onClick={() => void openReceive(order.id)}><span>{order.number} · {order.supplier_name}</span><small>{order.received_quantity}/{order.ordered_quantity} received <PackageCheck size={13}/></small></button>)}</div>{!visibleOrders.some(order => order.received_quantity < order.ordered_quantity) && <p className="workflow-help">No outstanding receipts.</p>}</div></section>
-    {dialog === 'supplier' && <SupplierDialog close={() => setDialog(null)} onSaved={() => { setDialog(null); notify('Supplier and product catalog created'); void load(); }}/>} {dialog === 'supplierEdit' && selectedSupplier && <SupplierEditDialog supplier={selectedSupplier} close={() => { setDialog(null); setSelectedSupplier(null); }} onSaved={() => { setDialog(null); setSelectedSupplier(null); notify('Supplier updated'); void load(); }}/>} {dialog === 'order' && <OrderDialog suppliers={suppliers} products={products} close={() => setDialog(null)} onSaved={() => { setDialog(null); notify('Purchase order created'); void load(); }}/>} {dialog === 'receive' && selectedOrder && <ReceiveDialog order={selectedOrder} close={() => { setDialog(null); setSelectedOrder(null); }} onSaved={() => { setDialog(null); setSelectedOrder(null); notify('Goods receipt posted and serial inventory created'); void load(); }}/>} {dialog === 'orderDetail' && selectedOrder && <OrderDetailDialog order={selectedOrder} close={() => { setDialog(null); setSelectedOrder(null); }}/>} {dialog === 'supplierDetail' && selectedSupplier && <SupplierDetailDialog supplier={selectedSupplier} products={products.filter(product => product.supplier_id === selectedSupplier.id)} close={() => { setDialog(null); setSelectedSupplier(null); }}/>}
-    {dialog === 'orderEdit' && selectedOrder && <OrderEditDialog order={selectedOrder} suppliers={suppliers} products={products} close={() => { setDialog(null); setSelectedOrder(null); }} onApprove={() => void approveOrder(selectedOrder)} onSaved={() => { setDialog(null); setSelectedOrder(null); notify('Purchase order updated'); void load(); }}/>}
-  </div>;
+  return (
+    <div className={`procurement-pages procurement-page-${procurementPage}`}>
+      <ProcurementSectionNav active={procurementPage} onOpen={openProcurementPage} />
+      <div className="ops-kpis">
+        <LiveKpi
+          label="Open purchase orders"
+          value={String(visibleOrders.filter((order) => !['Closed', 'Received'].includes(order.status)).length)}
+          note={`${visibleOrders.filter((order) => order.received_quantity < order.ordered_quantity).length} with outstanding units`}
+          icon={<ShoppingCart size={16} />}
+          tone="blue"
+        />
+        <LiveKpi
+          label="Units outstanding"
+          value={String(outstandingUnits)}
+          note="Partial receipts preserved"
+          icon={<PackageCheck size={16} />}
+          tone="amber"
+        />
+        <LiveKpi
+          label="Suppliers"
+          value={String(suppliers.length)}
+          note="Live supplier directory"
+          icon={<Users size={16} />}
+          tone="purple"
+        />
+        <LiveKpi
+          label="Avg. lead time"
+          value={`${averageLeadTime} days`}
+          note="From supplier records"
+          icon={<Boxes size={16} />}
+          tone="green"
+        />
+      </div>
+      {procurementPage === 'overview' && (
+        <ProcurementOverview
+          orders={visibleOrders.length}
+          outstandingUnits={outstandingUnits}
+          suppliers={suppliers.length}
+          receiving={visibleOrders.filter((order) => order.received_quantity < order.ordered_quantity).length}
+          onOpen={openProcurementPage}
+        />
+      )}
+      <section className="ops-panel workflow-panel">
+        <div className="ops-panel-head">
+          <div>
+            <h2>Connected procurement workflows</h2>
+            <p>Suppliers, product types, and serialized receiving are linked end to end.</p>
+          </div>
+          <button className="link-btn" onClick={() => void load()} disabled={busy}>
+            <RefreshCw size={14} className={busy ? 'spin' : ''} /> Refresh
+          </button>
+        </div>
+        <div className="workflow-actions">
+          <button className="ops-btn ghost" onClick={() => setDialog('supplier')}>
+            <Plus size={15} /> Add supplier
+          </button>
+          <button
+            className="ops-btn blue"
+            onClick={() => setDialog('order')}
+            disabled={!suppliers.length || !products.length}
+          >
+            <Plus size={15} /> Create purchase order
+          </button>
+          {suppliers.length > 0 && !products.length && (
+            <span className="workflow-help">Add a Laptop or POS product before creating an order.</span>
+          )}
+        </div>
+        {error && (
+          <p className="workflow-error" role="alert">
+            {error}
+          </p>
+        )}
+      </section>
+      <div className="ops-grid-two">
+        <section className="ops-panel">
+          <div className="ops-panel-head">
+            <div>
+              <h2>Purchase orders</h2>
+              <p>Live approvals, receiving, and delivery commitments.</p>
+            </div>
+          </div>
+          <div className="data-table labelled-cards">
+            <div className="table-head ops-table-head">
+              <span>Order</span>
+              <span>Supplier</span>
+              <span>Received</span>
+              <span>Status</span>
+              <span>Action</span>
+            </div>
+            {visibleOrders.map((order) => (
+              <div className="data-row" key={order.id}>
+                <button className="row-action" data-label="Order" onClick={() => void openOrder(order.id)}>
+                  {order.number}
+                </button>
+                <span data-label="Supplier">{order.supplier_name}</span>
+                <span data-label="Received">
+                  {order.received_quantity}/{order.ordered_quantity}
+                </span>
+                <span data-label="Status">
+                  <Status value={order.status} />
+                </span>
+                <div className="transfer-card-actions" data-label="Action">
+                  <button className="row-action" onClick={() => void openOrder(order.id)}>
+                    Details
+                  </button>
+                  <ActionMenu label={`More actions for ${order.number}`}>
+                    {order.received_quantity < order.ordered_quantity && (
+                      <ActionMenuItem onClick={() => void openReceive(order.id)}>
+                        <PackageCheck size={13} /> Receive goods
+                      </ActionMenuItem>
+                    )}
+                    <ActionMenuItem className="destructive-action" onClick={() => void archiveOrder(order)}>
+                      Cancel order
+                    </ActionMenuItem>
+                  </ActionMenu>
+                </div>
+              </div>
+            ))}
+            {!visibleOrders.length && (
+              <div className="empty-state">
+                <ShoppingCart size={22} />
+                <strong>No purchase orders</strong>
+                <span>Create a live purchase order to begin receiving.</span>
+              </div>
+            )}
+          </div>
+        </section>
+        <section className="ops-panel">
+          <div className="ops-panel-head">
+            <div>
+              <h2>Supplier directory</h2>
+              <p>Live supplier relationships and delivery terms.</p>
+            </div>
+          </div>
+          <div className="data-table labelled-cards">
+            <div className="table-head ops-table-head">
+              <span>Supplier</span>
+              <span>Contact</span>
+              <span>Lead time</span>
+              <span>Status</span>
+              <span>Action</span>
+            </div>
+            {suppliers.map((supplier) => (
+              <div className="data-row" key={supplier.id}>
+                <strong data-label="Supplier">
+                  {supplier.name}
+                  <small>{supplier.code}</small>
+                </strong>
+                <span data-label="Contact">{supplier.contact_name || supplier.phone || '—'}</span>
+                <span data-label="Lead time">{supplier.lead_time_days || 0} days</span>
+                <span data-label="Status">
+                  <Status value={supplier.status} />
+                </span>
+                <div className="transfer-card-actions" data-label="Action">
+                  <button
+                    className="row-action"
+                    onClick={() => {
+                      setSelectedSupplier(supplier);
+                      setDialog('supplierDetail');
+                    }}
+                  >
+                    Details
+                  </button>
+                  <ActionMenu label={`More actions for ${supplier.name}`}>
+                    <ActionMenuItem
+                      onClick={() => {
+                        setSelectedSupplier(supplier);
+                        setDialog('supplierEdit');
+                      }}
+                    >
+                      Edit
+                    </ActionMenuItem>
+                    {supplier.status === 'Active' && (
+                      <ActionMenuItem className="destructive-action" onClick={() => void archiveSupplier(supplier)}>
+                        Archive
+                      </ActionMenuItem>
+                    )}
+                  </ActionMenu>
+                </div>
+              </div>
+            ))}
+            {!suppliers.length && (
+              <div className="empty-state">
+                <Users size={22} />
+                <strong>No suppliers</strong>
+                <span>Add a supplier to create purchase orders.</span>
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
+      <section className="ops-panel">
+        <div className="ops-panel-head">
+          <div>
+            <h2>Receiving queue</h2>
+            <p>Partial deliveries preserve the outstanding balance.</p>
+          </div>
+        </div>
+        <div className="workflow-receiving">
+          <div>
+            {visibleOrders
+              .filter((order) => order.received_quantity < order.ordered_quantity)
+              .map((order) => (
+                <button key={order.id} className="workflow-order" onClick={() => void openReceive(order.id)}>
+                  <span>
+                    {order.number} · {order.supplier_name}
+                  </span>
+                  <small>
+                    {order.received_quantity}/{order.ordered_quantity} received <PackageCheck size={13} />
+                  </small>
+                </button>
+              ))}
+          </div>
+          {!visibleOrders.some((order) => order.received_quantity < order.ordered_quantity) && (
+            <p className="workflow-help">No outstanding receipts.</p>
+          )}
+        </div>
+      </section>
+      {dialog === 'supplier' && (
+        <SupplierDialog
+          close={() => setDialog(null)}
+          onSaved={() => {
+            setDialog(null);
+            notify('Supplier and product catalog created');
+            void load();
+          }}
+        />
+      )}{' '}
+      {dialog === 'supplierEdit' && selectedSupplier && (
+        <SupplierEditDialog
+          supplier={selectedSupplier}
+          close={() => {
+            setDialog(null);
+            setSelectedSupplier(null);
+          }}
+          onSaved={() => {
+            setDialog(null);
+            setSelectedSupplier(null);
+            notify('Supplier updated');
+            void load();
+          }}
+        />
+      )}{' '}
+      {dialog === 'order' && (
+        <OrderDialog
+          suppliers={suppliers}
+          products={products}
+          close={() => setDialog(null)}
+          onSaved={() => {
+            setDialog(null);
+            notify('Purchase order created');
+            void load();
+          }}
+        />
+      )}{' '}
+      {dialog === 'receive' && selectedOrder && (
+        <ReceiveDialog
+          order={selectedOrder}
+          close={() => {
+            setDialog(null);
+            setSelectedOrder(null);
+          }}
+          onSaved={() => {
+            setDialog(null);
+            setSelectedOrder(null);
+            notify('Goods receipt posted and serial inventory created');
+            void load();
+          }}
+        />
+      )}{' '}
+      {dialog === 'orderDetail' && selectedOrder && (
+        <OrderDetailDialog
+          order={selectedOrder}
+          close={() => {
+            setDialog(null);
+            setSelectedOrder(null);
+          }}
+        />
+      )}{' '}
+      {dialog === 'supplierDetail' && selectedSupplier && (
+        <SupplierDetailDialog
+          supplier={selectedSupplier}
+          products={products.filter((product) => product.supplier_id === selectedSupplier.id)}
+          close={() => {
+            setDialog(null);
+            setSelectedSupplier(null);
+          }}
+        />
+      )}
+      {dialog === 'orderEdit' && selectedOrder && (
+        <OrderEditDialog
+          order={selectedOrder}
+          suppliers={suppliers}
+          products={products}
+          close={() => {
+            setDialog(null);
+            setSelectedOrder(null);
+          }}
+          onApprove={() => void approveOrder(selectedOrder)}
+          onSaved={() => {
+            setDialog(null);
+            setSelectedOrder(null);
+            notify('Purchase order updated');
+            void load();
+          }}
+        />
+      )}
+    </div>
+  );
 }
 
-function ProcurementSectionNav({ active, onOpen }: { active: ProcurementPage; onOpen: (page: ProcurementPage) => void }) {
+function ProcurementSectionNav({
+  active,
+  onOpen,
+}: {
+  active: ProcurementPage;
+  onOpen: (page: ProcurementPage) => void;
+}) {
   const items: Array<{ page: ProcurementPage; label: string; icon: typeof LayoutGrid }> = [
     { page: 'overview', label: 'Overview', icon: LayoutGrid },
     { page: 'purchase-orders', label: 'Purchase orders', icon: ShoppingCart },
     { page: 'suppliers', label: 'Suppliers', icon: Users },
     { page: 'receiving', label: 'Receiving', icon: Truck },
   ];
-  return <nav className="procurement-page-nav" aria-label="Procurement workspace pages">{items.map(item => { const Icon = item.icon; return <button key={item.page} type="button" className={active === item.page ? 'active' : ''} aria-current={active === item.page ? 'page' : undefined} onClick={() => onOpen(item.page)}><Icon size={16}/><span>{item.label}</span></button>; })}</nav>;
+  return (
+    <nav className="procurement-page-nav" aria-label="Procurement workspace pages">
+      {items.map((item) => {
+        const Icon = item.icon;
+        return (
+          <button
+            key={item.page}
+            type="button"
+            className={active === item.page ? 'active' : ''}
+            aria-current={active === item.page ? 'page' : undefined}
+            onClick={() => onOpen(item.page)}
+          >
+            <Icon size={16} />
+            <span>{item.label}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
 }
 
-function ProcurementOverview({ orders, outstandingUnits, suppliers, receiving, onOpen }: { orders: number; outstandingUnits: number; suppliers: number; receiving: number; onOpen: (page: ProcurementPage) => void }) {
-  const items: Array<{ page: ProcurementPage; title: string; detail: string; count: number; icon: typeof ShoppingCart; tone: string }> = [
-    { page: 'purchase-orders', title: 'Purchase orders', detail: 'Review approvals, delivery commitments, and order lines.', count: orders, icon: ShoppingCart, tone: 'blue' },
-    { page: 'suppliers', title: 'Supplier directory', detail: 'Manage supplier terms and serialized product catalogs.', count: suppliers, icon: Users, tone: 'purple' },
-    { page: 'receiving', title: 'Receiving queue', detail: 'Post partial deliveries with one serial per unit.', count: receiving, icon: PackageCheck, tone: 'amber' },
+function ProcurementOverview({
+  orders,
+  outstandingUnits,
+  suppliers,
+  receiving,
+  onOpen,
+}: {
+  orders: number;
+  outstandingUnits: number;
+  suppliers: number;
+  receiving: number;
+  onOpen: (page: ProcurementPage) => void;
+}) {
+  const items: Array<{
+    page: ProcurementPage;
+    title: string;
+    detail: string;
+    count: number;
+    icon: typeof ShoppingCart;
+    tone: string;
+  }> = [
+    {
+      page: 'purchase-orders',
+      title: 'Purchase orders',
+      detail: 'Review approvals, delivery commitments, and order lines.',
+      count: orders,
+      icon: ShoppingCart,
+      tone: 'blue',
+    },
+    {
+      page: 'suppliers',
+      title: 'Supplier directory',
+      detail: 'Manage supplier terms and serialized product catalogs.',
+      count: suppliers,
+      icon: Users,
+      tone: 'purple',
+    },
+    {
+      page: 'receiving',
+      title: 'Receiving queue',
+      detail: 'Post partial deliveries with one serial per unit.',
+      count: receiving,
+      icon: PackageCheck,
+      tone: 'amber',
+    },
   ];
-  return <section className="procurement-overview" aria-labelledby="procurement-work-queues"><div className="procurement-overview-heading"><div><span className="ops-kicker">Workspace directory</span><h2 id="procurement-work-queues">Choose a procurement workflow</h2><p>Keep buying, supplier management, and serialized receiving focused and easy to scan.</p></div><span className="procurement-overview-total">{outstandingUnits} units outstanding</span></div><div className="procurement-overview-grid">{items.map(item => { const Icon = item.icon; return <button type="button" className="procurement-overview-card" key={item.page} onClick={() => onOpen(item.page)}><span className={`procurement-overview-icon ${item.tone}`}><Icon size={18}/></span><span className="procurement-overview-copy"><strong>{item.title}</strong><span>{item.detail}</span></span><span className="procurement-overview-count"><strong>{item.count}</strong><span>records</span></span><ArrowRight size={16} className="procurement-overview-arrow"/></button>; })}</div></section>;
+  return (
+    <section className="procurement-overview" aria-labelledby="procurement-work-queues">
+      <div className="procurement-overview-heading">
+        <div>
+          <span className="ops-kicker">Workspace directory</span>
+          <h2 id="procurement-work-queues">Choose a procurement workflow</h2>
+          <p>Keep buying, supplier management, and serialized receiving focused and easy to scan.</p>
+        </div>
+        <span className="procurement-overview-total">{outstandingUnits} units outstanding</span>
+      </div>
+      <div className="procurement-overview-grid">
+        {items.map((item) => {
+          const Icon = item.icon;
+          return (
+            <button
+              type="button"
+              className="procurement-overview-card"
+              key={item.page}
+              onClick={() => onOpen(item.page)}
+            >
+              <span className={`procurement-overview-icon ${item.tone}`}>
+                <Icon size={18} />
+              </span>
+              <span className="procurement-overview-copy">
+                <strong>{item.title}</strong>
+                <span>{item.detail}</span>
+              </span>
+              <span className="procurement-overview-count">
+                <strong>{item.count}</strong>
+                <span>records</span>
+              </span>
+              <ArrowRight size={16} className="procurement-overview-arrow" />
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
 
-function LiveKpi({ label, value, note, icon, tone }: { label: string; value: string; note: string; icon: React.ReactNode; tone: string }) { return <div className="ops-kpi"><span className={`kpi-icon ${tone}`}>{icon}</span><strong>{value}</strong><span>{label}</span><small>{note}</small></div>; }
-function Status({ value }: { value: string }) { return <span className={`status ${value.toLowerCase().replaceAll(' ', '-')}`}>{value}</span>; }
-function OrderEditDialog({ order, suppliers, products, close, onApprove, onSaved }: { order: PurchaseOrderDetail; suppliers: Supplier[]; products: SupplierProduct[]; close: () => void; onApprove: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState({ supplierId: order.supplier_id || '', destination: order.destination || '', expectedAt: order.expected_at ? String(order.expected_at).slice(0, 10) : '', status: order.status }); const [items, setItems] = useState(order.items.map(item => ({ productId: item.productId || '', quantity: String(item.quantity), unitCost: '0' }))); const [error, setError] = useState('');
+function LiveKpi({
+  label,
+  value,
+  note,
+  icon,
+  tone,
+}: {
+  label: string;
+  value: string;
+  note: string;
+  icon: React.ReactNode;
+  tone: string;
+}) {
+  return (
+    <div className="ops-kpi">
+      <span className={`kpi-icon ${tone}`}>{icon}</span>
+      <strong>{value}</strong>
+      <span>{label}</span>
+      <small>{note}</small>
+    </div>
+  );
+}
+function Status({ value }: { value: string }) {
+  return <span className={`status ${value.toLowerCase().replaceAll(' ', '-')}`}>{value}</span>;
+}
+function OrderEditDialog({
+  order,
+  suppliers,
+  products,
+  close,
+  onApprove,
+  onSaved,
+}: {
+  order: PurchaseOrderDetail;
+  suppliers: Supplier[];
+  products: SupplierProduct[];
+  close: () => void;
+  onApprove: () => void;
+  onSaved: () => void;
+}) {
+  const [form, setForm] = useState({
+    supplierId: order.supplier_id || '',
+    destination: order.destination || '',
+    expectedAt: order.expected_at ? String(order.expected_at).slice(0, 10) : '',
+    status: order.status,
+  });
+  const [items, setItems] = useState(
+    order.items.map((item) => ({ productId: item.productId || '', quantity: String(item.quantity), unitCost: '0' })),
+  );
+  const [error, setError] = useState('');
   const settings = useOrganizationSettings();
   const canEditLines = order.received_quantity === 0;
-  const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch(`/api/purchase-orders/${order.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, expectedAt: form.expectedAt || null, items: canEditLines ? items.map(item => ({ ...item, quantity: Number(item.quantity), unitCost: Number(item.unitCost) })) : undefined }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to update purchase order.'); return; } onSaved(); };
-  const availableProducts = products.filter(product => product.supplier_id === form.supplierId);
-  return <Dialog title={`Edit ${order.number}`} close={close}><form className="workflow-form" onSubmit={submit}><Field label="Supplier"><select disabled={!canEditLines} value={form.supplierId} onChange={e => setForm({ ...form, supplierId: e.target.value })}>{suppliers.map(supplier => <option key={supplier.id} value={supplier.id}>{supplier.code} · {supplier.name}</option>)}</select></Field><Field label="Destination"><input required value={form.destination} onChange={e => setForm({ ...form, destination: e.target.value })}/></Field><div className="workflow-form-grid"><Field label="Expected date"><input type="date" value={form.expectedAt} onChange={e => setForm({ ...form, expectedAt: e.target.value })}/></Field><Field label="Status"><select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}><option>Draft</option><option>Pending approval</option><option>Cancelled</option></select></Field></div><div className="serial-picker"><strong>Order lines{!canEditLines && ' · locked after receiving'}</strong>{items.map((item, index) => { const product = products.find(candidate => candidate.id === item.productId); return <div className="workflow-form" key={`${item.productId}-${index}`}><Field label="Supplier product"><select disabled={!canEditLines} required value={item.productId} onChange={e => setItems(current => current.map((line, lineIndex) => lineIndex === index ? { ...line, productId: e.target.value } : line))}><option value="">Select product</option>{availableProducts.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.product_type} · {candidate.product_name} · {candidate.sku}</option>)}</select></Field><div className="workflow-form-grid"><Field label="Quantity"><input disabled={!canEditLines} required min="1" type="number" value={item.quantity} onChange={e => setItems(current => current.map((line, lineIndex) => lineIndex === index ? { ...line, quantity: e.target.value } : line))}/></Field><Field label={`Unit cost (${product?.currency || settings.currency})`}><input disabled={!canEditLines} required min="0" step="0.01" type="number" value={item.unitCost} onChange={e => setItems(current => current.map((line, lineIndex) => lineIndex === index ? { ...line, unitCost: e.target.value } : line))}/></Field></div>{product && <span className="workflow-help">Serial number required · {product.warranty_months} month warranty</span>}</div>; })}</div>{order.receipts && <div className="serial-picker"><strong>Goods receipt history</strong>{order.receipts.map(receipt => <div className="workflow-help" key={receipt.id}>{receipt.number} · {formatOrganizationDate(receipt.receivedAt, settings)} · {receipt.receivedBy || 'Unknown receiver'}</div>)}</div>}{error && <p className="workflow-error">{error}</p>}<div className="workflow-dialog-actions"><button type="button" className="ops-btn ghost" onClick={close}>Cancel</button>{order.status === 'Pending approval' && <button type="button" className="ops-btn ghost" onClick={onApprove}>Approve</button>}<button className="ops-btn blue">Save purchase order</button></div></form></Dialog>;
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const response = await fetch(`/api/purchase-orders/${order.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...form,
+        expectedAt: form.expectedAt || null,
+        items: canEditLines
+          ? items.map((item) => ({ ...item, quantity: Number(item.quantity), unitCost: Number(item.unitCost) }))
+          : undefined,
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to update purchase order.');
+      return;
+    }
+    onSaved();
+  };
+  const availableProducts = products.filter((product) => product.supplier_id === form.supplierId);
+  return (
+    <Dialog title={`Edit ${order.number}`} close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Supplier">
+          <select
+            disabled={!canEditLines}
+            value={form.supplierId}
+            onChange={(e) => setForm({ ...form, supplierId: e.target.value })}
+          >
+            {suppliers.map((supplier) => (
+              <option key={supplier.id} value={supplier.id}>
+                {supplier.code} · {supplier.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Destination">
+          <input
+            required
+            value={form.destination}
+            onChange={(e) => setForm({ ...form, destination: e.target.value })}
+          />
+        </Field>
+        <div className="workflow-form-grid">
+          <Field label="Expected date">
+            <input
+              type="date"
+              value={form.expectedAt}
+              onChange={(e) => setForm({ ...form, expectedAt: e.target.value })}
+            />
+          </Field>
+          <Field label="Status">
+            <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+              <option>Draft</option>
+              <option>Pending approval</option>
+              <option>Cancelled</option>
+            </select>
+          </Field>
+        </div>
+        <div className="serial-picker">
+          <strong>Order lines{!canEditLines && ' · locked after receiving'}</strong>
+          {items.map((item, index) => {
+            const product = products.find((candidate) => candidate.id === item.productId);
+            return (
+              <div className="workflow-form" key={`${item.productId}-${index}`}>
+                <Field label="Supplier product">
+                  <select
+                    disabled={!canEditLines}
+                    required
+                    value={item.productId}
+                    onChange={(e) =>
+                      setItems((current) =>
+                        current.map((line, lineIndex) =>
+                          lineIndex === index ? { ...line, productId: e.target.value } : line,
+                        ),
+                      )
+                    }
+                  >
+                    <option value="">Select product</option>
+                    {availableProducts.map((candidate) => (
+                      <option key={candidate.id} value={candidate.id}>
+                        {candidate.product_type} · {candidate.product_name} · {candidate.sku}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <div className="workflow-form-grid">
+                  <Field label="Quantity">
+                    <input
+                      disabled={!canEditLines}
+                      required
+                      min="1"
+                      type="number"
+                      value={item.quantity}
+                      onChange={(e) =>
+                        setItems((current) =>
+                          current.map((line, lineIndex) =>
+                            lineIndex === index ? { ...line, quantity: e.target.value } : line,
+                          ),
+                        )
+                      }
+                    />
+                  </Field>
+                  <Field label={`Unit cost (${product?.currency || settings.currency})`}>
+                    <input
+                      disabled={!canEditLines}
+                      required
+                      min="0"
+                      step="0.01"
+                      type="number"
+                      value={item.unitCost}
+                      onChange={(e) =>
+                        setItems((current) =>
+                          current.map((line, lineIndex) =>
+                            lineIndex === index ? { ...line, unitCost: e.target.value } : line,
+                          ),
+                        )
+                      }
+                    />
+                  </Field>
+                </div>
+                {product && (
+                  <span className="workflow-help">
+                    Serial number required · {product.warranty_months} month warranty
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {order.receipts && (
+          <div className="serial-picker">
+            <strong>Goods receipt history</strong>
+            {order.receipts.map((receipt) => (
+              <div className="workflow-help" key={receipt.id}>
+                {receipt.number} · {formatOrganizationDate(receipt.receivedAt, settings)} ·{' '}
+                {receipt.receivedBy || 'Unknown receiver'}
+              </div>
+            ))}
+          </div>
+        )}
+        {error && <p className="workflow-error">{error}</p>}
+        <div className="workflow-dialog-actions">
+          <button type="button" className="ops-btn ghost" onClick={close}>
+            Cancel
+          </button>
+          {order.status === 'Pending approval' && (
+            <button type="button" className="ops-btn ghost" onClick={onApprove}>
+              Approve
+            </button>
+          )}
+          <button className="ops-btn blue">Save purchase order</button>
+        </div>
+      </form>
+    </Dialog>
+  );
 }
-function OrderDetailDialog({ order, close }: { order: PurchaseOrderDetail; close: () => void }) { return <Dialog title={`${order.number} details`} close={close}><div className="workflow-form"><div className="workflow-summary"><div><ShoppingCart size={15}/><span><strong>{order.supplier_name}</strong> supplier</span></div><div><PackageCheck size={15}/><span><strong>{order.received_quantity}/{order.ordered_quantity}</strong> received</span></div></div><p className="workflow-help">Destination: {order.destination || '—'}</p><div className="serial-picker"><strong>Order lines</strong>{order.items.map(item => <div key={item.id} className="workflow-help">{item.sku} · {item.description} · {item.receivedQuantity}/{item.quantity} received</div>)}</div><div className="workflow-dialog-actions"><button type="button" className="ops-btn blue" onClick={close}>Close</button></div></div></Dialog>; }
-function SupplierDetailDialog({ supplier, products, close }: { supplier: Supplier; products: SupplierProduct[]; close: () => void }) { return <Dialog title={`${supplier.name} details`} close={close}><div className="workflow-form"><div className="workflow-summary"><div><Users size={15}/><span><strong>{supplier.code}</strong> supplier code</span></div><div><Boxes size={15}/><span><strong>{supplier.lead_time_days || 0} days</strong> lead time</span></div></div><p className="workflow-help">Contact: {supplier.contact_name || '—'} · {supplier.phone || 'No phone recorded'}</p><p className="workflow-help">Payment terms: {supplier.payment_terms || '—'}</p><div className="serial-picker"><strong>Serialized product catalog</strong>{products.map(product => <div className="workflow-help" key={product.id}>{product.product_type === 'Laptop' ? <Laptop size={13}/> : <Boxes size={13}/>} {product.product_name} · {product.sku} · {product.warranty_months} month warranty · Cost {product.cost_price} · Sell {product.selling_price} · Serial required</div>)}{!products.length && <span className="workflow-help">No active products configured.</span>}</div><div className="workflow-dialog-actions"><button type="button" className="ops-btn blue" onClick={close}>Close</button></div></div></Dialog>; }
-function SupplierEditDialog({ supplier, close, onSaved }: { supplier: Supplier; close: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState({ name: supplier.name, contactName: supplier.contact_name || '', phone: supplier.phone || '', paymentTerms: supplier.payment_terms || '', leadTimeDays: String(supplier.lead_time_days || 0), status: supplier.status }); const [error, setError] = useState(''); const [saving, setSaving] = useState(false);
-  const submit = async (event: FormEvent) => { event.preventDefault(); setSaving(true); const response = await fetch(`/api/suppliers/${supplier.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, leadTimeDays: Number(form.leadTimeDays) }) }); const data = await response.json(); setSaving(false); if (!response.ok) { setError(data.error || 'Unable to update supplier.'); return; } onSaved(); };
-  return <Dialog title={`Edit ${supplier.name}`} close={close}><form className="workflow-form" onSubmit={submit}><Field label="Supplier name"><input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}/></Field><Field label="Contact name"><input value={form.contactName} onChange={e => setForm({ ...form, contactName: e.target.value })}/></Field><Field label="Phone"><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })}/></Field><div className="workflow-form-grid"><Field label="Payment terms"><input value={form.paymentTerms} onChange={e => setForm({ ...form, paymentTerms: e.target.value })}/></Field><Field label="Lead time (days)"><input type="number" min="0" value={form.leadTimeDays} onChange={e => setForm({ ...form, leadTimeDays: e.target.value })}/></Field></div><Field label="Status"><select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}><option>Active</option><option>Inactive</option><option>Blocked</option></select></Field>{error && <p className="workflow-error" role="alert">{error}</p>}<div className="workflow-dialog-actions"><button type="button" className="ops-btn ghost" onClick={close}>Cancel</button><button className="ops-btn blue" disabled={saving}>{saving ? 'Saving…' : 'Save supplier'}</button></div></form></Dialog>;
+function OrderDetailDialog({ order, close }: { order: PurchaseOrderDetail; close: () => void }) {
+  return (
+    <Dialog title={`${order.number} details`} close={close}>
+      <div className="workflow-form">
+        <div className="workflow-summary">
+          <div>
+            <ShoppingCart size={15} />
+            <span>
+              <strong>{order.supplier_name}</strong> supplier
+            </span>
+          </div>
+          <div>
+            <PackageCheck size={15} />
+            <span>
+              <strong>
+                {order.received_quantity}/{order.ordered_quantity}
+              </strong>{' '}
+              received
+            </span>
+          </div>
+        </div>
+        <p className="workflow-help">Destination: {order.destination || '—'}</p>
+        <div className="serial-picker">
+          <strong>Order lines</strong>
+          {order.items.map((item) => (
+            <div key={item.id} className="workflow-help">
+              {item.sku} · {item.description} · {item.receivedQuantity}/{item.quantity} received
+            </div>
+          ))}
+        </div>
+        <div className="workflow-dialog-actions">
+          <button type="button" className="ops-btn blue" onClick={close}>
+            Close
+          </button>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+function SupplierDetailDialog({
+  supplier,
+  products,
+  close,
+}: {
+  supplier: Supplier;
+  products: SupplierProduct[];
+  close: () => void;
+}) {
+  return (
+    <Dialog title={`${supplier.name} details`} close={close}>
+      <div className="workflow-form">
+        <div className="workflow-summary">
+          <div>
+            <Users size={15} />
+            <span>
+              <strong>{supplier.code}</strong> supplier code
+            </span>
+          </div>
+          <div>
+            <Boxes size={15} />
+            <span>
+              <strong>{supplier.lead_time_days || 0} days</strong> lead time
+            </span>
+          </div>
+        </div>
+        <p className="workflow-help">
+          Contact: {supplier.contact_name || '—'} · {supplier.phone || 'No phone recorded'}
+        </p>
+        <p className="workflow-help">Payment terms: {supplier.payment_terms || '—'}</p>
+        <div className="serial-picker">
+          <strong>Serialized product catalog</strong>
+          {products.map((product) => (
+            <div className="workflow-help" key={product.id}>
+              {product.product_type === 'Laptop' ? <Laptop size={13} /> : <Boxes size={13} />} {product.product_name} ·{' '}
+              {product.sku} · {product.warranty_months} month warranty · Cost {product.cost_price} · Sell{' '}
+              {product.selling_price} · Serial required
+            </div>
+          ))}
+          {!products.length && <span className="workflow-help">No active products configured.</span>}
+        </div>
+        <div className="workflow-dialog-actions">
+          <button type="button" className="ops-btn blue" onClick={close}>
+            Close
+          </button>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+function SupplierEditDialog({
+  supplier,
+  close,
+  onSaved,
+}: {
+  supplier: Supplier;
+  close: () => void;
+  onSaved: () => void;
+}) {
+  const [form, setForm] = useState({
+    name: supplier.name,
+    contactName: supplier.contact_name || '',
+    phone: supplier.phone || '',
+    paymentTerms: supplier.payment_terms || '',
+    leadTimeDays: String(supplier.lead_time_days || 0),
+    status: supplier.status,
+  });
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setSaving(true);
+    const response = await fetch(`/api/suppliers/${supplier.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...form, leadTimeDays: Number(form.leadTimeDays) }),
+    });
+    const data = await response.json();
+    setSaving(false);
+    if (!response.ok) {
+      setError(data.error || 'Unable to update supplier.');
+      return;
+    }
+    onSaved();
+  };
+  return (
+    <Dialog title={`Edit ${supplier.name}`} close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Supplier name">
+          <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        </Field>
+        <Field label="Contact name">
+          <input value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} />
+        </Field>
+        <Field label="Phone">
+          <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+        </Field>
+        <div className="workflow-form-grid">
+          <Field label="Payment terms">
+            <input value={form.paymentTerms} onChange={(e) => setForm({ ...form, paymentTerms: e.target.value })} />
+          </Field>
+          <Field label="Lead time (days)">
+            <input
+              type="number"
+              min="0"
+              value={form.leadTimeDays}
+              onChange={(e) => setForm({ ...form, leadTimeDays: e.target.value })}
+            />
+          </Field>
+        </div>
+        <Field label="Status">
+          <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+            <option>Active</option>
+            <option>Inactive</option>
+            <option>Blocked</option>
+          </select>
+        </Field>
+        {error && (
+          <p className="workflow-error" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="workflow-dialog-actions">
+          <button type="button" className="ops-btn ghost" onClick={close}>
+            Cancel
+          </button>
+          <button className="ops-btn blue" disabled={saving}>
+            {saving ? 'Saving…' : 'Save supplier'}
+          </button>
+        </div>
+      </form>
+    </Dialog>
+  );
 }
 function Dialog({ title, children, close }: { title: string; children: React.ReactNode; close: () => void }) {
   const dialogRef = useDialogFocus<HTMLDivElement>(close);
-  return <div className="workflow-dialog-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) close(); }}><div ref={dialogRef} className="workflow-dialog" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}><div className="workflow-dialog-head"><h3>{title}</h3><button onClick={close} aria-label="Close"><X size={16}/></button></div>{children}</div></div>;
+  return (
+    <div
+      className="workflow-dialog-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) close();
+      }}
+    >
+      <div ref={dialogRef} className="workflow-dialog" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}>
+        <div className="workflow-dialog-head">
+          <h3>{title}</h3>
+          <button onClick={close} aria-label="Close">
+            <X size={16} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="workflow-field"><span>{label}</span>{children}</label>; }
-function Actions({ close, label }: { close: () => void; label: string }) { return <div className="workflow-dialog-actions"><button type="button" className="ops-btn ghost" onClick={close}>Cancel</button><button className="ops-btn blue">{label}</button></div>; }
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="workflow-field">
+      <span>{label}</span>
+      {children}
+    </label>
+  );
+}
+function Actions({ close, label }: { close: () => void; label: string }) {
+  return (
+    <div className="workflow-dialog-actions">
+      <button type="button" className="ops-btn ghost" onClick={close}>
+        Cancel
+      </button>
+      <button className="ops-btn blue">{label}</button>
+    </div>
+  );
+}
 
 function SupplierDialog({ close, onSaved }: { close: () => void; onSaved: () => void }) {
   type ProductType = 'Laptop' | 'POS';
   const settings = useOrganizationSettings();
-  const [step, setStep] = useState(1); const [form, setForm] = useState({ name: '', contactName: '', phone: '', paymentTerms: '30 days', leadTimeDays: '14' });
-  const [types, setTypes] = useState<ProductType[]>(['Laptop']); const [products, setProducts] = useState<Record<ProductType, { productName: string; manufacturer: string; model: string; sku: string; warrantyMonths: string; costPrice: string; sellingPrice: string }>>({ Laptop: { productName: '', manufacturer: '', model: '', sku: '', warrantyMonths: '12', costPrice: '0', sellingPrice: '0' }, POS: { productName: '', manufacturer: '', model: '', sku: '', warrantyMonths: '12', costPrice: '0', sellingPrice: '0' } });
-  const [error, setError] = useState(''); const [saving, setSaving] = useState(false);
-  const updateProduct = (type: ProductType, key: keyof typeof products.Laptop, value: string) => setProducts(current => ({ ...current, [type]: { ...current[type], [key]: value } }));
-  const next = () => { setError(''); if (!form.name.trim()) { setError('Enter the supplier name.'); return; } setStep(2); };
-  const review = () => { setError(''); if (types.some(type => !products[type].productName.trim() || !products[type].sku.trim())) { setError('Each selected product type needs a product name and SKU.'); return; } setStep(3); };
-  const submit = async () => { setSaving(true); setError(''); const response = await fetch('/api/suppliers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, leadTimeDays: Number(form.leadTimeDays), products: types.map(type => ({ productType: type, ...products[type], warrantyMonths: Number(products[type].warrantyMonths), costPrice: Number(products[type].costPrice), sellingPrice: Number(products[type].sellingPrice), currency: settings.currency })) }) }); const data = await response.json(); setSaving(false); if (!response.ok) { setError(data.error || 'Unable to create supplier.'); return; } onSaved(); };
-  return <Dialog title="Add supplier and product catalog" close={close}><div className="stock-stepper"><span className={step >= 1 ? 'active' : ''}>1 <small>Supplier</small></span><i/><span className={step >= 2 ? 'active' : ''}>2 <small>Products</small></span><i/><span className={step >= 3 ? 'active' : ''}>3 <small>Review</small></span></div>{step === 1 && <div className="workflow-form"><p className="workflow-help">Create the supplier first, then add the serialized Laptop/POS products they are allowed to supply.</p><Field label="Supplier name"><input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}/></Field><Field label="Contact name"><input value={form.contactName} onChange={e => setForm({ ...form, contactName: e.target.value })}/></Field><Field label="Phone"><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })}/></Field><div className="workflow-form-grid"><Field label="Payment terms"><input value={form.paymentTerms} onChange={e => setForm({ ...form, paymentTerms: e.target.value })}/></Field><Field label="Lead time (days)"><input type="number" min="0" value={form.leadTimeDays} onChange={e => setForm({ ...form, leadTimeDays: e.target.value })}/></Field></div><div className="workflow-dialog-actions"><button type="button" className="ops-btn ghost" onClick={close}>Cancel</button><button type="button" className="ops-btn blue" onClick={next}>Next: products</button></div></div>}{step === 2 && <div className="workflow-form"><p className="workflow-help">Select one or both product types. Every product follows the same mandatory serial-number receiving rules.</p><div className="stock-type-grid"><button type="button" className={types.includes('Laptop') ? 'stock-type selected' : 'stock-type'} onClick={() => setTypes(current => current.includes('Laptop') ? current.filter(type => type !== 'Laptop') : [...current, 'Laptop'])}><Laptop size={24}/><strong>Laptop</strong><span>Serial required</span></button><button type="button" className={types.includes('POS') ? 'stock-type selected' : 'stock-type'} onClick={() => setTypes(current => current.includes('POS') ? current.filter(type => type !== 'POS') : [...current, 'POS'])}><Boxes size={24}/><strong>POS</strong><span>Serial required</span></button></div>{types.map(type => <div className="serial-picker" key={type}><strong>{type} product</strong><Field label="Product name"><input required value={products[type].productName} onChange={e => updateProduct(type, 'productName', e.target.value)} placeholder={type === 'Laptop' ? 'Lenovo ThinkPad E14' : 'iPay POS Pro'}/></Field><div className="workflow-form-grid"><Field label="SKU"><input required value={products[type].sku} onChange={e => updateProduct(type, 'sku', e.target.value)} placeholder={type === 'Laptop' ? 'LAP-LEN-E14' : 'POS-IPAY-PRO'}/></Field><Field label="Manufacturer"><input value={products[type].manufacturer} onChange={e => updateProduct(type, 'manufacturer', e.target.value)}/></Field></div><div className="workflow-form-grid"><Field label="Warranty (months)"><input type="number" min="0" max="120" value={products[type].warrantyMonths} onChange={e => updateProduct(type, 'warrantyMonths', e.target.value)}/></Field><Field label="Cost price"><input type="number" min="0" step="0.01" value={products[type].costPrice} onChange={e => updateProduct(type, 'costPrice', e.target.value)}/></Field><Field label="Selling price"><input type="number" min="0" step="0.01" value={products[type].sellingPrice} onChange={e => updateProduct(type, 'sellingPrice', e.target.value)}/></Field></div></div>)}{error && <p className="workflow-error" role="alert">{error}</p>}<div className="workflow-dialog-actions"><button type="button" className="ops-btn ghost" onClick={() => setStep(1)}>Back</button><button type="button" className="ops-btn blue" onClick={review} disabled={!types.length}>Next: review</button></div></div>}{step === 3 && <div className="workflow-form"><div className="stock-review"><div><span>Supplier</span><strong>{form.name || '—'}</strong></div><div><span>Contact</span><strong>{form.contactName || form.phone || '—'}</strong></div><div><span>Product types</span><strong>{types.join(' + ')}</strong></div><div><span>Serial rule</span><strong>Mandatory for every unit</strong></div></div>{types.map(type => <div className="serial-picker" key={type}><strong>{type} · {products[type].productName}</strong><span className="workflow-help">{products[type].sku} · {products[type].warrantyMonths} month warranty · Cost {products[type].costPrice} {settings.currency} · Sell {products[type].sellingPrice} {settings.currency}</span></div>)}{error && <p className="workflow-error" role="alert">{error}</p>}<div className="workflow-dialog-actions"><button type="button" className="ops-btn ghost" onClick={() => setStep(2)}>Back</button><button type="button" className="ops-btn blue" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving…' : 'Create supplier catalog'}</button></div></div>}</Dialog>;
+  const [step, setStep] = useState(1);
+  const [form, setForm] = useState({
+    name: '',
+    contactName: '',
+    phone: '',
+    paymentTerms: '30 days',
+    leadTimeDays: '14',
+  });
+  const [types, setTypes] = useState<ProductType[]>(['Laptop']);
+  const [products, setProducts] = useState<
+    Record<
+      ProductType,
+      {
+        productName: string;
+        manufacturer: string;
+        model: string;
+        sku: string;
+        warrantyMonths: string;
+        costPrice: string;
+        sellingPrice: string;
+      }
+    >
+  >({
+    Laptop: {
+      productName: '',
+      manufacturer: '',
+      model: '',
+      sku: '',
+      warrantyMonths: '12',
+      costPrice: '0',
+      sellingPrice: '0',
+    },
+    POS: {
+      productName: '',
+      manufacturer: '',
+      model: '',
+      sku: '',
+      warrantyMonths: '12',
+      costPrice: '0',
+      sellingPrice: '0',
+    },
+  });
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const updateProduct = (type: ProductType, key: keyof typeof products.Laptop, value: string) =>
+    setProducts((current) => ({ ...current, [type]: { ...current[type], [key]: value } }));
+  const next = () => {
+    setError('');
+    if (!form.name.trim()) {
+      setError('Enter the supplier name.');
+      return;
+    }
+    setStep(2);
+  };
+  const review = () => {
+    setError('');
+    if (types.some((type) => !products[type].productName.trim() || !products[type].sku.trim())) {
+      setError('Each selected product type needs a product name and SKU.');
+      return;
+    }
+    setStep(3);
+  };
+  const submit = async () => {
+    setSaving(true);
+    setError('');
+    const response = await fetch('/api/suppliers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...form,
+        leadTimeDays: Number(form.leadTimeDays),
+        products: types.map((type) => ({
+          productType: type,
+          ...products[type],
+          warrantyMonths: Number(products[type].warrantyMonths),
+          costPrice: Number(products[type].costPrice),
+          sellingPrice: Number(products[type].sellingPrice),
+          currency: settings.currency,
+        })),
+      }),
+    });
+    const data = await response.json();
+    setSaving(false);
+    if (!response.ok) {
+      setError(data.error || 'Unable to create supplier.');
+      return;
+    }
+    onSaved();
+  };
+  return (
+    <Dialog title="Add supplier and product catalog" close={close}>
+      <div className="stock-stepper">
+        <span className={step >= 1 ? 'active' : ''}>
+          1 <small>Supplier</small>
+        </span>
+        <i />
+        <span className={step >= 2 ? 'active' : ''}>
+          2 <small>Products</small>
+        </span>
+        <i />
+        <span className={step >= 3 ? 'active' : ''}>
+          3 <small>Review</small>
+        </span>
+      </div>
+      {step === 1 && (
+        <div className="workflow-form">
+          <p className="workflow-help">
+            Create the supplier first, then add the serialized Laptop/POS products they are allowed to supply.
+          </p>
+          <Field label="Supplier name">
+            <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          </Field>
+          <Field label="Contact name">
+            <input value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} />
+          </Field>
+          <Field label="Phone">
+            <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          </Field>
+          <div className="workflow-form-grid">
+            <Field label="Payment terms">
+              <input value={form.paymentTerms} onChange={(e) => setForm({ ...form, paymentTerms: e.target.value })} />
+            </Field>
+            <Field label="Lead time (days)">
+              <input
+                type="number"
+                min="0"
+                value={form.leadTimeDays}
+                onChange={(e) => setForm({ ...form, leadTimeDays: e.target.value })}
+              />
+            </Field>
+          </div>
+          <div className="workflow-dialog-actions">
+            <button type="button" className="ops-btn ghost" onClick={close}>
+              Cancel
+            </button>
+            <button type="button" className="ops-btn blue" onClick={next}>
+              Next: products
+            </button>
+          </div>
+        </div>
+      )}
+      {step === 2 && (
+        <div className="workflow-form">
+          <p className="workflow-help">
+            Select one or both product types. Every product follows the same mandatory serial-number receiving rules.
+          </p>
+          <div className="stock-type-grid">
+            <button
+              type="button"
+              className={types.includes('Laptop') ? 'stock-type selected' : 'stock-type'}
+              onClick={() =>
+                setTypes((current) =>
+                  current.includes('Laptop') ? current.filter((type) => type !== 'Laptop') : [...current, 'Laptop'],
+                )
+              }
+            >
+              <Laptop size={24} />
+              <strong>Laptop</strong>
+              <span>Serial required</span>
+            </button>
+            <button
+              type="button"
+              className={types.includes('POS') ? 'stock-type selected' : 'stock-type'}
+              onClick={() =>
+                setTypes((current) =>
+                  current.includes('POS') ? current.filter((type) => type !== 'POS') : [...current, 'POS'],
+                )
+              }
+            >
+              <Boxes size={24} />
+              <strong>POS</strong>
+              <span>Serial required</span>
+            </button>
+          </div>
+          {types.map((type) => (
+            <div className="serial-picker" key={type}>
+              <strong>{type} product</strong>
+              <Field label="Product name">
+                <input
+                  required
+                  value={products[type].productName}
+                  onChange={(e) => updateProduct(type, 'productName', e.target.value)}
+                  placeholder={type === 'Laptop' ? 'Lenovo ThinkPad E14' : 'iPay POS Pro'}
+                />
+              </Field>
+              <div className="workflow-form-grid">
+                <Field label="SKU">
+                  <input
+                    required
+                    value={products[type].sku}
+                    onChange={(e) => updateProduct(type, 'sku', e.target.value)}
+                    placeholder={type === 'Laptop' ? 'LAP-LEN-E14' : 'POS-IPAY-PRO'}
+                  />
+                </Field>
+                <Field label="Manufacturer">
+                  <input
+                    value={products[type].manufacturer}
+                    onChange={(e) => updateProduct(type, 'manufacturer', e.target.value)}
+                  />
+                </Field>
+              </div>
+              <div className="workflow-form-grid">
+                <Field label="Warranty (months)">
+                  <input
+                    type="number"
+                    min="0"
+                    max="120"
+                    value={products[type].warrantyMonths}
+                    onChange={(e) => updateProduct(type, 'warrantyMonths', e.target.value)}
+                  />
+                </Field>
+                <Field label="Cost price">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={products[type].costPrice}
+                    onChange={(e) => updateProduct(type, 'costPrice', e.target.value)}
+                  />
+                </Field>
+                <Field label="Selling price">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={products[type].sellingPrice}
+                    onChange={(e) => updateProduct(type, 'sellingPrice', e.target.value)}
+                  />
+                </Field>
+              </div>
+            </div>
+          ))}
+          {error && (
+            <p className="workflow-error" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="workflow-dialog-actions">
+            <button type="button" className="ops-btn ghost" onClick={() => setStep(1)}>
+              Back
+            </button>
+            <button type="button" className="ops-btn blue" onClick={review} disabled={!types.length}>
+              Next: review
+            </button>
+          </div>
+        </div>
+      )}
+      {step === 3 && (
+        <div className="workflow-form">
+          <div className="stock-review">
+            <div>
+              <span>Supplier</span>
+              <strong>{form.name || '—'}</strong>
+            </div>
+            <div>
+              <span>Contact</span>
+              <strong>{form.contactName || form.phone || '—'}</strong>
+            </div>
+            <div>
+              <span>Product types</span>
+              <strong>{types.join(' + ')}</strong>
+            </div>
+            <div>
+              <span>Serial rule</span>
+              <strong>Mandatory for every unit</strong>
+            </div>
+          </div>
+          {types.map((type) => (
+            <div className="serial-picker" key={type}>
+              <strong>
+                {type} · {products[type].productName}
+              </strong>
+              <span className="workflow-help">
+                {products[type].sku} · {products[type].warrantyMonths} month warranty · Cost {products[type].costPrice}{' '}
+                {settings.currency} · Sell {products[type].sellingPrice} {settings.currency}
+              </span>
+            </div>
+          ))}
+          {error && (
+            <p className="workflow-error" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="workflow-dialog-actions">
+            <button type="button" className="ops-btn ghost" onClick={() => setStep(2)}>
+              Back
+            </button>
+            <button type="button" className="ops-btn blue" onClick={() => void submit()} disabled={saving}>
+              {saving ? 'Saving…' : 'Create supplier catalog'}
+            </button>
+          </div>
+        </div>
+      )}
+    </Dialog>
+  );
 }
 
-function OrderDialog({ suppliers, products, close, onSaved }: { suppliers: Supplier[]; products: SupplierProduct[]; close: () => void; onSaved: () => void }) {
+function OrderDialog({
+  suppliers,
+  products,
+  close,
+  onSaved,
+}: {
+  suppliers: Supplier[];
+  products: SupplierProduct[];
+  close: () => void;
+  onSaved: () => void;
+}) {
   const settings = useOrganizationSettings();
-  const [form, setForm] = useState({ supplierId: suppliers[0]?.id || '', productId: products.find(product => product.supplier_id === suppliers[0]?.id)?.id || '', destination: '', quantity: '1', unitCost: '0', expectedAt: '' });
-  const [error, setError] = useState(''); const [saving, setSaving] = useState(false);
-  const supplierProducts = products.filter(product => product.supplier_id === form.supplierId); const selectedProduct = products.find(product => product.id === form.productId);
-  const submit = async (event: FormEvent) => { event.preventDefault(); setSaving(true); setError(''); const response = await fetch('/api/purchase-orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ supplierId: form.supplierId, destination: form.destination, expectedAt: form.expectedAt || undefined, items: [{ productId: form.productId, quantity: Number(form.quantity), unitCost: Number(form.unitCost) }] }) }); const data = await response.json(); setSaving(false); if (!response.ok) { setError(data.error || 'Unable to create purchase order.'); return; } onSaved(); };
-  return <Dialog title="Create purchase order" close={close}><form className="workflow-form" onSubmit={submit}><Field label="Supplier"><select required value={form.supplierId} onChange={e => { const supplierId = e.target.value; setForm({ ...form, supplierId, productId: products.find(product => product.supplier_id === supplierId)?.id || '' }); }}>{suppliers.map(supplier => <option key={supplier.id} value={supplier.id}>{supplier.code} · {supplier.name}</option>)}</select></Field><Field label="Supplier product"><select required value={form.productId} onChange={e => { const product = products.find(candidate => candidate.id === e.target.value); setForm({ ...form, productId: e.target.value, unitCost: String(product?.unit_cost || 0) }); }}>{supplierProducts.map(product => <option key={product.id} value={product.id}>{product.product_type} · {product.product_name} · {product.sku}</option>)}</select></Field>{selectedProduct && <p className="workflow-help">{selectedProduct.product_type} · {selectedProduct.warranty_months} month warranty · Serial number required for every received unit.</p>}<Field label="Destination"><input required value={form.destination} onChange={e => setForm({ ...form, destination: e.target.value })} placeholder={settings.address || `${settings.organizationName || 'Organization'} receiving location`}/></Field><div className="workflow-form-grid"><Field label="Quantity"><input required type="number" min="1" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })}/></Field><Field label={`Unit cost (${selectedProduct?.currency || settings.currency})`}><input required type="number" min="0" step="0.01" value={form.unitCost} onChange={e => setForm({ ...form, unitCost: e.target.value })}/></Field></div><Field label="Expected date"><input type="date" value={form.expectedAt} onChange={e => setForm({ ...form, expectedAt: e.target.value })}/></Field>{error && <p className="workflow-error" role="alert">{error}</p>}<div className="workflow-dialog-actions"><button type="button" className="ops-btn ghost" onClick={close}>Cancel</button><button className="ops-btn blue" disabled={saving || !supplierProducts.length}>{saving ? 'Saving…' : 'Create order'}</button></div></form></Dialog>;
+  const [form, setForm] = useState({
+    supplierId: suppliers[0]?.id || '',
+    productId: products.find((product) => product.supplier_id === suppliers[0]?.id)?.id || '',
+    destination: '',
+    quantity: '1',
+    unitCost: '0',
+    expectedAt: '',
+  });
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const supplierProducts = products.filter((product) => product.supplier_id === form.supplierId);
+  const selectedProduct = products.find((product) => product.id === form.productId);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setSaving(true);
+    setError('');
+    const response = await fetch('/api/purchase-orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        supplierId: form.supplierId,
+        destination: form.destination,
+        expectedAt: form.expectedAt || undefined,
+        items: [{ productId: form.productId, quantity: Number(form.quantity), unitCost: Number(form.unitCost) }],
+      }),
+    });
+    const data = await response.json();
+    setSaving(false);
+    if (!response.ok) {
+      setError(data.error || 'Unable to create purchase order.');
+      return;
+    }
+    onSaved();
+  };
+  return (
+    <Dialog title="Create purchase order" close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Supplier">
+          <select
+            required
+            value={form.supplierId}
+            onChange={(e) => {
+              const supplierId = e.target.value;
+              setForm({
+                ...form,
+                supplierId,
+                productId: products.find((product) => product.supplier_id === supplierId)?.id || '',
+              });
+            }}
+          >
+            {suppliers.map((supplier) => (
+              <option key={supplier.id} value={supplier.id}>
+                {supplier.code} · {supplier.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Supplier product">
+          <select
+            required
+            value={form.productId}
+            onChange={(e) => {
+              const product = products.find((candidate) => candidate.id === e.target.value);
+              setForm({ ...form, productId: e.target.value, unitCost: String(product?.unit_cost || 0) });
+            }}
+          >
+            {supplierProducts.map((product) => (
+              <option key={product.id} value={product.id}>
+                {product.product_type} · {product.product_name} · {product.sku}
+              </option>
+            ))}
+          </select>
+        </Field>
+        {selectedProduct && (
+          <p className="workflow-help">
+            {selectedProduct.product_type} · {selectedProduct.warranty_months} month warranty · Serial number required
+            for every received unit.
+          </p>
+        )}
+        <Field label="Destination">
+          <input
+            required
+            value={form.destination}
+            onChange={(e) => setForm({ ...form, destination: e.target.value })}
+            placeholder={settings.address || `${settings.organizationName || 'Organization'} receiving location`}
+          />
+        </Field>
+        <div className="workflow-form-grid">
+          <Field label="Quantity">
+            <input
+              required
+              type="number"
+              min="1"
+              value={form.quantity}
+              onChange={(e) => setForm({ ...form, quantity: e.target.value })}
+            />
+          </Field>
+          <Field label={`Unit cost (${selectedProduct?.currency || settings.currency})`}>
+            <input
+              required
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.unitCost}
+              onChange={(e) => setForm({ ...form, unitCost: e.target.value })}
+            />
+          </Field>
+        </div>
+        <Field label="Expected date">
+          <input
+            type="date"
+            value={form.expectedAt}
+            onChange={(e) => setForm({ ...form, expectedAt: e.target.value })}
+          />
+        </Field>
+        {error && (
+          <p className="workflow-error" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="workflow-dialog-actions">
+          <button type="button" className="ops-btn ghost" onClick={close}>
+            Cancel
+          </button>
+          <button className="ops-btn blue" disabled={saving || !supplierProducts.length}>
+            {saving ? 'Saving…' : 'Create order'}
+          </button>
+        </div>
+      </form>
+    </Dialog>
+  );
 }
 
-function ReceiveDialog({ order, close, onSaved }: { order: PurchaseOrderDetail; close: () => void; onSaved: () => void }) {
-  const line = order.items.find(item => item.receivedQuantity < item.quantity);
+function ReceiveDialog({
+  order,
+  close,
+  onSaved,
+}: {
+  order: PurchaseOrderDetail;
+  close: () => void;
+  onSaved: () => void;
+}) {
+  const line = order.items.find((item) => item.receivedQuantity < item.quantity);
   const remaining = line ? line.quantity - line.receivedQuantity : 0;
   const settings = useOrganizationSettings();
-  const [quantity, setQuantity] = useState(String(Math.max(1, remaining))); const [serialNumbers, setSerialNumbers] = useState(''); const [location, setLocation] = useState(order.destination || ''); const [error, setError] = useState(''); const [saving, setSaving] = useState(false);
-  const submit = async (event: FormEvent) => { event.preventDefault(); if (!line) return; setSaving(true); setError(''); const serials = serialNumbers.split(/[\n,]+/).map(value => value.trim()).filter(Boolean); if (serials.length !== Number(quantity)) { setError('Enter exactly one unique serial number for every received unit.'); setSaving(false); return; } const response = await fetch(`/api/purchase-orders/${order.id}/receive`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location, items: [{ purchaseOrderItemId: line.id, quantity: Number(quantity), serialNumbers: serials }] }) }); const data = await response.json(); setSaving(false); if (!response.ok) { setError(data.error || 'Unable to receive stock.'); return; } onSaved(); };
-  return <Dialog title={`Receive ${order.number}`} close={close}>{line ? <form className="workflow-form" onSubmit={submit}><p className="workflow-help">{line.sku} · {line.description} · {remaining} units outstanding. Enter one unique serial number per received unit.</p><Field label="Quantity"><input required type="number" min="1" max={remaining} value={quantity} onChange={e => setQuantity(e.target.value)}/></Field><Field label="Serial numbers"><textarea required rows={4} value={serialNumbers} onChange={e => setSerialNumbers(e.target.value)} placeholder="SN-001, SN-002"/></Field><Field label="Location"><input required value={location} onChange={e => setLocation(e.target.value)} placeholder={settings.address || `${settings.organizationName || 'Organization'} receiving location`}/></Field>{error && <p className="workflow-error" role="alert">{error}</p>}<div className="workflow-dialog-actions"><button type="button" className="ops-btn ghost" onClick={close}>Cancel</button><button className="ops-btn blue" disabled={saving}>{saving ? 'Posting…' : 'Post goods receipt'}</button></div></form> : <div className="empty-state"><PackageCheck size={22}/><strong>Nothing outstanding</strong><span>This purchase order is fully received.</span></div>}</Dialog>;
+  const [quantity, setQuantity] = useState(String(Math.max(1, remaining)));
+  const [serialNumbers, setSerialNumbers] = useState('');
+  const [location, setLocation] = useState(order.destination || '');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!line) return;
+    setSaving(true);
+    setError('');
+    const serials = serialNumbers
+      .split(/[\n,]+/)
+      .map((value) => value.trim())
+      .filter(Boolean);
+    if (serials.length !== Number(quantity)) {
+      setError('Enter exactly one unique serial number for every received unit.');
+      setSaving(false);
+      return;
+    }
+    const response = await fetch(`/api/purchase-orders/${order.id}/receive`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        location,
+        items: [{ purchaseOrderItemId: line.id, quantity: Number(quantity), serialNumbers: serials }],
+      }),
+    });
+    const data = await response.json();
+    setSaving(false);
+    if (!response.ok) {
+      setError(data.error || 'Unable to receive stock.');
+      return;
+    }
+    onSaved();
+  };
+  return (
+    <Dialog title={`Receive ${order.number}`} close={close}>
+      {line ? (
+        <form className="workflow-form" onSubmit={submit}>
+          <p className="workflow-help">
+            {line.sku} · {line.description} · {remaining} units outstanding. Enter one unique serial number per received
+            unit.
+          </p>
+          <Field label="Quantity">
+            <input
+              required
+              type="number"
+              min="1"
+              max={remaining}
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+            />
+          </Field>
+          <Field label="Serial numbers">
+            <textarea
+              required
+              rows={4}
+              value={serialNumbers}
+              onChange={(e) => setSerialNumbers(e.target.value)}
+              placeholder="SN-001, SN-002"
+            />
+          </Field>
+          <Field label="Location">
+            <input
+              required
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder={settings.address || `${settings.organizationName || 'Organization'} receiving location`}
+            />
+          </Field>
+          {error && (
+            <p className="workflow-error" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="workflow-dialog-actions">
+            <button type="button" className="ops-btn ghost" onClick={close}>
+              Cancel
+            </button>
+            <button className="ops-btn blue" disabled={saving}>
+              {saving ? 'Posting…' : 'Post goods receipt'}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="empty-state">
+          <PackageCheck size={22} />
+          <strong>Nothing outstanding</strong>
+          <span>This purchase order is fully received.</span>
+        </div>
+      )}
+    </Dialog>
+  );
 }

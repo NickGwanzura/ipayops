@@ -12,15 +12,18 @@ export function OrganizationSettingsProvider({ children }: { children: ReactNode
   const pathname = usePathname();
   const [settings, setSettings] = useState(DEFAULT_ORGANIZATION_SETTINGS);
   useEffect(() => {
-    const publicRoute = pathname === '/login'
-      || pathname === '/forgot-password'
-      || pathname === '/verify'
-      || pathname.startsWith('/invite/')
-      || pathname.startsWith('/reset-password/');
+    const publicRoute =
+      pathname === '/login' ||
+      pathname === '/forgot-password' ||
+      pathname === '/verify' ||
+      pathname.startsWith('/invite/') ||
+      pathname.startsWith('/reset-password/');
     if (publicRoute) return;
     void fetch('/api/organization-settings', { cache: 'no-store' })
-      .then(async response => response.ok ? response.json() : null)
-      .then(data => { if (data?.settings) setSettings({ ...DEFAULT_ORGANIZATION_SETTINGS, ...data.settings }); })
+      .then(async (response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (data?.settings) setSettings({ ...DEFAULT_ORGANIZATION_SETTINGS, ...data.settings });
+      })
       .catch(() => undefined);
   }, [pathname]);
   return <SettingsContext.Provider value={settings}>{children}</SettingsContext.Provider>;

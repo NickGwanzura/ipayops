@@ -3,7 +3,18 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { Activity, ArrowRight, BadgeCheck, Eye, EyeOff, HelpCircle, KeyRound, LockKeyhole, MapPin, ShieldCheck } from 'lucide-react';
+import {
+  Activity,
+  ArrowRight,
+  BadgeCheck,
+  Eye,
+  EyeOff,
+  HelpCircle,
+  KeyRound,
+  LockKeyhole,
+  MapPin,
+  ShieldCheck,
+} from 'lucide-react';
 import styles from './login.module.css';
 
 type MfaKind = 'enroll' | 'verify';
@@ -34,7 +45,12 @@ export default function LoginPage() {
   const loadChallenge = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/mfa/challenge');
-      const body = await response.json() as { error?: string; kind?: MfaKind; manualKey?: string; qrDataUrl?: string };
+      const body = (await response.json()) as {
+        error?: string;
+        kind?: MfaKind;
+        manualKey?: string;
+        qrDataUrl?: string;
+      };
       if (!response.ok || !body.kind) {
         setMessage(body.error || 'Unable to start MFA verification.');
         setStep('login');
@@ -62,8 +78,12 @@ export default function LoginPage() {
     setMessage('');
     setLoading(true);
     try {
-      const response = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, remember }) });
-      const body = await response.json() as { error?: string; mfaRequired?: boolean; enrollmentRequired?: boolean };
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, remember }),
+      });
+      const body = (await response.json()) as { error?: string; mfaRequired?: boolean; enrollmentRequired?: boolean };
       if (!response.ok) {
         setMessage(body.error || 'Unable to sign in.');
         return;
@@ -97,8 +117,12 @@ export default function LoginPage() {
     setMessage('');
     setLoading(true);
     try {
-      const response = await fetch('/api/auth/mfa/challenge', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: value }) });
-      const body = await response.json() as { error?: string; recoveryCodes?: string[] };
+      const response = await fetch('/api/auth/mfa/challenge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: value }),
+      });
+      const body = (await response.json()) as { error?: string; recoveryCodes?: string[] };
       if (!response.ok) {
         setMessage(body.error || 'Unable to verify MFA.');
         return;
@@ -144,7 +168,14 @@ export default function LoginPage() {
         <div className={styles.visualGrid} aria-hidden="true" />
         <header className={styles.visualHeader}>
           <Link href="/" className={styles.brand} aria-label="iPayTech Ops home">
-            <Image className={styles.brandLogo} src="/iPaytechLogo.jpg" alt="iPayTech" width={180} height={76} priority />
+            <Image
+              className={styles.brandLogo}
+              src="/iPaytechLogo.jpg"
+              alt="iPayTech"
+              width={180}
+              height={76}
+              priority
+            />
           </Link>
         </header>
         <div className={styles.posStage}>
@@ -158,16 +189,28 @@ export default function LoginPage() {
           />
         </div>
         <div className={styles.visualStory}>
-          <span className={styles.kicker}><Activity size={14} /> Operations control centre</span>
-          <h1>Every operation.<br />One clear view.</h1>
+          <span className={styles.kicker}>
+            <Activity size={14} /> Operations control centre
+          </span>
+          <h1>
+            Every operation.
+            <br />
+            One clear view.
+          </h1>
           <p>Serialized stock, sales, field jobs, warranties and finance—connected for the team serving Zimbabwe.</p>
           <div className={styles.trustRow}>
-            <span><BadgeCheck size={15} /> Role-based control</span>
-            <span><ShieldCheck size={15} /> Audit-ready activity</span>
+            <span>
+              <BadgeCheck size={15} /> Role-based control
+            </span>
+            <span>
+              <ShieldCheck size={15} /> Audit-ready activity
+            </span>
           </div>
         </div>
         <footer className={styles.visualFooter}>
-          <span><MapPin size={14} /> Harare, Zimbabwe</span>
+          <span>
+            <MapPin size={14} /> Harare, Zimbabwe
+          </span>
           <span>iPayTech Operations</span>
         </footer>
       </section>
@@ -176,100 +219,209 @@ export default function LoginPage() {
           <div className={styles.formHeader}>
             <div className={styles.mobileBrand}>
               <Link href="/" className={styles.brand} aria-label="iPayTech Ops home">
-                <Image className={styles.brandLogo} src="/iPaytechLogo.jpg" alt="iPayTech" width={180} height={76} priority />
+                <Image
+                  className={styles.brandLogo}
+                  src="/iPaytechLogo.jpg"
+                  alt="iPayTech"
+                  width={180}
+                  height={76}
+                  priority
+                />
               </Link>
             </div>
-            <span className={styles.environmentBadge}><i aria-hidden="true" /> Production workspace</span>
+            <span className={styles.environmentBadge}>
+              <i aria-hidden="true" /> Production workspace
+            </span>
           </div>
 
-          {step === 'login' && <>
-            <div className={styles.formIntro}>
-              <span className={styles.eyebrow}><LockKeyhole size={14} /> Secure team access</span>
-              <h2>Welcome to Ops 2026</h2>
-              <p>Sign in with your iPayTech work account to continue.</p>
-            </div>
-
-            <form className={styles.form} onSubmit={handleSubmit} noValidate>
-              <div className={styles.field}>
-                <label htmlFor="email">Work email</label>
-                <div className={styles.inputShell}>
-                  <KeyRound size={17} aria-hidden="true" />
-                  <input id="email" name="email" type="email" autoComplete="email" placeholder="you@company.com" value={email} onChange={(event) => setEmail(event.target.value)} required />
-                </div>
+          {step === 'login' && (
+            <>
+              <div className={styles.formIntro}>
+                <span className={styles.eyebrow}>
+                  <LockKeyhole size={14} /> Secure team access
+                </span>
+                <h2>Welcome to Ops 2026</h2>
+                <p>Sign in with your iPayTech work account to continue.</p>
               </div>
 
-              <div className={styles.field}>
-                <div className={styles.labelRow}>
-                  <label htmlFor="password">Password</label>
-                  <Link href="/forgot-password" className={styles.forgotLink}>Forgot password?</Link>
+              <form className={styles.form} onSubmit={handleSubmit} noValidate>
+                <div className={styles.field}>
+                  <label htmlFor="email">Work email</label>
+                  <div className={styles.inputShell}>
+                    <KeyRound size={17} aria-hidden="true" />
+                    <input
+                      id="email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      placeholder="you@company.com"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
-                <div className={styles.inputShell}>
-                  <LockKeyhole size={17} aria-hidden="true" />
-                  <input id="password" name="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" placeholder="Enter your password" value={password} onChange={(event) => setPassword(event.target.value)} required />
-                  <button type="button" className={styles.iconButton} onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'}>
-                    {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
-                  </button>
+
+                <div className={styles.field}>
+                  <div className={styles.labelRow}>
+                    <label htmlFor="password">Password</label>
+                    <Link href="/forgot-password" className={styles.forgotLink}>
+                      Forgot password?
+                    </Link>
+                  </div>
+                  <div className={styles.inputShell}>
+                    <LockKeyhole size={17} aria-hidden="true" />
+                    <input
+                      id="password"
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      required
+                    />
+                    <button
+                      type="button"
+                      className={styles.iconButton}
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                    </button>
+                  </div>
                 </div>
+
+                <label className={styles.remember}>
+                  <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
+                  <span className={styles.checkbox} aria-hidden="true" />
+                  <span>Keep me signed in on this device</span>
+                </label>
+
+                {message && (
+                  <p className={styles.formMessage} role="status">
+                    {message}
+                  </p>
+                )}
+
+                <button type="submit" className={styles.submitButton} disabled={loading}>
+                  {loading ? 'Signing in…' : 'Sign in'} {!loading && <ArrowRight size={17} />}
+                </button>
+              </form>
+            </>
+          )}
+
+          {step === 'mfa' && (
+            <div className={styles.mfaPanel} aria-labelledby="mfa-heading">
+              <div className={styles.formIntro}>
+                <span className={styles.eyebrow}>
+                  <ShieldCheck size={14} /> Multi-factor verification
+                </span>
+                <h2 id="mfa-heading">{mfaKind === 'enroll' ? 'Set up your authenticator' : 'Verify your identity'}</h2>
+                <p>
+                  {mfaKind === 'enroll'
+                    ? 'Scan this QR code with an authenticator app, then enter the 6-digit code it generates.'
+                    : 'Enter the 6-digit code from your authenticator app, or use one of your recovery codes.'}
+                </p>
               </div>
 
-              <label className={styles.remember}>
-                <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
-                <span className={styles.checkbox} aria-hidden="true" />
-                <span>Keep me signed in on this device</span>
-              </label>
-
-              {message && <p className={styles.formMessage} role="status">{message}</p>}
-
-              <button type="submit" className={styles.submitButton} disabled={loading}>{loading ? 'Signing in…' : 'Sign in'} {!loading && <ArrowRight size={17} />}</button>
-            </form>
-          </>}
-
-          {step === 'mfa' && <div className={styles.mfaPanel} aria-labelledby="mfa-heading">
-            <div className={styles.formIntro}>
-              <span className={styles.eyebrow}><ShieldCheck size={14} /> Multi-factor verification</span>
-              <h2 id="mfa-heading">{mfaKind === 'enroll' ? 'Set up your authenticator' : 'Verify your identity'}</h2>
-              <p>{mfaKind === 'enroll' ? 'Scan this QR code with an authenticator app, then enter the 6-digit code it generates.' : 'Enter the 6-digit code from your authenticator app, or use one of your recovery codes.'}</p>
-            </div>
-
-            {mfaKind === 'enroll' && <div className={styles.enrollmentCard}>
-              {qrDataUrl && <img className={styles.qrCode} src={qrDataUrl} alt="Authenticator setup QR code" />}
-              <div className={styles.manualKey}><span>Manual setup key</span><code>{manualKey || 'Loading…'}</code></div>
-            </div>}
-
-            <form className={styles.form} onSubmit={handleMfaSubmit} noValidate>
-              <div className={styles.field}>
-                <label htmlFor="mfa-code">{mfaKind === 'enroll' ? 'Authenticator code' : 'Authenticator or recovery code'}</label>
-                <div className={styles.inputShell}>
-                  <ShieldCheck size={17} aria-hidden="true" />
-                  <input id="mfa-code" name="mfa-code" inputMode="numeric" autoComplete="one-time-code" autoFocus value={mfaCode} onChange={(event) => setMfaCode(event.target.value)} placeholder={mfaKind === 'enroll' ? '000000' : '000000 or recovery code'} required />
+              {mfaKind === 'enroll' && (
+                <div className={styles.enrollmentCard}>
+                  {qrDataUrl && <img className={styles.qrCode} src={qrDataUrl} alt="Authenticator setup QR code" />}
+                  <div className={styles.manualKey}>
+                    <span>Manual setup key</span>
+                    <code>{manualKey || 'Loading…'}</code>
+                  </div>
                 </div>
+              )}
+
+              <form className={styles.form} onSubmit={handleMfaSubmit} noValidate>
+                <div className={styles.field}>
+                  <label htmlFor="mfa-code">
+                    {mfaKind === 'enroll' ? 'Authenticator code' : 'Authenticator or recovery code'}
+                  </label>
+                  <div className={styles.inputShell}>
+                    <ShieldCheck size={17} aria-hidden="true" />
+                    <input
+                      id="mfa-code"
+                      name="mfa-code"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      autoFocus
+                      value={mfaCode}
+                      onChange={(event) => setMfaCode(event.target.value)}
+                      placeholder={mfaKind === 'enroll' ? '000000' : '000000 or recovery code'}
+                      required
+                    />
+                  </div>
+                </div>
+                {message && (
+                  <p className={styles.formMessage} role="alert">
+                    {message}
+                  </p>
+                )}
+                <button type="submit" className={styles.submitButton} disabled={loading}>
+                  {loading ? 'Verifying…' : 'Verify and continue'} {!loading && <ArrowRight size={17} />}
+                </button>
+                <button type="button" className={styles.backButton} onClick={backToLogin}>
+                  Back to sign in
+                </button>
+              </form>
+            </div>
+          )}
+
+          {step === 'recovery' && (
+            <div className={styles.mfaPanel} aria-labelledby="recovery-heading">
+              <div className={styles.formIntro}>
+                <span className={styles.eyebrow}>
+                  <ShieldCheck size={14} /> Save these recovery codes
+                </span>
+                <h2 id="recovery-heading">MFA is enabled</h2>
+                <p>
+                  These codes are shown once. Save or print them now; each code can be used once if you lose access to
+                  your authenticator.
+                </p>
               </div>
-              {message && <p className={styles.formMessage} role="alert">{message}</p>}
-              <button type="submit" className={styles.submitButton} disabled={loading}>{loading ? 'Verifying…' : 'Verify and continue'} {!loading && <ArrowRight size={17} />}</button>
-              <button type="button" className={styles.backButton} onClick={backToLogin}>Back to sign in</button>
-            </form>
-          </div>}
+              <div className={styles.recoveryCodes} aria-label="Recovery codes">
+                {recoveryCodes.map((code) => (
+                  <code key={code}>{code}</code>
+                ))}
+              </div>
+              {message && (
+                <p className={styles.formMessage} role="status">
+                  {message}
+                </p>
+              )}
+              <div className={styles.recoveryActions}>
+                <button type="button" className={styles.secondaryButton} onClick={copyRecoveryCodes}>
+                  {copied ? 'Copied' : 'Copy codes'}
+                </button>
+                <button type="button" className={styles.submitButton} onClick={finishLogin}>
+                  Continue to workspace <ArrowRight size={17} />
+                </button>
+              </div>
+              <p className={styles.warning}>Do not share these codes. iPayTech Operations cannot display them again.</p>
+            </div>
+          )}
 
-          {step === 'recovery' && <div className={styles.mfaPanel} aria-labelledby="recovery-heading">
-            <div className={styles.formIntro}>
-              <span className={styles.eyebrow}><ShieldCheck size={14} /> Save these recovery codes</span>
-              <h2 id="recovery-heading">MFA is enabled</h2>
-              <p>These codes are shown once. Save or print them now; each code can be used once if you lose access to your authenticator.</p>
-            </div>
-            <div className={styles.recoveryCodes} aria-label="Recovery codes">
-              {recoveryCodes.map((code) => <code key={code}>{code}</code>)}
-            </div>
-            {message && <p className={styles.formMessage} role="status">{message}</p>}
-            <div className={styles.recoveryActions}>
-              <button type="button" className={styles.secondaryButton} onClick={copyRecoveryCodes}>{copied ? 'Copied' : 'Copy codes'}</button>
-              <button type="button" className={styles.submitButton} onClick={finishLogin}>Continue to workspace <ArrowRight size={17} /></button>
-            </div>
-            <p className={styles.warning}>Do not share these codes. iPayTech Operations cannot display them again.</p>
-          </div>}
-
-          <div className={styles.securityNote}><ShieldCheck size={16} /><span>Your access is protected with encrypted credentials and workspace-level permissions.</span></div>
-          <p className={styles.support}>Need help accessing your workspace? <button type="button" onClick={() => setMessage('Contact your workspace administrator for access support.')}>Contact your administrator</button> <HelpCircle size={14} /></p>
-          <div className={styles.buildMark}><span>iPayTech Operations</span><strong>Interface 2026.08</strong></div>
+          <div className={styles.securityNote}>
+            <ShieldCheck size={16} />
+            <span>Your access is protected with encrypted credentials and workspace-level permissions.</span>
+          </div>
+          <p className={styles.support}>
+            Need help accessing your workspace?{' '}
+            <button
+              type="button"
+              onClick={() => setMessage('Contact your workspace administrator for access support.')}
+            >
+              Contact your administrator
+            </button>{' '}
+            <HelpCircle size={14} />
+          </p>
+          <div className={styles.buildMark}>
+            <span>iPayTech Operations</span>
+            <strong>Interface 2026.08</strong>
+          </div>
         </div>
       </section>
     </main>

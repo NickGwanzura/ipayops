@@ -1,71 +1,1257 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { Check, ClipboardCheck, FileDown, PackageCheck, Plus, Search, ShieldCheck, Trash2, Wrench, X } from 'lucide-react';
+import {
+  Check,
+  ClipboardCheck,
+  FileDown,
+  PackageCheck,
+  Plus,
+  Search,
+  ShieldCheck,
+  Trash2,
+  Wrench,
+  X,
+} from 'lucide-react';
 import { formatCurrency, formatOrganizationDate, useOrganizationSettings } from '../organization-settings';
 import { normalizeRole } from '@/lib/rbac';
 import { useDialogFocus } from '../dialog-focus';
 import { ActionMenu, ActionMenuItem } from './action-menu';
 
-type Job = { id: string; number: string; title: string; status: string; scheduled_for?: string; notes?: string; client_id?: string; client_name: string; installer_name?: string; signoff_name?: string; items: Array<{ id: string; serialNumber: string; checklist?: Array<{ label: string; done: boolean }> }> };
+type Job = {
+  id: string;
+  number: string;
+  title: string;
+  status: string;
+  scheduled_for?: string;
+  notes?: string;
+  client_id?: string;
+  client_name: string;
+  installer_name?: string;
+  signoff_name?: string;
+  items: Array<{ id: string; serialNumber: string; checklist?: Array<{ label: string; done: boolean }> }>;
+};
 type Client = { id: string; name: string };
 type User = { id: string; full_name: string; email: string; role: string };
 type Inventory = { id: string; serial_number: string; sku: string; description: string; status: string };
-type Claim = { id: string; number: string; status: string; issue: string; resolution?: string; serial_number: string; description: string; client_name?: string; requisitions: Array<{ id: string; number: string; status: string; description: string }> };
+type Claim = {
+  id: string;
+  number: string;
+  status: string;
+  issue: string;
+  resolution?: string;
+  serial_number: string;
+  description: string;
+  client_name?: string;
+  requisitions: Array<{ id: string; number: string; status: string; description: string }>;
+};
 
-export function JobsWorkspace({ notify, newRecordSignal = 0, role = 'manager' }: { notify: (message: string) => void; newRecordSignal?: number; role?: string }) {
-  const [jobs, setJobs] = useState<Job[]>([]); const [clients, setClients] = useState<Client[]>([]); const [inventory, setInventory] = useState<Inventory[]>([]); const [installers, setInstallers] = useState<User[]>([]); const [dialog, setDialog] = useState<'job' | 'jobEdit' | 'signoff' | 'checklist' | null>(null); const [selected, setSelected] = useState<Job | null>(null); const [attachmentEntity, setAttachmentEntity] = useState<{ type: 'job'; id: string } | null>(null); const [error, setError] = useState(''); const [page, setPage] = useState(1); const [pagination, setPagination] = useState({ page: 1, pageSize: 50, total: 0, hasMore: false });
+export function JobsWorkspace({
+  notify,
+  newRecordSignal = 0,
+  role = 'manager',
+}: {
+  notify: (message: string) => void;
+  newRecordSignal?: number;
+  role?: string;
+}) {
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [inventory, setInventory] = useState<Inventory[]>([]);
+  const [installers, setInstallers] = useState<User[]>([]);
+  const [dialog, setDialog] = useState<'job' | 'jobEdit' | 'signoff' | 'checklist' | null>(null);
+  const [selected, setSelected] = useState<Job | null>(null);
+  const [attachmentEntity, setAttachmentEntity] = useState<{ type: 'job'; id: string } | null>(null);
+  const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, pageSize: 50, total: 0, hasMore: false });
   const settings = useOrganizationSettings();
   const canManageJobs = ['ceo', 'manager'].includes(normalizeRole(role));
-  const load = async () => { const responses = await Promise.all([fetch(`/api/jobs?page=${page}&pageSize=${pagination.pageSize}`, { cache: 'no-store' }), fetch('/api/crm/clients', { cache: 'no-store' }), fetch('/api/inventory?page=1&pageSize=100', { cache: 'no-store' })]); if (responses.some(response => !response.ok)) { setError('Live jobs data is unavailable.'); return; } const data = await Promise.all(responses.map(response => response.json())); setJobs(data[0].jobs || []); setPagination(data[0].pagination || pagination); setClients(data[1].clients || []); setInventory(data[2].inventory || []); if (canManageJobs) { const usersResponse = await fetch('/api/users', { cache: 'no-store' }); if (usersResponse.ok) { const usersData = await usersResponse.json(); setInstallers((usersData.users || []).filter((user: User) => ['sales_consultant', 'manager', 'ceo'].includes(user.role))); } } };
-  useEffect(() => { void load(); }, [page]);
-  useEffect(() => { if (newRecordSignal > 0) setDialog('job'); }, [newRecordSignal]);
-  const archiveJob = async (job: Job) => { if (!window.confirm(`Cancel ${job.number}?`)) return; const response = await fetch(`/api/jobs/${job.id}`, { method: 'DELETE' }); const data = await response.json(); if (!response.ok) { notify(data.error || 'Unable to cancel job card.'); return; } notify(`${job.number} cancelled`); void load(); };
-  return <><div className="ops-kpis"><LiveKpi label="Live job cards" value={jobs.length} note="Database-backed schedule" icon={<ClipboardCheck size={16}/>} tone="blue"/><LiveKpi label="In progress" value={jobs.filter(job => job.status === 'In progress').length} note="Installer ownership" icon={<Wrench size={16}/>} tone="amber"/><LiveKpi label="Completed" value={jobs.filter(job => job.status === 'Completed').length} note="Signed-off installations" icon={<Check size={16}/>} tone="green"/><LiveKpi label="Installed devices" value={inventory.filter(item => item.status === 'Installed').length} note="Linked serialized assets" icon={<PackageCheck size={16}/>} tone="purple"/></div><div className="workflow-actions">{canManageJobs && <button className="ops-btn blue" onClick={() => setDialog('job')} disabled={!clients.length}><Plus size={15}/> New job card</button>}<button className="link-btn" onClick={() => void load()}>Refresh</button></div>{error && <p className="workflow-error">{error}</p>}<Panel title="Live job card queue" subtitle={canManageJobs ? 'Assignments, schedules, serials, and sign-off are persisted' : 'Sales-linked job cards visible for your assignments'}><div className="data-table labelled-cards"><TableHead labels={['Job card','Client / title','Installer','Schedule','Status','Actions']}/>{jobs.map(job => <div className="data-row" key={job.id}><div data-label="Job card"><strong>{job.number}</strong><small>{job.title} · {job.items.length} serial(s)</small></div><span data-label="Client">{job.client_name}</span><span data-label="Installer">{job.installer_name || 'Unassigned'}</span><span data-label="Schedule">{job.scheduled_for ? formatOrganizationDate(job.scheduled_for, settings) : 'Unscheduled'}</span><Status value={job.status}/><div className="transfer-card-actions" data-label="Actions"><a className="row-action" href={`/api/jobs/${job.id}/pdf`} target="_blank" rel="noreferrer"><FileDown size={14}/> PDF</a>{canManageJobs ? <ActionMenu label={`More actions for ${job.number}`}><ActionMenuItem onClick={() => { setSelected(job); setDialog('jobEdit'); }}>Edit</ActionMenuItem><ActionMenuItem onClick={() => { setSelected(job); setDialog('checklist'); }}><ClipboardCheck size={14}/> Checklist</ActionMenuItem><ActionMenuItem onClick={() => { setSelected(job); setDialog('signoff'); }} disabled={job.status === 'Completed'}><Check size={14}/> Sign off</ActionMenuItem><ActionMenuItem onClick={() => setAttachmentEntity({ type: 'job', id: job.id })}>Attach</ActionMenuItem>{job.status !== 'Completed' && <ActionMenuItem onClick={() => void archiveJob(job)}>Cancel</ActionMenuItem>}</ActionMenu> : <span className="workflow-help">Read-only assignment</span>}</div></div>)}{!jobs.length && <div className="empty-state"><ClipboardCheck size={22}/><strong>No live job cards</strong><span>Assigned job cards will appear here.</span></div>}</div></Panel><Pagination page={page} pagination={pagination} setPage={setPage}/>{canManageJobs && dialog === 'job' && <JobDialog clients={clients} inventory={inventory} close={() => setDialog(null)} saved={() => { setDialog(null); notify('Job card created'); void load(); }}/>} {canManageJobs && dialog === 'jobEdit' && selected && <JobEditDialog job={selected} installers={installers} close={() => setDialog(null)} saved={() => { setDialog(null); notify('Job card updated'); void load(); }}/>} {canManageJobs && dialog === 'signoff' && selected && <SignoffDialog job={selected} close={() => setDialog(null)} saved={() => { setDialog(null); notify('Client sign-off captured'); void load(); }}/>} {canManageJobs && dialog === 'checklist' && selected && <ChecklistDialog job={selected} close={() => setDialog(null)} saved={() => { setDialog(null); notify('Configuration checklist updated'); void load(); }}/>} {attachmentEntity && <AttachmentDialog entityType="job" entityId={attachmentEntity.id} close={() => setAttachmentEntity(null)} saved={() => { setAttachmentEntity(null); notify('Job attachment uploaded'); }}/>}</>;
+  const load = async () => {
+    const responses = await Promise.all([
+      fetch(`/api/jobs?page=${page}&pageSize=${pagination.pageSize}`, { cache: 'no-store' }),
+      fetch('/api/crm/clients', { cache: 'no-store' }),
+      fetch('/api/inventory?page=1&pageSize=100', { cache: 'no-store' }),
+    ]);
+    if (responses.some((response) => !response.ok)) {
+      setError('Live jobs data is unavailable.');
+      return;
+    }
+    const data = await Promise.all(responses.map((response) => response.json()));
+    setJobs(data[0].jobs || []);
+    setPagination(data[0].pagination || pagination);
+    setClients(data[1].clients || []);
+    setInventory(data[2].inventory || []);
+    if (canManageJobs) {
+      const usersResponse = await fetch('/api/users', { cache: 'no-store' });
+      if (usersResponse.ok) {
+        const usersData = await usersResponse.json();
+        setInstallers(
+          (usersData.users || []).filter((user: User) => ['sales_consultant', 'manager', 'ceo'].includes(user.role)),
+        );
+      }
+    }
+  };
+  useEffect(() => {
+    void load();
+  }, [page]);
+  useEffect(() => {
+    if (newRecordSignal > 0) setDialog('job');
+  }, [newRecordSignal]);
+  const archiveJob = async (job: Job) => {
+    if (!window.confirm(`Cancel ${job.number}?`)) return;
+    const response = await fetch(`/api/jobs/${job.id}`, { method: 'DELETE' });
+    const data = await response.json();
+    if (!response.ok) {
+      notify(data.error || 'Unable to cancel job card.');
+      return;
+    }
+    notify(`${job.number} cancelled`);
+    void load();
+  };
+  return (
+    <>
+      <div className="ops-kpis">
+        <LiveKpi
+          label="Live job cards"
+          value={jobs.length}
+          note="Database-backed schedule"
+          icon={<ClipboardCheck size={16} />}
+          tone="blue"
+        />
+        <LiveKpi
+          label="In progress"
+          value={jobs.filter((job) => job.status === 'In progress').length}
+          note="Installer ownership"
+          icon={<Wrench size={16} />}
+          tone="amber"
+        />
+        <LiveKpi
+          label="Completed"
+          value={jobs.filter((job) => job.status === 'Completed').length}
+          note="Signed-off installations"
+          icon={<Check size={16} />}
+          tone="green"
+        />
+        <LiveKpi
+          label="Installed devices"
+          value={inventory.filter((item) => item.status === 'Installed').length}
+          note="Linked serialized assets"
+          icon={<PackageCheck size={16} />}
+          tone="purple"
+        />
+      </div>
+      <div className="workflow-actions">
+        {canManageJobs && (
+          <button className="ops-btn blue" onClick={() => setDialog('job')} disabled={!clients.length}>
+            <Plus size={15} /> New job card
+          </button>
+        )}
+        <button className="link-btn" onClick={() => void load()}>
+          Refresh
+        </button>
+      </div>
+      {error && <p className="workflow-error">{error}</p>}
+      <Panel
+        title="Live job card queue"
+        subtitle={
+          canManageJobs
+            ? 'Assignments, schedules, serials, and sign-off are persisted'
+            : 'Sales-linked job cards visible for your assignments'
+        }
+      >
+        <div className="data-table labelled-cards">
+          <TableHead labels={['Job card', 'Client / title', 'Installer', 'Schedule', 'Status', 'Actions']} />
+          {jobs.map((job) => (
+            <div className="data-row" key={job.id}>
+              <div data-label="Job card">
+                <strong>{job.number}</strong>
+                <small>
+                  {job.title} · {job.items.length} serial(s)
+                </small>
+              </div>
+              <span data-label="Client">{job.client_name}</span>
+              <span data-label="Installer">{job.installer_name || 'Unassigned'}</span>
+              <span data-label="Schedule">
+                {job.scheduled_for ? formatOrganizationDate(job.scheduled_for, settings) : 'Unscheduled'}
+              </span>
+              <Status value={job.status} />
+              <div className="transfer-card-actions" data-label="Actions">
+                <a className="row-action" href={`/api/jobs/${job.id}/pdf`} target="_blank" rel="noreferrer">
+                  <FileDown size={14} /> PDF
+                </a>
+                {canManageJobs ? (
+                  <ActionMenu label={`More actions for ${job.number}`}>
+                    <ActionMenuItem
+                      onClick={() => {
+                        setSelected(job);
+                        setDialog('jobEdit');
+                      }}
+                    >
+                      Edit
+                    </ActionMenuItem>
+                    <ActionMenuItem
+                      onClick={() => {
+                        setSelected(job);
+                        setDialog('checklist');
+                      }}
+                    >
+                      <ClipboardCheck size={14} /> Checklist
+                    </ActionMenuItem>
+                    <ActionMenuItem
+                      onClick={() => {
+                        setSelected(job);
+                        setDialog('signoff');
+                      }}
+                      disabled={job.status === 'Completed'}
+                    >
+                      <Check size={14} /> Sign off
+                    </ActionMenuItem>
+                    <ActionMenuItem onClick={() => setAttachmentEntity({ type: 'job', id: job.id })}>
+                      Attach
+                    </ActionMenuItem>
+                    {job.status !== 'Completed' && (
+                      <ActionMenuItem onClick={() => void archiveJob(job)}>Cancel</ActionMenuItem>
+                    )}
+                  </ActionMenu>
+                ) : (
+                  <span className="workflow-help">Read-only assignment</span>
+                )}
+              </div>
+            </div>
+          ))}
+          {!jobs.length && (
+            <div className="empty-state">
+              <ClipboardCheck size={22} />
+              <strong>No live job cards</strong>
+              <span>Assigned job cards will appear here.</span>
+            </div>
+          )}
+        </div>
+      </Panel>
+      <Pagination page={page} pagination={pagination} setPage={setPage} />
+      {canManageJobs && dialog === 'job' && (
+        <JobDialog
+          clients={clients}
+          inventory={inventory}
+          close={() => setDialog(null)}
+          saved={() => {
+            setDialog(null);
+            notify('Job card created');
+            void load();
+          }}
+        />
+      )}{' '}
+      {canManageJobs && dialog === 'jobEdit' && selected && (
+        <JobEditDialog
+          job={selected}
+          installers={installers}
+          close={() => setDialog(null)}
+          saved={() => {
+            setDialog(null);
+            notify('Job card updated');
+            void load();
+          }}
+        />
+      )}{' '}
+      {canManageJobs && dialog === 'signoff' && selected && (
+        <SignoffDialog
+          job={selected}
+          close={() => setDialog(null)}
+          saved={() => {
+            setDialog(null);
+            notify('Client sign-off captured');
+            void load();
+          }}
+        />
+      )}{' '}
+      {canManageJobs && dialog === 'checklist' && selected && (
+        <ChecklistDialog
+          job={selected}
+          close={() => setDialog(null)}
+          saved={() => {
+            setDialog(null);
+            notify('Configuration checklist updated');
+            void load();
+          }}
+        />
+      )}{' '}
+      {attachmentEntity && (
+        <AttachmentDialog
+          entityType="job"
+          entityId={attachmentEntity.id}
+          close={() => setAttachmentEntity(null)}
+          saved={() => {
+            setAttachmentEntity(null);
+            notify('Job attachment uploaded');
+          }}
+        />
+      )}
+    </>
+  );
 }
 
-export function WarrantyWorkspace({ notify, newRecordSignal = 0 }: { notify: (message: string) => void; newRecordSignal?: number }) {
-  const [claims, setClaims] = useState<Claim[]>([]); const [serial, setSerial] = useState(''); const [check, setCheck] = useState<any>(null); const [inventory, setInventory] = useState<Inventory[]>([]); const [dialog, setDialog] = useState<'claim' | 'claimDetail' | 'repair' | 'replace' | 'resolve' | null>(null); const [selected, setSelected] = useState<Claim | null>(null); const [attachmentEntity, setAttachmentEntity] = useState<{ type: 'claim'; id: string } | null>(null); const [error, setError] = useState(''); const [page, setPage] = useState(1); const [pagination, setPagination] = useState({ page: 1, pageSize: 50, total: 0, hasMore: false });
-  const load = async () => { const [claimsResponse, inventoryResponse] = await Promise.all([fetch(`/api/warranty/claims?page=${page}&pageSize=${pagination.pageSize}`, { cache: 'no-store' }), fetch('/api/inventory?page=1&pageSize=100', { cache: 'no-store' })]); if (!claimsResponse.ok || !inventoryResponse.ok) { setError('Live warranty data is unavailable.'); return; } const claimData = await claimsResponse.json(); const inventoryData = await inventoryResponse.json(); setClaims(claimData.claims || []); setPagination(claimData.pagination || pagination); setInventory(inventoryData.inventory || []); };
-  useEffect(() => { void load(); }, [page]);
-  useEffect(() => { if (newRecordSignal > 0) setDialog('claim'); }, [newRecordSignal]);
-  const checkWarranty = async () => { setError(''); const response = await fetch(`/api/warranty/check?serial=${encodeURIComponent(serial)}`); const data = await response.json(); if (!response.ok) { setCheck(null); setError(data.error || 'Serial not found.'); return; } setCheck(data.warranty); };
-  return <><div className="ops-kpis"><LiveKpi label="Live claims" value={claims.length} note="Warranty service queue" icon={<ShieldCheck size={16}/>} tone="blue"/><LiveKpi label="Open / assessment" value={claims.filter(claim => ['Open', 'Under assessment'].includes(claim.status)).length} note="Needs service action" icon={<Search size={16}/>} tone="amber"/><LiveKpi label="Repair requisitions" value={claims.reduce((sum, claim) => sum + claim.requisitions.length, 0)} note="Linked repair requests" icon={<Wrench size={16}/>} tone="purple"/><LiveKpi label="Resolved" value={claims.filter(claim => claim.status === 'Resolved').length} note="Closed service records" icon={<Check size={16}/>} tone="green"/></div><div className="trace-search warranty-check"><div><span className="ops-kicker">Warranty checker</span><h2>Verify live coverage by serial</h2><p>Checks the current warranty contract and claim history.</p></div><div className="serial-field"><Search size={15}/><input value={serial} onChange={e => setSerial(e.target.value)} placeholder="Enter serial"/><button onClick={() => void checkWarranty()}>Check coverage</button></div></div>{check && <div className="coverage-card"><span className="device-icon green-bg"><ShieldCheck size={18}/></span><div className="coverage-copy"><strong>{check.serial_number} · {check.description}</strong><span>{check.client_name || 'No client assigned'} · {check.warranty_status}</span></div><Status value={check.warranty_status}/><div className="coverage-dates"><span>Started <b>{check.starts_at || '—'}</b></span><span>Expires <b>{check.expires_at || '—'}</b></span></div></div>}{error && <p className="workflow-error">{error}</p>}<Panel title="Live warranty claims" subtitle="Claims, repairs, resolutions, and serialized replacements"><div className="data-table labelled-cards"><TableHead labels={['Claim / device','Client','Issue','Status','Actions']}/>{claims.map(claim => <div className="data-row" key={claim.id}><div data-label="Claim / device"><strong>{claim.number}</strong><small>{claim.serial_number} · {claim.description}</small></div><span data-label="Client">{claim.client_name || '—'}</span><span data-label="Issue">{claim.issue}</span><Status value={claim.status}/><div className="transfer-card-actions" data-label="Actions"><button className="row-action" onClick={() => { setSelected(claim); setDialog('claimDetail'); }}>History</button><ActionMenu label={`More actions for ${claim.number}`}><ActionMenuItem onClick={() => { setSelected(claim); setDialog('repair'); }}><Wrench size={14}/> Repair</ActionMenuItem><ActionMenuItem onClick={() => { setSelected(claim); setDialog('replace'); }}><PackageCheck size={14}/> Replace</ActionMenuItem><ActionMenuItem onClick={() => { setSelected(claim); setDialog('resolve'); }}><Check size={14}/> Resolve</ActionMenuItem><ActionMenuItem onClick={() => setAttachmentEntity({ type: 'claim', id: claim.id })}>Attach evidence</ActionMenuItem></ActionMenu></div></div>)}{!claims.length && <div className="empty-state"><ShieldCheck size={22}/><strong>No live warranty claims</strong><span>Check a serial, then create a claim when service is required.</span></div>}</div></Panel><Pagination page={page} pagination={pagination} setPage={setPage}/><div className="workflow-actions"><button className="ops-btn blue" onClick={() => setDialog('claim')}><Plus size={15}/> New warranty claim</button><button className="link-btn" onClick={() => void load()}>Refresh</button></div>{dialog === 'claim' && <ClaimDialog inventory={inventory} close={() => setDialog(null)} saved={() => { setDialog(null); notify('Warranty claim created'); void load(); }}/>} {dialog === 'claimDetail' && selected && <ClaimDetailDialog claim={selected} close={() => setDialog(null)}/>} {dialog === 'repair' && selected && <RepairDialog claim={selected} close={() => setDialog(null)} saved={() => { setDialog(null); notify('Repair requisition created'); void load(); }}/>} {dialog === 'replace' && selected && <ReplacementDialog claim={selected} inventory={inventory} close={() => setDialog(null)} saved={() => { setDialog(null); notify('Warranty replacement completed'); void load(); }}/>} {dialog === 'resolve' && selected && <ResolveDialog claim={selected} close={() => setDialog(null)} saved={() => { setDialog(null); notify('Warranty claim resolved'); void load(); }}/>} {attachmentEntity && <AttachmentDialog entityType="claim" entityId={attachmentEntity.id} close={() => setAttachmentEntity(null)} saved={() => { setAttachmentEntity(null); notify('Claim attachment uploaded'); }}/>}</>;
+export function WarrantyWorkspace({
+  notify,
+  newRecordSignal = 0,
+}: {
+  notify: (message: string) => void;
+  newRecordSignal?: number;
+}) {
+  const [claims, setClaims] = useState<Claim[]>([]);
+  const [serial, setSerial] = useState('');
+  const [check, setCheck] = useState<any>(null);
+  const [inventory, setInventory] = useState<Inventory[]>([]);
+  const [dialog, setDialog] = useState<'claim' | 'claimDetail' | 'repair' | 'replace' | 'resolve' | null>(null);
+  const [selected, setSelected] = useState<Claim | null>(null);
+  const [attachmentEntity, setAttachmentEntity] = useState<{ type: 'claim'; id: string } | null>(null);
+  const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, pageSize: 50, total: 0, hasMore: false });
+  const load = async () => {
+    const [claimsResponse, inventoryResponse] = await Promise.all([
+      fetch(`/api/warranty/claims?page=${page}&pageSize=${pagination.pageSize}`, { cache: 'no-store' }),
+      fetch('/api/inventory?page=1&pageSize=100', { cache: 'no-store' }),
+    ]);
+    if (!claimsResponse.ok || !inventoryResponse.ok) {
+      setError('Live warranty data is unavailable.');
+      return;
+    }
+    const claimData = await claimsResponse.json();
+    const inventoryData = await inventoryResponse.json();
+    setClaims(claimData.claims || []);
+    setPagination(claimData.pagination || pagination);
+    setInventory(inventoryData.inventory || []);
+  };
+  useEffect(() => {
+    void load();
+  }, [page]);
+  useEffect(() => {
+    if (newRecordSignal > 0) setDialog('claim');
+  }, [newRecordSignal]);
+  const checkWarranty = async () => {
+    setError('');
+    const response = await fetch(`/api/warranty/check?serial=${encodeURIComponent(serial)}`);
+    const data = await response.json();
+    if (!response.ok) {
+      setCheck(null);
+      setError(data.error || 'Serial not found.');
+      return;
+    }
+    setCheck(data.warranty);
+  };
+  return (
+    <>
+      <div className="ops-kpis">
+        <LiveKpi
+          label="Live claims"
+          value={claims.length}
+          note="Warranty service queue"
+          icon={<ShieldCheck size={16} />}
+          tone="blue"
+        />
+        <LiveKpi
+          label="Open / assessment"
+          value={claims.filter((claim) => ['Open', 'Under assessment'].includes(claim.status)).length}
+          note="Needs service action"
+          icon={<Search size={16} />}
+          tone="amber"
+        />
+        <LiveKpi
+          label="Repair requisitions"
+          value={claims.reduce((sum, claim) => sum + claim.requisitions.length, 0)}
+          note="Linked repair requests"
+          icon={<Wrench size={16} />}
+          tone="purple"
+        />
+        <LiveKpi
+          label="Resolved"
+          value={claims.filter((claim) => claim.status === 'Resolved').length}
+          note="Closed service records"
+          icon={<Check size={16} />}
+          tone="green"
+        />
+      </div>
+      <div className="trace-search warranty-check">
+        <div>
+          <span className="ops-kicker">Warranty checker</span>
+          <h2>Verify live coverage by serial</h2>
+          <p>Checks the current warranty contract and claim history.</p>
+        </div>
+        <div className="serial-field">
+          <Search size={15} />
+          <input value={serial} onChange={(e) => setSerial(e.target.value)} placeholder="Enter serial" />
+          <button onClick={() => void checkWarranty()}>Check coverage</button>
+        </div>
+      </div>
+      {check && (
+        <div className="coverage-card">
+          <span className="device-icon green-bg">
+            <ShieldCheck size={18} />
+          </span>
+          <div className="coverage-copy">
+            <strong>
+              {check.serial_number} · {check.description}
+            </strong>
+            <span>
+              {check.client_name || 'No client assigned'} · {check.warranty_status}
+            </span>
+          </div>
+          <Status value={check.warranty_status} />
+          <div className="coverage-dates">
+            <span>
+              Started <b>{check.starts_at || '—'}</b>
+            </span>
+            <span>
+              Expires <b>{check.expires_at || '—'}</b>
+            </span>
+          </div>
+        </div>
+      )}
+      {error && <p className="workflow-error">{error}</p>}
+      <Panel title="Live warranty claims" subtitle="Claims, repairs, resolutions, and serialized replacements">
+        <div className="data-table labelled-cards">
+          <TableHead labels={['Claim / device', 'Client', 'Issue', 'Status', 'Actions']} />
+          {claims.map((claim) => (
+            <div className="data-row" key={claim.id}>
+              <div data-label="Claim / device">
+                <strong>{claim.number}</strong>
+                <small>
+                  {claim.serial_number} · {claim.description}
+                </small>
+              </div>
+              <span data-label="Client">{claim.client_name || '—'}</span>
+              <span data-label="Issue">{claim.issue}</span>
+              <Status value={claim.status} />
+              <div className="transfer-card-actions" data-label="Actions">
+                <button
+                  className="row-action"
+                  onClick={() => {
+                    setSelected(claim);
+                    setDialog('claimDetail');
+                  }}
+                >
+                  History
+                </button>
+                <ActionMenu label={`More actions for ${claim.number}`}>
+                  <ActionMenuItem
+                    onClick={() => {
+                      setSelected(claim);
+                      setDialog('repair');
+                    }}
+                  >
+                    <Wrench size={14} /> Repair
+                  </ActionMenuItem>
+                  <ActionMenuItem
+                    onClick={() => {
+                      setSelected(claim);
+                      setDialog('replace');
+                    }}
+                  >
+                    <PackageCheck size={14} /> Replace
+                  </ActionMenuItem>
+                  <ActionMenuItem
+                    onClick={() => {
+                      setSelected(claim);
+                      setDialog('resolve');
+                    }}
+                  >
+                    <Check size={14} /> Resolve
+                  </ActionMenuItem>
+                  <ActionMenuItem onClick={() => setAttachmentEntity({ type: 'claim', id: claim.id })}>
+                    Attach evidence
+                  </ActionMenuItem>
+                </ActionMenu>
+              </div>
+            </div>
+          ))}
+          {!claims.length && (
+            <div className="empty-state">
+              <ShieldCheck size={22} />
+              <strong>No live warranty claims</strong>
+              <span>Check a serial, then create a claim when service is required.</span>
+            </div>
+          )}
+        </div>
+      </Panel>
+      <Pagination page={page} pagination={pagination} setPage={setPage} />
+      <div className="workflow-actions">
+        <button className="ops-btn blue" onClick={() => setDialog('claim')}>
+          <Plus size={15} /> New warranty claim
+        </button>
+        <button className="link-btn" onClick={() => void load()}>
+          Refresh
+        </button>
+      </div>
+      {dialog === 'claim' && (
+        <ClaimDialog
+          inventory={inventory}
+          close={() => setDialog(null)}
+          saved={() => {
+            setDialog(null);
+            notify('Warranty claim created');
+            void load();
+          }}
+        />
+      )}{' '}
+      {dialog === 'claimDetail' && selected && <ClaimDetailDialog claim={selected} close={() => setDialog(null)} />}{' '}
+      {dialog === 'repair' && selected && (
+        <RepairDialog
+          claim={selected}
+          close={() => setDialog(null)}
+          saved={() => {
+            setDialog(null);
+            notify('Repair requisition created');
+            void load();
+          }}
+        />
+      )}{' '}
+      {dialog === 'replace' && selected && (
+        <ReplacementDialog
+          claim={selected}
+          inventory={inventory}
+          close={() => setDialog(null)}
+          saved={() => {
+            setDialog(null);
+            notify('Warranty replacement completed');
+            void load();
+          }}
+        />
+      )}{' '}
+      {dialog === 'resolve' && selected && (
+        <ResolveDialog
+          claim={selected}
+          close={() => setDialog(null)}
+          saved={() => {
+            setDialog(null);
+            notify('Warranty claim resolved');
+            void load();
+          }}
+        />
+      )}{' '}
+      {attachmentEntity && (
+        <AttachmentDialog
+          entityType="claim"
+          entityId={attachmentEntity.id}
+          close={() => setAttachmentEntity(null)}
+          saved={() => {
+            setAttachmentEntity(null);
+            notify('Claim attachment uploaded');
+          }}
+        />
+      )}
+    </>
+  );
 }
 
-function Dialog({ title, children, close }: { title: string; children: React.ReactNode; close: () => void }) { const dialogRef = useDialogFocus<HTMLDivElement>(close); return <div className="workflow-dialog-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) close(); }}><div ref={dialogRef} className="workflow-dialog" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}><div className="workflow-dialog-head"><h3>{title}</h3><button onClick={close} aria-label="Close"><X size={16}/></button></div>{children}</div></div>; }
-function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="workflow-field"><span>{label}</span>{children}</label>; }
-function Actions({ close, label = 'Save' }: { close: () => void; label?: string }) { return <div className="workflow-dialog-actions"><button type="button" className="ops-btn ghost" onClick={close}>Cancel</button><button className="ops-btn blue">{label}</button></div>; }
-function Panel({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) { return <section className="ops-panel"><div className="ops-panel-head"><div><h2>{title}</h2><p>{subtitle}</p></div></div>{children}</section>; }
-function TableHead({ labels }: { labels: string[] }) { return <div className="table-head ops-table-head">{labels.map(label => <span key={label}>{label}</span>)}</div>; }
-function Status({ value }: { value: string }) { const key = value.toLowerCase().replaceAll(' ', '-'); return <span className={`status ${key}`}>{value}</span>; }
-function LiveKpi({ label, value, note, icon, tone }: { label: string; value: number; note: string; icon: React.ReactNode; tone: string }) { return <div className="ops-kpi"><span className={`kpi-icon ${tone}`}>{icon}</span><strong>{value}</strong><span>{label}</span><small>{note}</small></div>; }
-function Pagination({ page, pagination, setPage }: { page: number; pagination: { pageSize: number; total: number; hasMore: boolean }; setPage: React.Dispatch<React.SetStateAction<number>> }) { const start = pagination.total ? ((page - 1) * pagination.pageSize) + 1 : 0; return <div className="ops-pagination" aria-label="List pagination"><span>Showing {start}–{Math.min(page * pagination.pageSize, pagination.total)} of {pagination.total}</span><div><button type="button" className="link-btn" disabled={page <= 1} onClick={() => setPage(current => Math.max(1, current - 1))}>Previous</button><button type="button" className="link-btn" disabled={!pagination.hasMore} onClick={() => setPage(current => current + 1)}>Next</button></div></div>; }
+function Dialog({ title, children, close }: { title: string; children: React.ReactNode; close: () => void }) {
+  const dialogRef = useDialogFocus<HTMLDivElement>(close);
+  return (
+    <div
+      className="workflow-dialog-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) close();
+      }}
+    >
+      <div ref={dialogRef} className="workflow-dialog" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}>
+        <div className="workflow-dialog-head">
+          <h3>{title}</h3>
+          <button onClick={close} aria-label="Close">
+            <X size={16} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="workflow-field">
+      <span>{label}</span>
+      {children}
+    </label>
+  );
+}
+function Actions({ close, label = 'Save' }: { close: () => void; label?: string }) {
+  return (
+    <div className="workflow-dialog-actions">
+      <button type="button" className="ops-btn ghost" onClick={close}>
+        Cancel
+      </button>
+      <button className="ops-btn blue">{label}</button>
+    </div>
+  );
+}
+function Panel({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+  return (
+    <section className="ops-panel">
+      <div className="ops-panel-head">
+        <div>
+          <h2>{title}</h2>
+          <p>{subtitle}</p>
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+function TableHead({ labels }: { labels: string[] }) {
+  return (
+    <div className="table-head ops-table-head">
+      {labels.map((label) => (
+        <span key={label}>{label}</span>
+      ))}
+    </div>
+  );
+}
+function Status({ value }: { value: string }) {
+  const key = value.toLowerCase().replaceAll(' ', '-');
+  return <span className={`status ${key}`}>{value}</span>;
+}
+function LiveKpi({
+  label,
+  value,
+  note,
+  icon,
+  tone,
+}: {
+  label: string;
+  value: number;
+  note: string;
+  icon: React.ReactNode;
+  tone: string;
+}) {
+  return (
+    <div className="ops-kpi">
+      <span className={`kpi-icon ${tone}`}>{icon}</span>
+      <strong>{value}</strong>
+      <span>{label}</span>
+      <small>{note}</small>
+    </div>
+  );
+}
+function Pagination({
+  page,
+  pagination,
+  setPage,
+}: {
+  page: number;
+  pagination: { pageSize: number; total: number; hasMore: boolean };
+  setPage: React.Dispatch<React.SetStateAction<number>>;
+}) {
+  const start = pagination.total ? (page - 1) * pagination.pageSize + 1 : 0;
+  return (
+    <div className="ops-pagination" aria-label="List pagination">
+      <span>
+        Showing {start}–{Math.min(page * pagination.pageSize, pagination.total)} of {pagination.total}
+      </span>
+      <div>
+        <button
+          type="button"
+          className="link-btn"
+          disabled={page <= 1}
+          onClick={() => setPage((current) => Math.max(1, current - 1))}
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          className="link-btn"
+          disabled={!pagination.hasMore}
+          onClick={() => setPage((current) => current + 1)}
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+}
 
-function ChecklistDialog({ job, close, saved }: { job: Job; close: () => void; saved: () => void }) { const defaults = ['Serial verified against sale', 'Power and network configured', 'User training delivered', 'Images attached', 'Client acknowledgement captured']; const [items, setItems] = useState(job.items.map(item => ({ inventoryItemId: item.id, serialNumber: item.serialNumber, checklist: item.checklist?.length ? item.checklist : defaults.map(label => ({ label, done: false })) }))); const [error, setError] = useState(''); const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch(`/api/jobs/${job.id}/checklist`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: items.map(item => ({ inventoryItemId: item.inventoryItemId, checklist: item.checklist })) }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to update checklist.'); return; } saved(); }; return <Dialog title={`Configuration checklist · ${job.number}`} close={close}><form className="workflow-form" onSubmit={submit}>{items.map((item, itemIndex) => <div className="serial-picker" key={item.inventoryItemId}><strong>{item.serialNumber}</strong>{item.checklist.map((check, checkIndex) => <label key={check.label}><input type="checkbox" checked={check.done} onChange={e => setItems(current => current.map((row, index) => index !== itemIndex ? row : { ...row, checklist: row.checklist.map((entry, entryIndex) => entryIndex === checkIndex ? { ...entry, done: e.target.checked } : entry) }))}/>{check.label}</label>)}</div>)}{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Save checklist"/></form></Dialog>; }
+function ChecklistDialog({ job, close, saved }: { job: Job; close: () => void; saved: () => void }) {
+  const defaults = [
+    'Serial verified against sale',
+    'Power and network configured',
+    'User training delivered',
+    'Images attached',
+    'Client acknowledgement captured',
+  ];
+  const [items, setItems] = useState(
+    job.items.map((item) => ({
+      inventoryItemId: item.id,
+      serialNumber: item.serialNumber,
+      checklist: item.checklist?.length ? item.checklist : defaults.map((label) => ({ label, done: false })),
+    })),
+  );
+  const [error, setError] = useState('');
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const response = await fetch(`/api/jobs/${job.id}/checklist`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items: items.map((item) => ({ inventoryItemId: item.inventoryItemId, checklist: item.checklist })),
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to update checklist.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title={`Configuration checklist · ${job.number}`} close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        {items.map((item, itemIndex) => (
+          <div className="serial-picker" key={item.inventoryItemId}>
+            <strong>{item.serialNumber}</strong>
+            {item.checklist.map((check, checkIndex) => (
+              <label key={check.label}>
+                <input
+                  type="checkbox"
+                  checked={check.done}
+                  onChange={(e) =>
+                    setItems((current) =>
+                      current.map((row, index) =>
+                        index !== itemIndex
+                          ? row
+                          : {
+                              ...row,
+                              checklist: row.checklist.map((entry, entryIndex) =>
+                                entryIndex === checkIndex ? { ...entry, done: e.target.checked } : entry,
+                              ),
+                            },
+                      ),
+                    )
+                  }
+                />
+                {check.label}
+              </label>
+            ))}
+          </div>
+        ))}
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Save checklist" />
+      </form>
+    </Dialog>
+  );
+}
 function ClaimDetailDialog({ claim, close }: { claim: Claim; close: () => void }) {
-  const [detail, setDetail] = useState<{ requisitions: Array<{ id: string; number: string; description: string; estimatedCost: string; status: string; createdAt: string }>; replacements: Array<{ id: string; originalSerial: string; replacementSerial: string; reason: string; createdAt: string }>; resolution?: string } | null>(null); const [error, setError] = useState('');
+  const [detail, setDetail] = useState<{
+    requisitions: Array<{
+      id: string;
+      number: string;
+      description: string;
+      estimatedCost: string;
+      status: string;
+      createdAt: string;
+    }>;
+    replacements: Array<{
+      id: string;
+      originalSerial: string;
+      replacementSerial: string;
+      reason: string;
+      createdAt: string;
+    }>;
+    resolution?: string;
+  } | null>(null);
+  const [error, setError] = useState('');
   const settings = useOrganizationSettings();
-  useEffect(() => { void fetch(`/api/warranty/claims/${claim.id}`, { cache: 'no-store' }).then(async response => { const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Unable to load claim history.'); setDetail(data.claim); }).catch(loadError => setError(loadError instanceof Error ? loadError.message : 'Unable to load claim history.')); }, [claim.id]);
-  return <Dialog title={`${claim.number} history`} close={close}><div className="workflow-form"><p className="workflow-help"><strong>{claim.serial_number}</strong> · {claim.issue}</p><div className="serial-picker"><strong>Repair requisitions</strong>{detail?.requisitions.map(item => <div className="workflow-help" key={item.id}>{item.number} · {item.description} · {formatCurrency(item.estimatedCost, settings.currency)} · {item.status}</div>)}{detail && !detail.requisitions.length && <span className="workflow-help">No repair requisitions recorded.</span>}</div><div className="serial-picker"><strong>Replacement audit trail</strong>{detail?.replacements.map(item => <div className="workflow-help" key={item.id}>{item.originalSerial} → {item.replacementSerial} · {item.reason} · {formatOrganizationDate(item.createdAt, settings)}</div>)}{detail && !detail.replacements.length && <span className="workflow-help">No replacement recorded.</span>}</div>{detail?.resolution && <Field label="Resolution"><textarea readOnly rows={3} value={detail.resolution}/></Field>}{error && <p className="workflow-error">{error}</p>}<div className="workflow-dialog-actions"><button type="button" className="ops-btn blue" onClick={close}>Close</button></div></div></Dialog>;
+  useEffect(() => {
+    void fetch(`/api/warranty/claims/${claim.id}`, { cache: 'no-store' })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Unable to load claim history.');
+        setDetail(data.claim);
+      })
+      .catch((loadError) => setError(loadError instanceof Error ? loadError.message : 'Unable to load claim history.'));
+  }, [claim.id]);
+  return (
+    <Dialog title={`${claim.number} history`} close={close}>
+      <div className="workflow-form">
+        <p className="workflow-help">
+          <strong>{claim.serial_number}</strong> · {claim.issue}
+        </p>
+        <div className="serial-picker">
+          <strong>Repair requisitions</strong>
+          {detail?.requisitions.map((item) => (
+            <div className="workflow-help" key={item.id}>
+              {item.number} · {item.description} · {formatCurrency(item.estimatedCost, settings.currency)} ·{' '}
+              {item.status}
+            </div>
+          ))}
+          {detail && !detail.requisitions.length && (
+            <span className="workflow-help">No repair requisitions recorded.</span>
+          )}
+        </div>
+        <div className="serial-picker">
+          <strong>Replacement audit trail</strong>
+          {detail?.replacements.map((item) => (
+            <div className="workflow-help" key={item.id}>
+              {item.originalSerial} → {item.replacementSerial} · {item.reason} ·{' '}
+              {formatOrganizationDate(item.createdAt, settings)}
+            </div>
+          ))}
+          {detail && !detail.replacements.length && <span className="workflow-help">No replacement recorded.</span>}
+        </div>
+        {detail?.resolution && (
+          <Field label="Resolution">
+            <textarea readOnly rows={3} value={detail.resolution} />
+          </Field>
+        )}
+        {error && <p className="workflow-error">{error}</p>}
+        <div className="workflow-dialog-actions">
+          <button type="button" className="ops-btn blue" onClick={close}>
+            Close
+          </button>
+        </div>
+      </div>
+    </Dialog>
+  );
 }
-function ResolveDialog({ claim, close, saved }: { claim: Claim; close: () => void; saved: () => void }) { const [status, setStatus] = useState<'Resolved' | 'Rejected'>('Resolved'); const [resolution, setResolution] = useState(''); const [error, setError] = useState(''); const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch(`/api/warranty/claims/${claim.id}/resolve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status, resolution }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to resolve claim.'); return; } saved(); }; return <Dialog title={`Resolve ${claim.number}`} close={close}><form className="workflow-form" onSubmit={submit}><Field label="Outcome"><select value={status} onChange={e => setStatus(e.target.value as 'Resolved' | 'Rejected')}><option>Resolved</option><option>Rejected</option></select></Field><Field label="Resolution notes"><textarea required rows={4} value={resolution} onChange={e => setResolution(e.target.value)}/></Field>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Save resolution"/></form></Dialog>; }
-function AttachmentDialog({ entityType, entityId, close, saved }: { entityType: 'job' | 'claim'; entityId: string; close: () => void; saved: () => void }) {
-  const [file, setFile] = useState<File | null>(null); const [attachments, setAttachments] = useState<{ id: string; file_name: string; mime_type: string; size_bytes: number }[]>([]); const [error, setError] = useState('');
-  useEffect(() => { void fetch(`/api/attachments?entityType=${entityType}&entityId=${entityId}`, { cache: 'no-store' }).then(response => response.json()).then(data => setAttachments(data.attachments || [])); }, [entityId, entityType]);
-  const submit = async (event: FormEvent) => { event.preventDefault(); if (!file) { setError('Choose an image or PDF.'); return; } const form = new FormData(); form.set('entityType', entityType); form.set('entityId', entityId); form.set('file', file); const response = await fetch('/api/attachments', { method: 'POST', body: form }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to upload attachment.'); return; } setAttachments(current => [data.attachment, ...current]); setFile(null); saved(); };
-  const remove = async (attachment: { id: string; file_name: string }) => { if (!window.confirm(`Delete ${attachment.file_name}?`)) return; const response = await fetch(`/api/attachments/${attachment.id}`, { method: 'DELETE' }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to delete attachment.'); return; } setAttachments(current => current.filter(item => item.id !== attachment.id)); };
-  return <Dialog title={`Attach ${entityType === 'job' ? 'job photo' : 'claim evidence'}`} close={close}><form className="workflow-form" onSubmit={submit}><p className="workflow-help">Accepted: JPG, PNG, WEBP, or PDF. Maximum 10 MB.</p>{attachments.length > 0 && <div className="serial-picker"><strong>Existing attachments</strong>{attachments.map(attachment => <div className="attachment-row" key={attachment.id}><a href={`/api/attachments/${attachment.id}`} target="_blank" rel="noreferrer">{attachment.file_name} · {(attachment.size_bytes / 1024).toFixed(0)} KB</a><button type="button" className="row-action" onClick={() => void remove(attachment)} aria-label={`Delete ${attachment.file_name}`}><Trash2 size={13}/> Delete</button></div>)}</div>}<Field label="File"><input required type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={e => setFile(e.target.files?.[0] || null)}/></Field>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Upload attachment"/></form></Dialog>;
+function ResolveDialog({ claim, close, saved }: { claim: Claim; close: () => void; saved: () => void }) {
+  const [status, setStatus] = useState<'Resolved' | 'Rejected'>('Resolved');
+  const [resolution, setResolution] = useState('');
+  const [error, setError] = useState('');
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const response = await fetch(`/api/warranty/claims/${claim.id}/resolve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, resolution }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to resolve claim.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title={`Resolve ${claim.number}`} close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Outcome">
+          <select value={status} onChange={(e) => setStatus(e.target.value as 'Resolved' | 'Rejected')}>
+            <option>Resolved</option>
+            <option>Rejected</option>
+          </select>
+        </Field>
+        <Field label="Resolution notes">
+          <textarea required rows={4} value={resolution} onChange={(e) => setResolution(e.target.value)} />
+        </Field>
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Save resolution" />
+      </form>
+    </Dialog>
+  );
+}
+function AttachmentDialog({
+  entityType,
+  entityId,
+  close,
+  saved,
+}: {
+  entityType: 'job' | 'claim';
+  entityId: string;
+  close: () => void;
+  saved: () => void;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [attachments, setAttachments] = useState<
+    { id: string; file_name: string; mime_type: string; size_bytes: number }[]
+  >([]);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    void fetch(`/api/attachments?entityType=${entityType}&entityId=${entityId}`, { cache: 'no-store' })
+      .then((response) => response.json())
+      .then((data) => setAttachments(data.attachments || []));
+  }, [entityId, entityType]);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!file) {
+      setError('Choose an image or PDF.');
+      return;
+    }
+    const form = new FormData();
+    form.set('entityType', entityType);
+    form.set('entityId', entityId);
+    form.set('file', file);
+    const response = await fetch('/api/attachments', { method: 'POST', body: form });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to upload attachment.');
+      return;
+    }
+    setAttachments((current) => [data.attachment, ...current]);
+    setFile(null);
+    saved();
+  };
+  const remove = async (attachment: { id: string; file_name: string }) => {
+    if (!window.confirm(`Delete ${attachment.file_name}?`)) return;
+    const response = await fetch(`/api/attachments/${attachment.id}`, { method: 'DELETE' });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to delete attachment.');
+      return;
+    }
+    setAttachments((current) => current.filter((item) => item.id !== attachment.id));
+  };
+  return (
+    <Dialog title={`Attach ${entityType === 'job' ? 'job photo' : 'claim evidence'}`} close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <p className="workflow-help">Accepted: JPG, PNG, WEBP, or PDF. Maximum 10 MB.</p>
+        {attachments.length > 0 && (
+          <div className="serial-picker">
+            <strong>Existing attachments</strong>
+            {attachments.map((attachment) => (
+              <div className="attachment-row" key={attachment.id}>
+                <a href={`/api/attachments/${attachment.id}`} target="_blank" rel="noreferrer">
+                  {attachment.file_name} · {(attachment.size_bytes / 1024).toFixed(0)} KB
+                </a>
+                <button
+                  type="button"
+                  className="row-action"
+                  onClick={() => void remove(attachment)}
+                  aria-label={`Delete ${attachment.file_name}`}
+                >
+                  <Trash2 size={13} /> Delete
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <Field label="File">
+          <input
+            required
+            type="file"
+            accept="image/jpeg,image/png,image/webp,application/pdf"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+          />
+        </Field>
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Upload attachment" />
+      </form>
+    </Dialog>
+  );
 }
 
-function JobEditDialog({ job, installers, close, saved }: { job: Job; installers: User[]; close: () => void; saved: () => void }) {
-  const [form, setForm] = useState({ title: job.title, installerId: '', scheduledFor: job.scheduled_for ? new Date(job.scheduled_for).toISOString().slice(0, 16) : '', status: job.status, notes: job.notes || '' }); const [error, setError] = useState('');
-  const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch(`/api/jobs/${job.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, installerId: form.installerId || null, scheduledFor: form.scheduledFor ? new Date(form.scheduledFor).toISOString() : null }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to update job card.'); return; } saved(); };
-  return <Dialog title={`Edit ${job.number}`} close={close}><form className="workflow-form" onSubmit={submit}><Field label="Title"><input required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })}/></Field><Field label="Installer"><select value={form.installerId} onChange={e => setForm({ ...form, installerId: e.target.value })}><option value="">Unassigned</option>{installers.map(installer => <option key={installer.id} value={installer.id}>{installer.full_name} · {installer.role}</option>)}</select></Field><div className="workflow-form-grid"><Field label="Schedule"><input type="datetime-local" value={form.scheduledFor} onChange={e => setForm({ ...form, scheduledFor: e.target.value })}/></Field><Field label="Status"><select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}><option>Scheduled</option><option>In progress</option><option>Completed</option><option>Cancelled</option></select></Field></div><Field label="Notes"><textarea rows={3} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}/></Field>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Save job card"/></form></Dialog>;
+function JobEditDialog({
+  job,
+  installers,
+  close,
+  saved,
+}: {
+  job: Job;
+  installers: User[];
+  close: () => void;
+  saved: () => void;
+}) {
+  const [form, setForm] = useState({
+    title: job.title,
+    installerId: '',
+    scheduledFor: job.scheduled_for ? new Date(job.scheduled_for).toISOString().slice(0, 16) : '',
+    status: job.status,
+    notes: job.notes || '',
+  });
+  const [error, setError] = useState('');
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const response = await fetch(`/api/jobs/${job.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...form,
+        installerId: form.installerId || null,
+        scheduledFor: form.scheduledFor ? new Date(form.scheduledFor).toISOString() : null,
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to update job card.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title={`Edit ${job.number}`} close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Title">
+          <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+        </Field>
+        <Field label="Installer">
+          <select value={form.installerId} onChange={(e) => setForm({ ...form, installerId: e.target.value })}>
+            <option value="">Unassigned</option>
+            {installers.map((installer) => (
+              <option key={installer.id} value={installer.id}>
+                {installer.full_name} · {installer.role}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <div className="workflow-form-grid">
+          <Field label="Schedule">
+            <input
+              type="datetime-local"
+              value={form.scheduledFor}
+              onChange={(e) => setForm({ ...form, scheduledFor: e.target.value })}
+            />
+          </Field>
+          <Field label="Status">
+            <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+              <option>Scheduled</option>
+              <option>In progress</option>
+              <option>Completed</option>
+              <option>Cancelled</option>
+            </select>
+          </Field>
+        </div>
+        <Field label="Notes">
+          <textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+        </Field>
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Save job card" />
+      </form>
+    </Dialog>
+  );
 }
 
-function JobDialog({ clients, inventory, close, saved }: { clients: Client[]; inventory: Inventory[]; close: () => void; saved: () => void }) { const [form, setForm] = useState({ clientId: clients[0]?.id || '', title: '', scheduledFor: '' }); const [items, setItems] = useState<string[]>([]); const [error, setError] = useState(''); const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch('/api/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, scheduledFor: form.scheduledFor ? new Date(form.scheduledFor).toISOString() : undefined, inventoryItemIds: items }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to create job.'); return; } saved(); }; return <Dialog title="New job card" close={close}><form className="workflow-form" onSubmit={submit}><Field label="Client"><select value={form.clientId} onChange={e => setForm({ ...form, clientId: e.target.value })}>{clients.map(client => <option key={client.id} value={client.id}>{client.name}</option>)}</select></Field><Field label="Title"><input required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })}/></Field><Field label="Schedule"><input type="datetime-local" value={form.scheduledFor} onChange={e => setForm({ ...form, scheduledFor: e.target.value })}/></Field><div className="serial-picker"><strong>Stock serials · selected units move to Installed</strong>{inventory.filter(item => ['Available', 'Sold', 'Reserved'].includes(item.status)).slice(0, 50).map(item => <label key={item.id}><input type="checkbox" checked={items.includes(item.id)} onChange={e => setItems(current => e.target.checked ? [...current, item.id] : current.filter(id => id !== item.id))}/>{item.serial_number} · {item.description} · {item.status}</label>)}</div>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Create job"/></form></Dialog>; }
-function SignoffDialog({ job, close, saved }: { job: Job; close: () => void; saved: () => void }) { const [name, setName] = useState(''); const [notes, setNotes] = useState(''); const [error, setError] = useState(''); const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch(`/api/jobs/${job.id}/signoff`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, notes }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to capture sign-off.'); return; } saved(); }; return <Dialog title={`Sign off ${job.number}`} close={close}><form className="workflow-form" onSubmit={submit}><Field label="Client representative"><input required value={name} onChange={e => setName(e.target.value)}/></Field><Field label="Notes"><textarea rows={3} value={notes} onChange={e => setNotes(e.target.value)}/></Field>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Capture sign-off"/></form></Dialog>; }
-function ClaimDialog({ inventory, close, saved }: { inventory: Inventory[]; close: () => void; saved: () => void }) { const [inventoryItemId, setInventoryItemId] = useState(inventory[0]?.id || ''); const [issue, setIssue] = useState(''); const [error, setError] = useState(''); const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch('/api/warranty/claims', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inventoryItemId, issue }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to create claim.'); return; } saved(); }; return <Dialog title="New warranty claim" close={close}><form className="workflow-form" onSubmit={submit}><Field label="Serial"><select value={inventoryItemId} onChange={e => setInventoryItemId(e.target.value)}>{inventory.map(item => <option key={item.id} value={item.id}>{item.serial_number} · {item.description}</option>)}</select></Field><Field label="Issue"><textarea required rows={3} value={issue} onChange={e => setIssue(e.target.value)} /></Field>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Create claim"/></form></Dialog>; }
-function RepairDialog({ claim, close, saved }: { claim: Claim; close: () => void; saved: () => void }) { const [description, setDescription] = useState(''); const [cost, setCost] = useState('0'); const [error, setError] = useState(''); const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch(`/api/warranty/claims/${claim.id}/requisitions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ description, estimatedCost: Number(cost) }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to create requisition.'); return; } saved(); }; return <Dialog title={`Repair ${claim.number}`} close={close}><form className="workflow-form" onSubmit={submit}><Field label="Repair description"><textarea required rows={3} value={description} onChange={e => setDescription(e.target.value)}/></Field><Field label="Estimated cost"><input required type="number" min="0" step="0.01" value={cost} onChange={e => setCost(e.target.value)}/></Field>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Create requisition"/></form></Dialog>; }
-function ReplacementDialog({ claim, inventory, close, saved }: { claim: Claim; inventory: Inventory[]; close: () => void; saved: () => void }) { const [replacementInventoryItemId, setReplacementInventoryItemId] = useState(inventory.find(item => item.status === 'Available')?.id || ''); const [reason, setReason] = useState(''); const [error, setError] = useState(''); const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch(`/api/warranty/claims/${claim.id}/replace`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ replacementInventoryItemId, reason }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to complete replacement.'); return; } saved(); }; return <Dialog title={`Replace ${claim.number}`} close={close}><form className="workflow-form" onSubmit={submit}><Field label="Available replacement"><select value={replacementInventoryItemId} onChange={e => setReplacementInventoryItemId(e.target.value)}>{inventory.filter(item => item.status === 'Available').map(item => <option key={item.id} value={item.id}>{item.serial_number} · {item.description}</option>)}</select></Field><Field label="Reason"><textarea required rows={3} value={reason} onChange={e => setReason(e.target.value)}/></Field>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Complete replacement"/></form></Dialog>; }
+function JobDialog({
+  clients,
+  inventory,
+  close,
+  saved,
+}: {
+  clients: Client[];
+  inventory: Inventory[];
+  close: () => void;
+  saved: () => void;
+}) {
+  const [form, setForm] = useState({ clientId: clients[0]?.id || '', title: '', scheduledFor: '' });
+  const [items, setItems] = useState<string[]>([]);
+  const [error, setError] = useState('');
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const response = await fetch('/api/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...form,
+        scheduledFor: form.scheduledFor ? new Date(form.scheduledFor).toISOString() : undefined,
+        inventoryItemIds: items,
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to create job.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title="New job card" close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Client">
+          <select value={form.clientId} onChange={(e) => setForm({ ...form, clientId: e.target.value })}>
+            {clients.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Title">
+          <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+        </Field>
+        <Field label="Schedule">
+          <input
+            type="datetime-local"
+            value={form.scheduledFor}
+            onChange={(e) => setForm({ ...form, scheduledFor: e.target.value })}
+          />
+        </Field>
+        <div className="serial-picker">
+          <strong>Stock serials · selected units move to Installed</strong>
+          {inventory
+            .filter((item) => ['Available', 'Sold', 'Reserved'].includes(item.status))
+            .slice(0, 50)
+            .map((item) => (
+              <label key={item.id}>
+                <input
+                  type="checkbox"
+                  checked={items.includes(item.id)}
+                  onChange={(e) =>
+                    setItems((current) =>
+                      e.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id),
+                    )
+                  }
+                />
+                {item.serial_number} · {item.description} · {item.status}
+              </label>
+            ))}
+        </div>
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Create job" />
+      </form>
+    </Dialog>
+  );
+}
+function SignoffDialog({ job, close, saved }: { job: Job; close: () => void; saved: () => void }) {
+  const [name, setName] = useState('');
+  const [notes, setNotes] = useState('');
+  const [error, setError] = useState('');
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const response = await fetch(`/api/jobs/${job.id}/signoff`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, notes }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to capture sign-off.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title={`Sign off ${job.number}`} close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Client representative">
+          <input required value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <Field label="Notes">
+          <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+        </Field>
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Capture sign-off" />
+      </form>
+    </Dialog>
+  );
+}
+function ClaimDialog({ inventory, close, saved }: { inventory: Inventory[]; close: () => void; saved: () => void }) {
+  const [inventoryItemId, setInventoryItemId] = useState(inventory[0]?.id || '');
+  const [issue, setIssue] = useState('');
+  const [error, setError] = useState('');
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const response = await fetch('/api/warranty/claims', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inventoryItemId, issue }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to create claim.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title="New warranty claim" close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Serial">
+          <select value={inventoryItemId} onChange={(e) => setInventoryItemId(e.target.value)}>
+            {inventory.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.serial_number} · {item.description}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Issue">
+          <textarea required rows={3} value={issue} onChange={(e) => setIssue(e.target.value)} />
+        </Field>
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Create claim" />
+      </form>
+    </Dialog>
+  );
+}
+function RepairDialog({ claim, close, saved }: { claim: Claim; close: () => void; saved: () => void }) {
+  const [description, setDescription] = useState('');
+  const [cost, setCost] = useState('0');
+  const [error, setError] = useState('');
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const response = await fetch(`/api/warranty/claims/${claim.id}/requisitions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description, estimatedCost: Number(cost) }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to create requisition.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title={`Repair ${claim.number}`} close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Repair description">
+          <textarea required rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
+        </Field>
+        <Field label="Estimated cost">
+          <input required type="number" min="0" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} />
+        </Field>
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Create requisition" />
+      </form>
+    </Dialog>
+  );
+}
+function ReplacementDialog({
+  claim,
+  inventory,
+  close,
+  saved,
+}: {
+  claim: Claim;
+  inventory: Inventory[];
+  close: () => void;
+  saved: () => void;
+}) {
+  const [replacementInventoryItemId, setReplacementInventoryItemId] = useState(
+    inventory.find((item) => item.status === 'Available')?.id || '',
+  );
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const response = await fetch(`/api/warranty/claims/${claim.id}/replace`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ replacementInventoryItemId, reason }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to complete replacement.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title={`Replace ${claim.number}`} close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Available replacement">
+          <select value={replacementInventoryItemId} onChange={(e) => setReplacementInventoryItemId(e.target.value)}>
+            {inventory
+              .filter((item) => item.status === 'Available')
+              .map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.serial_number} · {item.description}
+                </option>
+              ))}
+          </select>
+        </Field>
+        <Field label="Reason">
+          <textarea required rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
+        </Field>
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Complete replacement" />
+      </form>
+    </Dialog>
+  );
+}

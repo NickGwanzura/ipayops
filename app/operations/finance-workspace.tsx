@@ -1,30 +1,174 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import { ArrowRight, Check, CircleDollarSign, FileText, LayoutGrid, Paperclip, Plus, ReceiptText, RotateCcw, Search, Settings2, Truck, Upload, UserRound, Users, WalletCards, X } from 'lucide-react';
+import {
+  ArrowRight,
+  Check,
+  CircleDollarSign,
+  FileText,
+  LayoutGrid,
+  Paperclip,
+  Plus,
+  ReceiptText,
+  RotateCcw,
+  Search,
+  Settings2,
+  Truck,
+  Upload,
+  UserRound,
+  Users,
+  WalletCards,
+  X,
+} from 'lucide-react';
 import { formatCurrency, formatOrganizationDate, useOrganizationSettings } from '../organization-settings';
 import { normalizeRole } from '@/lib/rbac';
 import { useDialogFocus } from '../dialog-focus';
 import { ActionMenu, ActionMenuItem } from './action-menu';
 
-type Expense = { id: string; number: string; category: string; description: string; amount: string; currency: string; status: string; submitted_at: string; serial_number?: string; product_type?: string; submitter_name?: string; attachment_count?: number };
+type Expense = {
+  id: string;
+  number: string;
+  category: string;
+  description: string;
+  amount: string;
+  currency: string;
+  status: string;
+  submitted_at: string;
+  serial_number?: string;
+  product_type?: string;
+  submitter_name?: string;
+  attachment_count?: number;
+};
 type ExpenseAttachment = { id: string; fileName: string; mimeType: string; sizeBytes: number; createdAt: string };
-type Invoice = { id: string; number: string; status: string; total: string; paid_amount: string; outstanding: string; client_name: string; sale_number: string; due_at?: string };
-type DeliveryNote = { id: string; number: string; status: string; delivery_address?: string; created_at: string; client_name: string; sale_number: string };
-type Payment = { id: string; amount: string; method: string; reference?: string; paid_at: string; recorded_by?: string };
-type ReturnRecord = { id: string; number: string; status: string; reason: string; refund_amount: string; refund_status: string; refund_method?: string; refund_reference?: string; credit_note_number?: string; refunded_at?: string; created_at: string; sale_number: string; client_name: string };
+type Invoice = {
+  id: string;
+  number: string;
+  status: string;
+  total: string;
+  paid_amount: string;
+  outstanding: string;
+  client_name: string;
+  sale_number: string;
+  due_at?: string;
+};
+type DeliveryNote = {
+  id: string;
+  number: string;
+  status: string;
+  delivery_address?: string;
+  created_at: string;
+  client_name: string;
+  sale_number: string;
+};
+type Payment = {
+  id: string;
+  amount: string;
+  method: string;
+  reference?: string;
+  paid_at: string;
+  recorded_by?: string;
+};
+type ReturnRecord = {
+  id: string;
+  number: string;
+  status: string;
+  reason: string;
+  refund_amount: string;
+  refund_status: string;
+  refund_method?: string;
+  refund_reference?: string;
+  credit_note_number?: string;
+  refunded_at?: string;
+  created_at: string;
+  sale_number: string;
+  client_name: string;
+};
 type Rule = { id: string; name: string; rate: string; trigger_status: string; is_active: boolean };
-type Target = { id: string; consultant_id?: string; consultant_name: string; period_start: string; period_end: string; target_amount: string; achieved: string };
+type Target = {
+  id: string;
+  consultant_id?: string;
+  consultant_name: string;
+  period_start: string;
+  period_end: string;
+  target_amount: string;
+  achieved: string;
+};
 type User = { id: string; full_name: string; role: string };
-type Commission = { id: string; sale_number: string; client_name: string; consultant_name?: string; rate: string; amount: string; clawback_amount?: string; status: string };
-type Employee = { id: string; full_name: string; email: string; role: string; is_active: boolean; pending_tasks: number; completed_tasks: number; last_event?: string };
-type Invitation = { id: string; full_name: string; email: string; role: string; status: string; expires_at: string; sent_at: string; sent_count: number };
-type EmployeeEvent = { id: string; event_type: string; status: string; effective_at: string; notes?: string; created_at: string; created_by_name?: string };
-type OnboardingTask = { id: string; user_id: string; user_name: string; title: string; category: string; due_at?: string; status: string };
-type FinanceDialog = 'expense' | 'expenseDetail' | 'expenseEdit' | 'payment' | 'invoiceDetail' | 'deliveryDetail' | 'invite' | 'employeeEdit' | 'employeeHistory' | 'rule' | 'ruleEdit' | 'target' | 'targetEdit' | 'onboarding' | null;
+type Commission = {
+  id: string;
+  sale_number: string;
+  client_name: string;
+  consultant_name?: string;
+  rate: string;
+  amount: string;
+  clawback_amount?: string;
+  status: string;
+};
+type Employee = {
+  id: string;
+  full_name: string;
+  email: string;
+  role: string;
+  is_active: boolean;
+  pending_tasks: number;
+  completed_tasks: number;
+  last_event?: string;
+};
+type Invitation = {
+  id: string;
+  full_name: string;
+  email: string;
+  role: string;
+  status: string;
+  expires_at: string;
+  sent_at: string;
+  sent_count: number;
+};
+type EmployeeEvent = {
+  id: string;
+  event_type: string;
+  status: string;
+  effective_at: string;
+  notes?: string;
+  created_at: string;
+  created_by_name?: string;
+};
+type OnboardingTask = {
+  id: string;
+  user_id: string;
+  user_name: string;
+  title: string;
+  category: string;
+  due_at?: string;
+  status: string;
+};
+type FinanceDialog =
+  | 'expense'
+  | 'expenseDetail'
+  | 'expenseEdit'
+  | 'payment'
+  | 'invoiceDetail'
+  | 'deliveryDetail'
+  | 'invite'
+  | 'employeeEdit'
+  | 'employeeHistory'
+  | 'rule'
+  | 'ruleEdit'
+  | 'target'
+  | 'targetEdit'
+  | 'onboarding'
+  | null;
 type FinancePage = 'overview' | 'commissions' | 'expenses' | 'invoices' | 'deliveries' | 'returns' | 'controls';
 
-const financePages: FinancePage[] = ['overview', 'commissions', 'expenses', 'invoices', 'deliveries', 'returns', 'controls'];
+const financePages: FinancePage[] = [
+  'overview',
+  'commissions',
+  'expenses',
+  'invoices',
+  'deliveries',
+  'returns',
+  'controls',
+];
 
 function requestedFinancePage(): FinancePage {
   if (typeof window === 'undefined') return 'overview';
@@ -32,15 +176,35 @@ function requestedFinancePage(): FinancePage {
   return requested && financePages.includes(requested) ? requested : 'overview';
 }
 
-export default function FinanceWorkspace({ notify, newRecordSignal = 0, role = 'finance', section = 'all' }: { notify: (message: string) => void; newRecordSignal?: number; role?: string; section?: 'all' | 'hr' }) {
-  const [expenses, setExpenses] = useState<Expense[]>([]); const [rules, setRules] = useState<Rule[]>([]); const [targets, setTargets] = useState<Target[]>([]); const [users, setUsers] = useState<User[]>([]); const [commissions, setCommissions] = useState<Commission[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]); const [deliveryNotes, setDeliveryNotes] = useState<DeliveryNote[]>([]); const [employees, setEmployees] = useState<Employee[]>([]); const [tasks, setTasks] = useState<OnboardingTask[]>([]); const [invitations, setInvitations] = useState<Invitation[]>([]);
+export default function FinanceWorkspace({
+  notify,
+  newRecordSignal = 0,
+  role = 'finance',
+  section = 'all',
+}: {
+  notify: (message: string) => void;
+  newRecordSignal?: number;
+  role?: string;
+  section?: 'all' | 'hr';
+}) {
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [rules, setRules] = useState<Rule[]>([]);
+  const [targets, setTargets] = useState<Target[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [commissions, setCommissions] = useState<Commission[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [deliveryNotes, setDeliveryNotes] = useState<DeliveryNote[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [tasks, setTasks] = useState<OnboardingTask[]>([]);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [returns, setReturns] = useState<ReturnRecord[]>([]);
   const [dialog, setDialog] = useState<FinanceDialog>(null);
-  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null); const [selectedDeliveryNote, setSelectedDeliveryNote] = useState<DeliveryNote | null>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [selectedDeliveryNote, setSelectedDeliveryNote] = useState<DeliveryNote | null>(null);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
-  const [selectedRule, setSelectedRule] = useState<Rule | null>(null); const [selectedTarget, setSelectedTarget] = useState<Target | null>(null);
+  const [selectedRule, setSelectedRule] = useState<Rule | null>(null);
+  const [selectedTarget, setSelectedTarget] = useState<Target | null>(null);
   const [error, setError] = useState('');
   const [financePage, setFinancePage] = useState<FinancePage>(requestedFinancePage);
   const settings = useOrganizationSettings();
@@ -52,8 +216,22 @@ export default function FinanceWorkspace({ notify, newRecordSignal = 0, role = '
   const load = async () => {
     setError('');
     try {
-      const get = async (path: string) => { const response = await fetch(path, { cache: 'no-store' }); return response.ok ? response.json() : null; };
-      const [expenseData, invoiceData, deliveryNoteData, rulesData, targetsData, usersData, commissionData, employeeData, taskData, invitationData] = await Promise.all([
+      const get = async (path: string) => {
+        const response = await fetch(path, { cache: 'no-store' });
+        return response.ok ? response.json() : null;
+      };
+      const [
+        expenseData,
+        invoiceData,
+        deliveryNoteData,
+        rulesData,
+        targetsData,
+        usersData,
+        commissionData,
+        employeeData,
+        taskData,
+        invitationData,
+      ] = await Promise.all([
         canFinance ? get('/api/finance/expenses') : Promise.resolve(null),
         canFinance ? get('/api/crm/invoices') : Promise.resolve(null),
         canFinance ? get('/api/crm/delivery-notes') : Promise.resolve(null),
@@ -65,18 +243,36 @@ export default function FinanceWorkspace({ notify, newRecordSignal = 0, role = '
         canManagePeople ? get('/api/hr/onboarding') : Promise.resolve(null),
         canManagePeople ? get('/api/hr/invitations') : Promise.resolve(null),
       ]);
-      setExpenses(expenseData?.expenses || []); setInvoices(invoiceData?.invoices || []); setDeliveryNotes(deliveryNoteData?.deliveryNotes || []);
-      setRules(rulesData?.rules || []); setTargets(targetsData?.targets || []); setUsers(usersData?.users || []);
-      setCommissions(commissionData?.commissions || []); setEmployees(employeeData?.employees || []); setTasks(taskData?.tasks || []); setInvitations(invitationData?.invitations || []);
+      setExpenses(expenseData?.expenses || []);
+      setInvoices(invoiceData?.invoices || []);
+      setDeliveryNotes(deliveryNoteData?.deliveryNotes || []);
+      setRules(rulesData?.rules || []);
+      setTargets(targetsData?.targets || []);
+      setUsers(usersData?.users || []);
+      setCommissions(commissionData?.commissions || []);
+      setEmployees(employeeData?.employees || []);
+      setTasks(taskData?.tasks || []);
+      setInvitations(invitationData?.invitations || []);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Live finance data is unavailable.');
     }
   };
 
-  useEffect(() => { void load(); }, []);
-  const loadReturns = async () => { const response = await fetch('/api/crm/returns', { cache: 'no-store' }); if (!response.ok) return; const data = await response.json(); setReturns(data.returns || []); };
-  useEffect(() => { if (canFinance) void loadReturns(); }, [canFinance]);
-  useEffect(() => { if (newRecordSignal > 0) setDialog(section === 'hr' ? 'invite' : 'expense'); }, [newRecordSignal, section]);
+  useEffect(() => {
+    void load();
+  }, []);
+  const loadReturns = async () => {
+    const response = await fetch('/api/crm/returns', { cache: 'no-store' });
+    if (!response.ok) return;
+    const data = await response.json();
+    setReturns(data.returns || []);
+  };
+  useEffect(() => {
+    if (canFinance) void loadReturns();
+  }, [canFinance]);
+  useEffect(() => {
+    if (newRecordSignal > 0) setDialog(section === 'hr' ? 'invite' : 'expense');
+  }, [newRecordSignal, section]);
   useEffect(() => {
     const syncFromHistory = () => setFinancePage(requestedFinancePage());
     window.addEventListener('popstate', syncFromHistory);
@@ -86,99 +282,788 @@ export default function FinanceWorkspace({ notify, newRecordSignal = 0, role = '
   const openFinancePage = (page: FinancePage) => {
     setFinancePage(page);
     const url = new URL(window.location.href);
-    if (page === 'overview') url.searchParams.delete('view'); else url.searchParams.set('view', page);
+    if (page === 'overview') url.searchParams.delete('view');
+    else url.searchParams.set('view', page);
     window.history.pushState(null, '', `${url.pathname}${url.search}`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const updateExpense = async (expense: Expense, status: 'Approved' | 'Rejected' | 'Paid') => {
-    const response = await fetch(`/api/finance/expenses/${expense.id}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
+    const response = await fetch(`/api/finance/expenses/${expense.id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
     const data = await response.json();
-    if (!response.ok) { notify(data.error || 'Unable to update expense.'); return; }
+    if (!response.ok) {
+      notify(data.error || 'Unable to update expense.');
+      return;
+    }
     notify(`${expense.number} marked ${status.toLowerCase()}`);
     void load();
   };
 
-  const runCommissions = async () => { const response = await fetch('/api/finance/commissions/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }); const data = await response.json(); if (!response.ok) { notify(data.error || 'Unable to run commissions.'); return; } notify(`${data.run.created} commission entries calculated`); void load(); };
-  const updateCommission = async (commission: Commission, status: 'Approved' | 'Paid' | 'Voided') => { const response = await fetch(`/api/finance/commissions/${commission.id}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) }); const data = await response.json(); if (!response.ok) { notify(data.error || 'Unable to update commission.'); return; } notify(`${commission.sale_number} commission marked ${status.toLowerCase()}`); void load(); };
-  const completeTask = async (task: OnboardingTask) => { const response = await fetch(`/api/hr/onboarding/${task.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'Completed' }) }); const data = await response.json(); if (!response.ok) { notify(data.error || 'Unable to complete task.'); return; } notify(`${task.title} completed`); void load(); };
-  const offboard = async (employee: Employee) => { if (!window.confirm(`Delete user ${employee.full_name}? Their account will be disabled and archived from active HR records; lifecycle history will be retained.`)) return; const response = await fetch(`/api/hr/employees/${employee.id}/offboard`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notes: 'User deleted from the People workspace; account archived with lifecycle history retained.' }) }); const data = await response.json(); if (!response.ok) { notify(data.error || 'Unable to delete user.'); return; } notify(`${employee.full_name} deleted`); void load(); };
-  const resendInvitation = async (invitation: Invitation) => { const response = await fetch(`/api/hr/invitations/${invitation.id}`, { method: 'POST' }); const data = await response.json(); if (!response.ok) { notify(data.error || 'Unable to resend invitation.'); return; } notify(data.emailStatus === 'sent' ? `Invitation resent to ${invitation.email}` : 'Invitation renewed, but email delivery is not configured.'); void load(); };
-  const revokeInvitation = async (invitation: Invitation) => { if (!window.confirm(`Revoke the invitation for ${invitation.email}?`)) return; const response = await fetch(`/api/hr/invitations/${invitation.id}`, { method: 'DELETE' }); const data = await response.json(); if (!response.ok) { notify(data.error || 'Unable to revoke invitation.'); return; } notify(`Invitation for ${invitation.email} revoked`); void load(); };
-  const processRefund = async (returnRecord: ReturnRecord) => { const method = returnRecord.refund_method || 'Credit note'; const reference = window.prompt(`Reference for ${returnRecord.number} (${method})`, ''); if (reference === null) return; const response = await fetch(`/api/crm/returns/${returnRecord.id}/refund`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ method, reference }) }); const data = await response.json(); if (!response.ok) { notify(data.error || 'Unable to process refund.'); return; } notify(`${returnRecord.number} refund processed${data.refund.credit_note_number ? ` · ${data.refund.credit_note_number}` : ''}`); void loadReturns(); };
+  const runCommissions = async () => {
+    const response = await fetch('/api/finance/commissions/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      notify(data.error || 'Unable to run commissions.');
+      return;
+    }
+    notify(`${data.run.created} commission entries calculated`);
+    void load();
+  };
+  const updateCommission = async (commission: Commission, status: 'Approved' | 'Paid' | 'Voided') => {
+    const response = await fetch(`/api/finance/commissions/${commission.id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      notify(data.error || 'Unable to update commission.');
+      return;
+    }
+    notify(`${commission.sale_number} commission marked ${status.toLowerCase()}`);
+    void load();
+  };
+  const completeTask = async (task: OnboardingTask) => {
+    const response = await fetch(`/api/hr/onboarding/${task.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'Completed' }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      notify(data.error || 'Unable to complete task.');
+      return;
+    }
+    notify(`${task.title} completed`);
+    void load();
+  };
+  const offboard = async (employee: Employee) => {
+    if (
+      !window.confirm(
+        `Delete user ${employee.full_name}? Their account will be disabled and archived from active HR records; lifecycle history will be retained.`,
+      )
+    )
+      return;
+    const response = await fetch(`/api/hr/employees/${employee.id}/offboard`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        notes: 'User deleted from the People workspace; account archived with lifecycle history retained.',
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      notify(data.error || 'Unable to delete user.');
+      return;
+    }
+    notify(`${employee.full_name} deleted`);
+    void load();
+  };
+  const resendInvitation = async (invitation: Invitation) => {
+    const response = await fetch(`/api/hr/invitations/${invitation.id}`, { method: 'POST' });
+    const data = await response.json();
+    if (!response.ok) {
+      notify(data.error || 'Unable to resend invitation.');
+      return;
+    }
+    notify(
+      data.emailStatus === 'sent'
+        ? `Invitation resent to ${invitation.email}`
+        : 'Invitation renewed, but email delivery is not configured.',
+    );
+    void load();
+  };
+  const revokeInvitation = async (invitation: Invitation) => {
+    if (!window.confirm(`Revoke the invitation for ${invitation.email}?`)) return;
+    const response = await fetch(`/api/hr/invitations/${invitation.id}`, { method: 'DELETE' });
+    const data = await response.json();
+    if (!response.ok) {
+      notify(data.error || 'Unable to revoke invitation.');
+      return;
+    }
+    notify(`Invitation for ${invitation.email} revoked`);
+    void load();
+  };
+  const processRefund = async (returnRecord: ReturnRecord) => {
+    const method = returnRecord.refund_method || 'Credit note';
+    const reference = window.prompt(`Reference for ${returnRecord.number} (${method})`, '');
+    if (reference === null) return;
+    const response = await fetch(`/api/crm/returns/${returnRecord.id}/refund`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ method, reference }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      notify(data.error || 'Unable to process refund.');
+      return;
+    }
+    notify(
+      `${returnRecord.number} refund processed${data.refund.credit_note_number ? ` · ${data.refund.credit_note_number}` : ''}`,
+    );
+    void loadReturns();
+  };
 
-  const saved = (message: string) => { setDialog(null); notify(message); void load(); };
-  const pendingTotal = expenses.filter(expense => expense.status === 'Pending').reduce((sum, expense) => sum + Number(expense.amount), 0);
+  const saved = (message: string) => {
+    setDialog(null);
+    notify(message);
+    void load();
+  };
+  const pendingTotal = expenses
+    .filter((expense) => expense.status === 'Pending')
+    .reduce((sum, expense) => sum + Number(expense.amount), 0);
   const outstandingTotal = invoices.reduce((sum, invoice) => sum + Number(invoice.outstanding || 0), 0);
-  if (section === 'hr' && canManagePeople) return <ManagerControlView employees={employees} invitations={invitations} tasks={tasks} rules={rules} targets={targets} users={users} dialog={dialog} setDialog={setDialog} selectedEmployee={selectedEmployee} setSelectedEmployee={setSelectedEmployee} selectedRule={selectedRule} setSelectedRule={setSelectedRule} selectedTarget={selectedTarget} setSelectedTarget={setSelectedTarget} completeTask={completeTask} offboard={offboard} resendInvitation={resendInvitation} revokeInvitation={revokeInvitation} saved={saved} notify={notify}/>;
-  if (normalizedRole === 'manager') return <ManagerControlView employees={employees} invitations={invitations} tasks={tasks} rules={rules} targets={targets} users={users} dialog={dialog} setDialog={setDialog} selectedEmployee={selectedEmployee} setSelectedEmployee={setSelectedEmployee} selectedRule={selectedRule} setSelectedRule={setSelectedRule} selectedTarget={selectedTarget} setSelectedTarget={setSelectedTarget} completeTask={completeTask} offboard={offboard} resendInvitation={resendInvitation} revokeInvitation={revokeInvitation} saved={saved} notify={notify}/>;
-  return <div className={`finance-pages finance-page-${financePage}`}>
-    <FinanceSectionNav active={financePage} onOpen={openFinancePage} showControls={canManageCommissionSettings}/>
-    <div className="ops-kpis">
-      <LiveKpi label="Pending expenses" value={formatCurrency(pendingTotal, settings.currency)} note={`${expenses.filter(expense => expense.status === 'Pending').length} awaiting review`} icon={<CircleDollarSign size={16}/>} tone="amber"/>
-      <LiveKpi label="Outstanding invoices" value={formatCurrency(outstandingTotal, settings.currency)} note={`${invoices.filter(invoice => Number(invoice.outstanding) > 0).length} accounts receivable`} icon={<FileText size={16}/>} tone="blue"/>
-      <LiveKpi label="Recorded invoices" value={invoices.length.toString()} note="Payment lifecycle enabled" icon={<Check size={16}/>} tone="green"/>
-      <LiveKpi label="Provisional commissions" value={commissions.filter(commission => commission.status === 'Provisional').length.toString()} note="Awaiting manager approval" icon={<Paperclip size={16}/>} tone="purple"/>
-    </div>
-    {financePage === 'overview' && <FinanceOverview
-      pendingExpenses={expenses.filter(expense => expense.status === 'Pending').length}
-      openInvoices={invoices.filter(invoice => Number(invoice.outstanding) > 0).length}
-      provisionalCommissions={commissions.filter(commission => commission.status === 'Provisional').length}
-      deliveryNotes={deliveryNotes.length}
-      returns={returns.filter(record => record.refund_status === 'Pending').length}
-      rules={rules.length}
-      onOpen={openFinancePage}
-      showControls={canManageCommissionSettings}
-    />}
-    <div className="ops-grid-two finance-priority-grid">
-      <LivePanel className="finance-commissions-panel" title="Commission run" subtitle="Run active rules, then approve and pay entries"><div className="workflow-actions"><button className="ops-btn blue" onClick={() => void runCommissions()}><CircleDollarSign size={15}/> Run commissions</button><span className="workflow-help">{commissions.length} entries · {formatCurrency(commissions.reduce((sum, commission) => sum + Number(commission.amount) - Number(commission.clawback_amount || 0), 0), settings.currency)} net total</span></div><div className="data-table labelled-cards"><TableHead labels={['Sale','Consultant','Rate','Amount','Action']}/>{commissions.map(commission => <div className="data-row" key={commission.id}><div data-label="Sale"><strong>{commission.sale_number}</strong><small>{commission.client_name}</small></div><span data-label="Consultant">{commission.consultant_name || 'Unassigned'}</span><span data-label="Rate">{Number(commission.rate).toFixed(2)}%</span><span data-label="Amount">{formatCurrency(commission.amount, settings.currency)}{Number(commission.clawback_amount) > 0 && <small className="workflow-error"> − {formatCurrency(commission.clawback_amount, settings.currency)} clawback due</small>}</span><div className="transfer-card-actions" data-label="Action"><Status value={commission.status}/>{commission.status === 'Provisional' && <><button className="row-action" onClick={() => void updateCommission(commission, 'Approved')}><Check size={13}/> Approve</button><button className="row-action" onClick={() => void updateCommission(commission, 'Voided')}><X size={13}/> Void</button></>}{commission.status === 'Approved' && <button className="row-action" onClick={() => void updateCommission(commission, 'Paid')}><CircleDollarSign size={13}/> Paid</button>}</div></div>)}{!commissions.length && <Empty title="No commission entries" detail="Run an active rule after confirmed sales are assigned to consultants." icon={<CircleDollarSign size={22}/>}/>}</div></LivePanel>
-      <LivePanel className="finance-ceo-hr-panel" title="HR lifecycle" subtitle="Employee accounts, invitations, onboarding, and auditable lifecycle history"><div className="workflow-actions"><button className="ops-btn blue" onClick={() => setDialog('invite')}><Plus size={15}/> Invite employee</button><button className="ops-btn ghost" onClick={() => setDialog('onboarding')}><Plus size={15}/> Add onboarding task</button><span className="workflow-help">{employees.filter(employee => employee.is_active).length} active employees</span></div><div className="data-table labelled-cards finance-ceo-people"><TableHead labels={['Employee','Role','Tasks','Account']}/>{employees.map(employee => <div className="data-row" key={employee.id}><div data-label="Employee"><strong>{employee.full_name}</strong><small>{employee.email} · {employee.last_event || 'No lifecycle event'}</small></div><span data-label="Role">{employee.role}</span><span data-label="Tasks">{employee.completed_tasks} done · {employee.pending_tasks} pending</span><div className="transfer-card-actions" data-label="Account"><Status value={employee.is_active ? 'Active' : 'Inactive'}/><button className="row-action" onClick={() => { setSelectedEmployee(employee); setDialog('employeeHistory'); }}>History</button><button className="row-action" onClick={() => { setSelectedEmployee(employee); setDialog('employeeEdit'); }}>Edit</button>{employee.is_active && <button className="row-action destructive-action" onClick={() => void offboard(employee)}><Users size={13}/> Delete user</button>}</div></div>)}</div><InvitationTable invitations={invitations} resendInvitation={resendInvitation} revokeInvitation={revokeInvitation}/><div className="data-table labelled-cards"><TableHead labels={['Onboarding task','Employee','Due','Action']}/>{tasks.filter(task => task.status === 'Pending').map(task => <div className="data-row" key={task.id}><strong data-label="Onboarding task">{task.title}</strong><span data-label="Employee">{task.user_name}</span><span data-label="Due">{task.due_at || 'No due date'}</span><button className="row-action" data-label="Action" onClick={() => void completeTask(task)}><Check size={13}/> Complete</button></div>)}{!tasks.some(task => task.status === 'Pending') && <p className="workflow-help">No pending onboarding tasks.</p>}</div></LivePanel>
-    </div>
-    <div className="workflow-actions finance-primary-actions"><button className="ops-btn blue" onClick={() => setDialog('expense')}><Plus size={15}/> Submit expense</button><button className="link-btn" onClick={() => void load()}>Refresh</button></div>
-    {error && <p className="workflow-error" role="alert">{error}</p>}
-    <div className="ops-grid-two finance-ledger-grid">
-      <LivePanel className="finance-expenses-page-panel" title="Expenses & approvals" subtitle="Receipt-backed claims with controlled status transitions">
-        <div className="data-table"><TableHead labels={['Expense','Submitter','Amount','Status','Action']}/>
-          {expenses.map(expense => <div className="data-row" key={expense.id}>
-            <div><strong>{expense.number}</strong><small>{expense.category} · {expense.description}</small></div><span>{expense.submitter_name || 'Current user'}</span><span>{formatCurrency(expense.amount, expense.currency || settings.currency)}</span><Status value={expense.status}/>
-            <div className="transfer-card-actions">{expense.attachment_count ? <span title="Receipt attached"><Paperclip size={13}/>{expense.attachment_count}</span> : null}<button className="row-action" onClick={() => { setSelectedExpense(expense); setDialog('expenseDetail'); }}><FileText size={14}/> Details</button>{expense.status === 'Pending' && <><button className="row-action" onClick={() => { setSelectedExpense(expense); setDialog('expenseEdit'); }}>Edit</button><button className="row-action" onClick={() => void updateExpense(expense, 'Approved')}><Check size={14}/> Approve</button><button className="row-action" onClick={() => void updateExpense(expense, 'Rejected')}><X size={14}/> Reject</button></>}{expense.status === 'Approved' && <button className="row-action" onClick={() => void updateExpense(expense, 'Paid')}><CircleDollarSign size={14}/> Mark paid</button>}</div>
-          </div>)}
-          {!expenses.length && <Empty title="No expense claims" detail="Submit the first live expense claim." icon={<CircleDollarSign size={22}/>}/>}
-        </div>
-      </LivePanel>
-      <LivePanel className="finance-invoices-page-panel" title="Invoices & payments" subtitle="Open invoice details, download PDFs, and record partial payments">
-        <div className="data-table"><TableHead labels={['Invoice','Client','Total','Outstanding','Action']}/>
-          {invoices.map(invoice => <div className="data-row" key={invoice.id}><div><strong>{invoice.number}</strong><small>{invoice.sale_number}</small></div><span>{invoice.client_name}</span><span>{formatCurrency(invoice.total, settings.currency)}</span><Status value={Number(invoice.outstanding) <= 0 ? 'Paid' : invoice.status}/><div className="transfer-card-actions"><button className="row-action" onClick={() => { setSelectedInvoice(invoice); setDialog('invoiceDetail'); }}><FileText size={14}/> Details</button><button className="row-action" onClick={() => window.open(`/api/crm/invoices/${invoice.id}/pdf`, '_blank', 'noopener,noreferrer')}><FileText size={14}/> PDF</button><button className="row-action" disabled={invoice.status === 'Void' || Number(invoice.outstanding) <= 0} onClick={() => { setSelectedInvoice(invoice); setDialog('payment'); }}><CircleDollarSign size={14}/> Record payment</button></div></div>)}
-          {!invoices.length && <Empty title="No invoices" detail="Invoices generated from confirmed sales will appear here." icon={<FileText size={22}/>}/>}
-        </div>
-      </LivePanel>
-    </div>
-    <LivePanel className="finance-deliveries-page-panel" title="Delivery notes" subtitle="Review delivery records and open the generated PDF">
-      <div className="data-table"><TableHead labels={['Delivery note','Client','Address','Status','Action']}/>
-        {deliveryNotes.map(note => <div className="data-row" key={note.id}><div><strong>{note.number}</strong><small>{note.sale_number} · {formatOrganizationDate(note.created_at, settings)}</small></div><span>{note.client_name}</span><span>{note.delivery_address || 'No address recorded'}</span><Status value={note.status}/><div className="transfer-card-actions"><button className="row-action" onClick={() => { setSelectedDeliveryNote(note); setDialog('deliveryDetail'); }}><FileText size={14}/> Details</button><button className="row-action" onClick={() => window.open(`/api/crm/delivery-notes/${note.id}/pdf`, '_blank', 'noopener,noreferrer')}><FileText size={14}/> PDF</button></div></div>)}
-        {!deliveryNotes.length && <Empty title="No delivery notes" detail="Delivery notes generated from confirmed sales will appear here." icon={<FileText size={22}/>}/>}
+  if (section === 'hr' && canManagePeople)
+    return (
+      <ManagerControlView
+        employees={employees}
+        invitations={invitations}
+        tasks={tasks}
+        rules={rules}
+        targets={targets}
+        users={users}
+        dialog={dialog}
+        setDialog={setDialog}
+        selectedEmployee={selectedEmployee}
+        setSelectedEmployee={setSelectedEmployee}
+        selectedRule={selectedRule}
+        setSelectedRule={setSelectedRule}
+        selectedTarget={selectedTarget}
+        setSelectedTarget={setSelectedTarget}
+        completeTask={completeTask}
+        offboard={offboard}
+        resendInvitation={resendInvitation}
+        revokeInvitation={revokeInvitation}
+        saved={saved}
+        notify={notify}
+      />
+    );
+  if (normalizedRole === 'manager')
+    return (
+      <ManagerControlView
+        employees={employees}
+        invitations={invitations}
+        tasks={tasks}
+        rules={rules}
+        targets={targets}
+        users={users}
+        dialog={dialog}
+        setDialog={setDialog}
+        selectedEmployee={selectedEmployee}
+        setSelectedEmployee={setSelectedEmployee}
+        selectedRule={selectedRule}
+        setSelectedRule={setSelectedRule}
+        selectedTarget={selectedTarget}
+        setSelectedTarget={setSelectedTarget}
+        completeTask={completeTask}
+        offboard={offboard}
+        resendInvitation={resendInvitation}
+        revokeInvitation={revokeInvitation}
+        saved={saved}
+        notify={notify}
+      />
+    );
+  return (
+    <div className={`finance-pages finance-page-${financePage}`}>
+      <FinanceSectionNav active={financePage} onOpen={openFinancePage} showControls={canManageCommissionSettings} />
+      <div className="ops-kpis">
+        <LiveKpi
+          label="Pending expenses"
+          value={formatCurrency(pendingTotal, settings.currency)}
+          note={`${expenses.filter((expense) => expense.status === 'Pending').length} awaiting review`}
+          icon={<CircleDollarSign size={16} />}
+          tone="amber"
+        />
+        <LiveKpi
+          label="Outstanding invoices"
+          value={formatCurrency(outstandingTotal, settings.currency)}
+          note={`${invoices.filter((invoice) => Number(invoice.outstanding) > 0).length} accounts receivable`}
+          icon={<FileText size={16} />}
+          tone="blue"
+        />
+        <LiveKpi
+          label="Recorded invoices"
+          value={invoices.length.toString()}
+          note="Payment lifecycle enabled"
+          icon={<Check size={16} />}
+          tone="green"
+        />
+        <LiveKpi
+          label="Provisional commissions"
+          value={commissions.filter((commission) => commission.status === 'Provisional').length.toString()}
+          note="Awaiting manager approval"
+          icon={<Paperclip size={16} />}
+          tone="purple"
+        />
       </div>
-    </LivePanel>
-    <LivePanel className="finance-returns-page-panel" title="Returns and refunds" subtitle="Process pending refunds and credit notes with a traceable history"><div className="data-table"><TableHead labels={['Return','Client / sale','Amount','Status','Action']}/>{returns.map(returnRecord => <div className="data-row" key={returnRecord.id}><div><strong>{returnRecord.number}</strong><small>{returnRecord.reason}</small></div><span>{returnRecord.client_name} · {returnRecord.sale_number}</span><span>{formatCurrency(returnRecord.refund_amount, settings.currency)}</span><Status value={returnRecord.refund_status}/><div className="transfer-card-actions">{returnRecord.credit_note_number ? <span className="workflow-help">{returnRecord.credit_note_number}</span> : null}{returnRecord.refund_status === 'Pending' && <button className="row-action" onClick={() => void processRefund(returnRecord)}>Process refund</button>}</div></div>)}{!returns.length && <Empty title="No returns" detail="Completed sales returns will appear here." icon={<RotateCcw size={22}/>}/>}</div></LivePanel>
-    <LivePanel className="finance-controls-page-panel" title="Finance controls" subtitle="Commission rules and consultant targets are configured per organization"><div className="workflow-summary"><div><Users size={14}/><strong>{rules.length} commission rules</strong><button className="link-btn" onClick={() => setDialog('rule')}><Plus size={12}/> Add rule</button></div><div><Check size={14}/><strong>{targets.length} consultant targets</strong><button className="link-btn" onClick={() => setDialog('target')}><Plus size={12}/> Add target</button></div><div><Paperclip size={14}/><strong>Receipt storage</strong>Cloudflare R2 or local adapter</div></div>{rules.length > 0 && <div className="data-table"><TableHead labels={['Rule','Rate','Trigger','Status']}/>{rules.map(rule => <div className="data-row" key={rule.id}><strong>{rule.name}</strong><span>{Number(rule.rate).toFixed(2)}%</span><span>{rule.trigger_status}</span><div className="transfer-card-actions"><Status value={rule.is_active ? 'Active' : 'Inactive'}/><button className="row-action" onClick={() => { setSelectedRule(rule); setDialog('ruleEdit'); }}>Edit</button></div></div>)}</div>}{targets.length > 0 && <div className="data-table"><TableHead labels={['Consultant','Period','Target','Achieved']}/>{targets.map(target => <div className="data-row" key={target.id}><strong>{target.consultant_name}</strong><span>{target.period_start} → {target.period_end}</span><span>{formatCurrency(target.target_amount, settings.currency)}</span><span className="green-text">{formatCurrency(target.achieved, settings.currency)}</span><button className="row-action" onClick={() => { setSelectedTarget(target); setDialog('targetEdit'); }}>Edit</button></div>)}</div>}{!rules.length && !targets.length && <p className="workflow-help">Add the first commission rule or consultant target to make the finance controls visible.</p>}</LivePanel>
-    {dialog === 'expense' && <ExpenseDialog close={() => setDialog(null)} saved={() => saved('Expense submitted')}/>}
-    {dialog === 'expenseDetail' && selectedExpense && <ExpenseDetailDialog expense={selectedExpense} close={() => setDialog(null)}/>}
-    {dialog === 'expenseEdit' && selectedExpense && <ExpenseEditDialog expense={selectedExpense} close={() => setDialog(null)} saved={() => saved('Expense updated')}/>}
-    {dialog === 'payment' && selectedInvoice && <PaymentDialog invoice={selectedInvoice} close={() => setDialog(null)} saved={() => saved('Payment recorded')}/>}
-    {dialog === 'invoiceDetail' && selectedInvoice && <InvoiceDetailDialog invoice={selectedInvoice} close={() => setDialog(null)} openPayment={() => setDialog('payment')}/>}
-    {dialog === 'deliveryDetail' && selectedDeliveryNote && <DeliveryNoteDetailDialog note={selectedDeliveryNote} close={() => setDialog(null)}/>}
-    {dialog === 'invite' && <InviteEmployeeDialog allowCeo close={() => setDialog(null)} saved={() => saved('Invitation created')}/>}
-    {dialog === 'employeeEdit' && selectedEmployee && <EmployeeEditDialog allowCeo employee={selectedEmployee} close={() => { setDialog(null); setSelectedEmployee(null); }} saved={() => { setDialog(null); setSelectedEmployee(null); notify('Employee updated'); void load(); }}/>}
-    {dialog === 'employeeHistory' && selectedEmployee && <EmployeeHistoryDialog employee={selectedEmployee} close={() => { setDialog(null); setSelectedEmployee(null); }}/>}
-    {dialog === 'rule' && <RuleDialog close={() => setDialog(null)} saved={() => saved('Commission rule created')}/>}
-    {dialog === 'ruleEdit' && selectedRule && <RuleEditDialog rule={selectedRule} close={() => setDialog(null)} saved={() => saved('Commission rule updated')}/>}
-    {dialog === 'target' && <TargetDialog users={users} close={() => setDialog(null)} saved={() => saved('Consultant target created')}/>}
-    {dialog === 'targetEdit' && selectedTarget && <TargetEditDialog target={selectedTarget} users={users} close={() => setDialog(null)} saved={() => saved('Consultant target updated')}/>}
-    {dialog === 'onboarding' && <OnboardingDialog users={users} close={() => setDialog(null)} saved={() => saved('Onboarding task created')}/>}
-  </div>;
+      {financePage === 'overview' && (
+        <FinanceOverview
+          pendingExpenses={expenses.filter((expense) => expense.status === 'Pending').length}
+          openInvoices={invoices.filter((invoice) => Number(invoice.outstanding) > 0).length}
+          provisionalCommissions={commissions.filter((commission) => commission.status === 'Provisional').length}
+          deliveryNotes={deliveryNotes.length}
+          returns={returns.filter((record) => record.refund_status === 'Pending').length}
+          rules={rules.length}
+          onOpen={openFinancePage}
+          showControls={canManageCommissionSettings}
+        />
+      )}
+      <div className="ops-grid-two finance-priority-grid">
+        <LivePanel
+          className="finance-commissions-panel"
+          title="Commission run"
+          subtitle="Run active rules, then approve and pay entries"
+        >
+          <div className="workflow-actions">
+            <button className="ops-btn blue" onClick={() => void runCommissions()}>
+              <CircleDollarSign size={15} /> Run commissions
+            </button>
+            <span className="workflow-help">
+              {commissions.length} entries ·{' '}
+              {formatCurrency(
+                commissions.reduce(
+                  (sum, commission) => sum + Number(commission.amount) - Number(commission.clawback_amount || 0),
+                  0,
+                ),
+                settings.currency,
+              )}{' '}
+              net total
+            </span>
+          </div>
+          <div className="data-table labelled-cards">
+            <TableHead labels={['Sale', 'Consultant', 'Rate', 'Amount', 'Action']} />
+            {commissions.map((commission) => (
+              <div className="data-row" key={commission.id}>
+                <div data-label="Sale">
+                  <strong>{commission.sale_number}</strong>
+                  <small>{commission.client_name}</small>
+                </div>
+                <span data-label="Consultant">{commission.consultant_name || 'Unassigned'}</span>
+                <span data-label="Rate">{Number(commission.rate).toFixed(2)}%</span>
+                <span data-label="Amount">
+                  {formatCurrency(commission.amount, settings.currency)}
+                  {Number(commission.clawback_amount) > 0 && (
+                    <small className="workflow-error">
+                      {' '}
+                      − {formatCurrency(commission.clawback_amount, settings.currency)} clawback due
+                    </small>
+                  )}
+                </span>
+                <div className="transfer-card-actions" data-label="Action">
+                  <Status value={commission.status} />
+                  {commission.status === 'Provisional' && (
+                    <>
+                      <button className="row-action" onClick={() => void updateCommission(commission, 'Approved')}>
+                        <Check size={13} /> Approve
+                      </button>
+                      <button className="row-action" onClick={() => void updateCommission(commission, 'Voided')}>
+                        <X size={13} /> Void
+                      </button>
+                    </>
+                  )}
+                  {commission.status === 'Approved' && (
+                    <button className="row-action" onClick={() => void updateCommission(commission, 'Paid')}>
+                      <CircleDollarSign size={13} /> Paid
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+            {!commissions.length && (
+              <Empty
+                title="No commission entries"
+                detail="Run an active rule after confirmed sales are assigned to consultants."
+                icon={<CircleDollarSign size={22} />}
+              />
+            )}
+          </div>
+        </LivePanel>
+        <LivePanel
+          className="finance-ceo-hr-panel"
+          title="HR lifecycle"
+          subtitle="Employee accounts, invitations, onboarding, and auditable lifecycle history"
+        >
+          <div className="workflow-actions">
+            <button className="ops-btn blue" onClick={() => setDialog('invite')}>
+              <Plus size={15} /> Invite employee
+            </button>
+            <button className="ops-btn ghost" onClick={() => setDialog('onboarding')}>
+              <Plus size={15} /> Add onboarding task
+            </button>
+            <span className="workflow-help">
+              {employees.filter((employee) => employee.is_active).length} active employees
+            </span>
+          </div>
+          <div className="data-table labelled-cards finance-ceo-people">
+            <TableHead labels={['Employee', 'Role', 'Tasks', 'Account']} />
+            {employees.map((employee) => (
+              <div className="data-row" key={employee.id}>
+                <div data-label="Employee">
+                  <strong>{employee.full_name}</strong>
+                  <small>
+                    {employee.email} · {employee.last_event || 'No lifecycle event'}
+                  </small>
+                </div>
+                <span data-label="Role">{employee.role}</span>
+                <span data-label="Tasks">
+                  {employee.completed_tasks} done · {employee.pending_tasks} pending
+                </span>
+                <div className="transfer-card-actions" data-label="Account">
+                  <Status value={employee.is_active ? 'Active' : 'Inactive'} />
+                  <button
+                    className="row-action"
+                    onClick={() => {
+                      setSelectedEmployee(employee);
+                      setDialog('employeeHistory');
+                    }}
+                  >
+                    History
+                  </button>
+                  <button
+                    className="row-action"
+                    onClick={() => {
+                      setSelectedEmployee(employee);
+                      setDialog('employeeEdit');
+                    }}
+                  >
+                    Edit
+                  </button>
+                  {employee.is_active && (
+                    <button className="row-action destructive-action" onClick={() => void offboard(employee)}>
+                      <Users size={13} /> Delete user
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          <InvitationTable
+            invitations={invitations}
+            resendInvitation={resendInvitation}
+            revokeInvitation={revokeInvitation}
+          />
+          <div className="data-table labelled-cards">
+            <TableHead labels={['Onboarding task', 'Employee', 'Due', 'Action']} />
+            {tasks
+              .filter((task) => task.status === 'Pending')
+              .map((task) => (
+                <div className="data-row" key={task.id}>
+                  <strong data-label="Onboarding task">{task.title}</strong>
+                  <span data-label="Employee">{task.user_name}</span>
+                  <span data-label="Due">{task.due_at || 'No due date'}</span>
+                  <button className="row-action" data-label="Action" onClick={() => void completeTask(task)}>
+                    <Check size={13} /> Complete
+                  </button>
+                </div>
+              ))}
+            {!tasks.some((task) => task.status === 'Pending') && (
+              <p className="workflow-help">No pending onboarding tasks.</p>
+            )}
+          </div>
+        </LivePanel>
+      </div>
+      <div className="workflow-actions finance-primary-actions">
+        <button className="ops-btn blue" onClick={() => setDialog('expense')}>
+          <Plus size={15} /> Submit expense
+        </button>
+        <button className="link-btn" onClick={() => void load()}>
+          Refresh
+        </button>
+      </div>
+      {error && (
+        <p className="workflow-error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="ops-grid-two finance-ledger-grid">
+        <LivePanel
+          className="finance-expenses-page-panel"
+          title="Expenses & approvals"
+          subtitle="Receipt-backed claims with controlled status transitions"
+        >
+          <div className="data-table">
+            <TableHead labels={['Expense', 'Submitter', 'Amount', 'Status', 'Action']} />
+            {expenses.map((expense) => (
+              <div className="data-row" key={expense.id}>
+                <div>
+                  <strong>{expense.number}</strong>
+                  <small>
+                    {expense.category} · {expense.description}
+                  </small>
+                </div>
+                <span>{expense.submitter_name || 'Current user'}</span>
+                <span>{formatCurrency(expense.amount, expense.currency || settings.currency)}</span>
+                <Status value={expense.status} />
+                <div className="transfer-card-actions">
+                  {expense.attachment_count ? (
+                    <span title="Receipt attached">
+                      <Paperclip size={13} />
+                      {expense.attachment_count}
+                    </span>
+                  ) : null}
+                  <button
+                    className="row-action"
+                    onClick={() => {
+                      setSelectedExpense(expense);
+                      setDialog('expenseDetail');
+                    }}
+                  >
+                    <FileText size={14} /> Details
+                  </button>
+                  {expense.status === 'Pending' && (
+                    <>
+                      <button
+                        className="row-action"
+                        onClick={() => {
+                          setSelectedExpense(expense);
+                          setDialog('expenseEdit');
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button className="row-action" onClick={() => void updateExpense(expense, 'Approved')}>
+                        <Check size={14} /> Approve
+                      </button>
+                      <button className="row-action" onClick={() => void updateExpense(expense, 'Rejected')}>
+                        <X size={14} /> Reject
+                      </button>
+                    </>
+                  )}
+                  {expense.status === 'Approved' && (
+                    <button className="row-action" onClick={() => void updateExpense(expense, 'Paid')}>
+                      <CircleDollarSign size={14} /> Mark paid
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+            {!expenses.length && (
+              <Empty
+                title="No expense claims"
+                detail="Submit the first live expense claim."
+                icon={<CircleDollarSign size={22} />}
+              />
+            )}
+          </div>
+        </LivePanel>
+        <LivePanel
+          className="finance-invoices-page-panel"
+          title="Invoices & payments"
+          subtitle="Open invoice details, download PDFs, and record partial payments"
+        >
+          <div className="data-table">
+            <TableHead labels={['Invoice', 'Client', 'Total', 'Outstanding', 'Action']} />
+            {invoices.map((invoice) => (
+              <div className="data-row" key={invoice.id}>
+                <div>
+                  <strong>{invoice.number}</strong>
+                  <small>{invoice.sale_number}</small>
+                </div>
+                <span>{invoice.client_name}</span>
+                <span>{formatCurrency(invoice.total, settings.currency)}</span>
+                <Status value={Number(invoice.outstanding) <= 0 ? 'Paid' : invoice.status} />
+                <div className="transfer-card-actions">
+                  <button
+                    className="row-action"
+                    onClick={() => {
+                      setSelectedInvoice(invoice);
+                      setDialog('invoiceDetail');
+                    }}
+                  >
+                    <FileText size={14} /> Details
+                  </button>
+                  <button
+                    className="row-action"
+                    onClick={() => window.open(`/api/crm/invoices/${invoice.id}/pdf`, '_blank', 'noopener,noreferrer')}
+                  >
+                    <FileText size={14} /> PDF
+                  </button>
+                  <button
+                    className="row-action"
+                    disabled={invoice.status === 'Void' || Number(invoice.outstanding) <= 0}
+                    onClick={() => {
+                      setSelectedInvoice(invoice);
+                      setDialog('payment');
+                    }}
+                  >
+                    <CircleDollarSign size={14} /> Record payment
+                  </button>
+                </div>
+              </div>
+            ))}
+            {!invoices.length && (
+              <Empty
+                title="No invoices"
+                detail="Invoices generated from confirmed sales will appear here."
+                icon={<FileText size={22} />}
+              />
+            )}
+          </div>
+        </LivePanel>
+      </div>
+      <LivePanel
+        className="finance-deliveries-page-panel"
+        title="Delivery notes"
+        subtitle="Review delivery records and open the generated PDF"
+      >
+        <div className="data-table">
+          <TableHead labels={['Delivery note', 'Client', 'Address', 'Status', 'Action']} />
+          {deliveryNotes.map((note) => (
+            <div className="data-row" key={note.id}>
+              <div>
+                <strong>{note.number}</strong>
+                <small>
+                  {note.sale_number} · {formatOrganizationDate(note.created_at, settings)}
+                </small>
+              </div>
+              <span>{note.client_name}</span>
+              <span>{note.delivery_address || 'No address recorded'}</span>
+              <Status value={note.status} />
+              <div className="transfer-card-actions">
+                <button
+                  className="row-action"
+                  onClick={() => {
+                    setSelectedDeliveryNote(note);
+                    setDialog('deliveryDetail');
+                  }}
+                >
+                  <FileText size={14} /> Details
+                </button>
+                <button
+                  className="row-action"
+                  onClick={() => window.open(`/api/crm/delivery-notes/${note.id}/pdf`, '_blank', 'noopener,noreferrer')}
+                >
+                  <FileText size={14} /> PDF
+                </button>
+              </div>
+            </div>
+          ))}
+          {!deliveryNotes.length && (
+            <Empty
+              title="No delivery notes"
+              detail="Delivery notes generated from confirmed sales will appear here."
+              icon={<FileText size={22} />}
+            />
+          )}
+        </div>
+      </LivePanel>
+      <LivePanel
+        className="finance-returns-page-panel"
+        title="Returns and refunds"
+        subtitle="Process pending refunds and credit notes with a traceable history"
+      >
+        <div className="data-table">
+          <TableHead labels={['Return', 'Client / sale', 'Amount', 'Status', 'Action']} />
+          {returns.map((returnRecord) => (
+            <div className="data-row" key={returnRecord.id}>
+              <div>
+                <strong>{returnRecord.number}</strong>
+                <small>{returnRecord.reason}</small>
+              </div>
+              <span>
+                {returnRecord.client_name} · {returnRecord.sale_number}
+              </span>
+              <span>{formatCurrency(returnRecord.refund_amount, settings.currency)}</span>
+              <Status value={returnRecord.refund_status} />
+              <div className="transfer-card-actions">
+                {returnRecord.credit_note_number ? (
+                  <span className="workflow-help">{returnRecord.credit_note_number}</span>
+                ) : null}
+                {returnRecord.refund_status === 'Pending' && (
+                  <button className="row-action" onClick={() => void processRefund(returnRecord)}>
+                    Process refund
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+          {!returns.length && (
+            <Empty
+              title="No returns"
+              detail="Completed sales returns will appear here."
+              icon={<RotateCcw size={22} />}
+            />
+          )}
+        </div>
+      </LivePanel>
+      <LivePanel
+        className="finance-controls-page-panel"
+        title="Finance controls"
+        subtitle="Commission rules and consultant targets are configured per organization"
+      >
+        <div className="workflow-summary">
+          <div>
+            <Users size={14} />
+            <strong>{rules.length} commission rules</strong>
+            <button className="link-btn" onClick={() => setDialog('rule')}>
+              <Plus size={12} /> Add rule
+            </button>
+          </div>
+          <div>
+            <Check size={14} />
+            <strong>{targets.length} consultant targets</strong>
+            <button className="link-btn" onClick={() => setDialog('target')}>
+              <Plus size={12} /> Add target
+            </button>
+          </div>
+          <div>
+            <Paperclip size={14} />
+            <strong>Receipt storage</strong>Cloudflare R2 or local adapter
+          </div>
+        </div>
+        {rules.length > 0 && (
+          <div className="data-table">
+            <TableHead labels={['Rule', 'Rate', 'Trigger', 'Status']} />
+            {rules.map((rule) => (
+              <div className="data-row" key={rule.id}>
+                <strong>{rule.name}</strong>
+                <span>{Number(rule.rate).toFixed(2)}%</span>
+                <span>{rule.trigger_status}</span>
+                <div className="transfer-card-actions">
+                  <Status value={rule.is_active ? 'Active' : 'Inactive'} />
+                  <button
+                    className="row-action"
+                    onClick={() => {
+                      setSelectedRule(rule);
+                      setDialog('ruleEdit');
+                    }}
+                  >
+                    Edit
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {targets.length > 0 && (
+          <div className="data-table">
+            <TableHead labels={['Consultant', 'Period', 'Target', 'Achieved']} />
+            {targets.map((target) => (
+              <div className="data-row" key={target.id}>
+                <strong>{target.consultant_name}</strong>
+                <span>
+                  {target.period_start} → {target.period_end}
+                </span>
+                <span>{formatCurrency(target.target_amount, settings.currency)}</span>
+                <span className="green-text">{formatCurrency(target.achieved, settings.currency)}</span>
+                <button
+                  className="row-action"
+                  onClick={() => {
+                    setSelectedTarget(target);
+                    setDialog('targetEdit');
+                  }}
+                >
+                  Edit
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {!rules.length && !targets.length && (
+          <p className="workflow-help">
+            Add the first commission rule or consultant target to make the finance controls visible.
+          </p>
+        )}
+      </LivePanel>
+      {dialog === 'expense' && <ExpenseDialog close={() => setDialog(null)} saved={() => saved('Expense submitted')} />}
+      {dialog === 'expenseDetail' && selectedExpense && (
+        <ExpenseDetailDialog expense={selectedExpense} close={() => setDialog(null)} />
+      )}
+      {dialog === 'expenseEdit' && selectedExpense && (
+        <ExpenseEditDialog
+          expense={selectedExpense}
+          close={() => setDialog(null)}
+          saved={() => saved('Expense updated')}
+        />
+      )}
+      {dialog === 'payment' && selectedInvoice && (
+        <PaymentDialog
+          invoice={selectedInvoice}
+          close={() => setDialog(null)}
+          saved={() => saved('Payment recorded')}
+        />
+      )}
+      {dialog === 'invoiceDetail' && selectedInvoice && (
+        <InvoiceDetailDialog
+          invoice={selectedInvoice}
+          close={() => setDialog(null)}
+          openPayment={() => setDialog('payment')}
+        />
+      )}
+      {dialog === 'deliveryDetail' && selectedDeliveryNote && (
+        <DeliveryNoteDetailDialog note={selectedDeliveryNote} close={() => setDialog(null)} />
+      )}
+      {dialog === 'invite' && (
+        <InviteEmployeeDialog allowCeo close={() => setDialog(null)} saved={() => saved('Invitation created')} />
+      )}
+      {dialog === 'employeeEdit' && selectedEmployee && (
+        <EmployeeEditDialog
+          allowCeo
+          employee={selectedEmployee}
+          close={() => {
+            setDialog(null);
+            setSelectedEmployee(null);
+          }}
+          saved={() => {
+            setDialog(null);
+            setSelectedEmployee(null);
+            notify('Employee updated');
+            void load();
+          }}
+        />
+      )}
+      {dialog === 'employeeHistory' && selectedEmployee && (
+        <EmployeeHistoryDialog
+          employee={selectedEmployee}
+          close={() => {
+            setDialog(null);
+            setSelectedEmployee(null);
+          }}
+        />
+      )}
+      {dialog === 'rule' && <RuleDialog close={() => setDialog(null)} saved={() => saved('Commission rule created')} />}
+      {dialog === 'ruleEdit' && selectedRule && (
+        <RuleEditDialog
+          rule={selectedRule}
+          close={() => setDialog(null)}
+          saved={() => saved('Commission rule updated')}
+        />
+      )}
+      {dialog === 'target' && (
+        <TargetDialog users={users} close={() => setDialog(null)} saved={() => saved('Consultant target created')} />
+      )}
+      {dialog === 'targetEdit' && selectedTarget && (
+        <TargetEditDialog
+          target={selectedTarget}
+          users={users}
+          close={() => setDialog(null)}
+          saved={() => saved('Consultant target updated')}
+        />
+      )}
+      {dialog === 'onboarding' && (
+        <OnboardingDialog users={users} close={() => setDialog(null)} saved={() => saved('Onboarding task created')} />
+      )}
+    </div>
+  );
 }
 
-function FinanceSectionNav({ active, onOpen, showControls }: { active: FinancePage; onOpen: (page: FinancePage) => void; showControls: boolean }) {
+function FinanceSectionNav({
+  active,
+  onOpen,
+  showControls,
+}: {
+  active: FinancePage;
+  onOpen: (page: FinancePage) => void;
+  showControls: boolean;
+}) {
   const items: Array<{ page: FinancePage; label: string; icon: typeof LayoutGrid }> = [
     { page: 'overview', label: 'Overview', icon: LayoutGrid },
     { page: 'commissions', label: 'Commissions', icon: CircleDollarSign },
@@ -188,211 +1073,1984 @@ function FinanceSectionNav({ active, onOpen, showControls }: { active: FinancePa
     { page: 'returns', label: 'Returns', icon: RotateCcw },
   ];
   if (showControls) items.push({ page: 'controls', label: 'Controls', icon: Settings2 });
-  return <nav className="finance-page-nav" aria-label="Finance workspace pages">
-    {items.map(item => {
-      const Icon = item.icon;
-      return <button key={item.page} type="button" className={active === item.page ? 'active' : ''} aria-current={active === item.page ? 'page' : undefined} onClick={() => onOpen(item.page)}><Icon size={16}/><span>{item.label}</span></button>;
-    })}
-  </nav>;
+  return (
+    <nav className="finance-page-nav" aria-label="Finance workspace pages">
+      {items.map((item) => {
+        const Icon = item.icon;
+        return (
+          <button
+            key={item.page}
+            type="button"
+            className={active === item.page ? 'active' : ''}
+            aria-current={active === item.page ? 'page' : undefined}
+            onClick={() => onOpen(item.page)}
+          >
+            <Icon size={16} />
+            <span>{item.label}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
 }
 
-function FinanceOverview({ pendingExpenses, openInvoices, provisionalCommissions, deliveryNotes, returns, rules, onOpen, showControls }: { pendingExpenses: number; openInvoices: number; provisionalCommissions: number; deliveryNotes: number; returns: number; rules: number; onOpen: (page: FinancePage) => void; showControls: boolean }) {
-  const items: Array<{ page: FinancePage; title: string; detail: string; count: number; icon: typeof CircleDollarSign; tone: string }> = [
-    { page: 'commissions', title: 'Commissions', detail: 'Run, approve and settle consultant commission entries.', count: provisionalCommissions, icon: CircleDollarSign, tone: 'purple' },
-    { page: 'expenses', title: 'Expenses', detail: 'Review receipt-backed claims and approval status.', count: pendingExpenses, icon: ReceiptText, tone: 'amber' },
-    { page: 'invoices', title: 'Invoices & payments', detail: 'Manage debtors, PDFs and partial payment history.', count: openInvoices, icon: WalletCards, tone: 'blue' },
-    { page: 'deliveries', title: 'Delivery notes', detail: 'Open delivery records and branded documents.', count: deliveryNotes, icon: Truck, tone: 'green' },
-    { page: 'returns', title: 'Returns & refunds', detail: 'Process pending refunds and credit notes.', count: returns, icon: RotateCcw, tone: 'red' },
+function FinanceOverview({
+  pendingExpenses,
+  openInvoices,
+  provisionalCommissions,
+  deliveryNotes,
+  returns,
+  rules,
+  onOpen,
+  showControls,
+}: {
+  pendingExpenses: number;
+  openInvoices: number;
+  provisionalCommissions: number;
+  deliveryNotes: number;
+  returns: number;
+  rules: number;
+  onOpen: (page: FinancePage) => void;
+  showControls: boolean;
+}) {
+  const items: Array<{
+    page: FinancePage;
+    title: string;
+    detail: string;
+    count: number;
+    icon: typeof CircleDollarSign;
+    tone: string;
+  }> = [
+    {
+      page: 'commissions',
+      title: 'Commissions',
+      detail: 'Run, approve and settle consultant commission entries.',
+      count: provisionalCommissions,
+      icon: CircleDollarSign,
+      tone: 'purple',
+    },
+    {
+      page: 'expenses',
+      title: 'Expenses',
+      detail: 'Review receipt-backed claims and approval status.',
+      count: pendingExpenses,
+      icon: ReceiptText,
+      tone: 'amber',
+    },
+    {
+      page: 'invoices',
+      title: 'Invoices & payments',
+      detail: 'Manage debtors, PDFs and partial payment history.',
+      count: openInvoices,
+      icon: WalletCards,
+      tone: 'blue',
+    },
+    {
+      page: 'deliveries',
+      title: 'Delivery notes',
+      detail: 'Open delivery records and branded documents.',
+      count: deliveryNotes,
+      icon: Truck,
+      tone: 'green',
+    },
+    {
+      page: 'returns',
+      title: 'Returns & refunds',
+      detail: 'Process pending refunds and credit notes.',
+      count: returns,
+      icon: RotateCcw,
+      tone: 'red',
+    },
   ];
-  if (showControls) items.push({ page: 'controls', title: 'Finance controls', detail: 'Maintain commission rules and consultant targets.', count: rules, icon: Settings2, tone: 'slate' });
-  return <section className="finance-overview" aria-labelledby="finance-work-queues">
-    <div className="finance-overview-heading"><div><span className="ops-kicker">Workspace directory</span><h2 id="finance-work-queues">Choose a finance workflow</h2><p>Each operational queue now opens as a focused page with its own actions and records.</p></div></div>
-    <div className="finance-overview-grid">
-      {items.map(item => {
-        const Icon = item.icon;
-        return <button type="button" className="finance-overview-card" key={item.page} onClick={() => onOpen(item.page)}>
-          <span className={`finance-overview-icon ${item.tone}`}><Icon size={18}/></span>
-          <span className="finance-overview-copy"><strong>{item.title}</strong><span>{item.detail}</span></span>
-          <span className="finance-overview-count"><strong>{item.count}</strong><span>open</span></span>
-          <ArrowRight className="finance-overview-arrow" size={17}/>
-        </button>;
-      })}
-    </div>
-  </section>;
+  if (showControls)
+    items.push({
+      page: 'controls',
+      title: 'Finance controls',
+      detail: 'Maintain commission rules and consultant targets.',
+      count: rules,
+      icon: Settings2,
+      tone: 'slate',
+    });
+  return (
+    <section className="finance-overview" aria-labelledby="finance-work-queues">
+      <div className="finance-overview-heading">
+        <div>
+          <span className="ops-kicker">Workspace directory</span>
+          <h2 id="finance-work-queues">Choose a finance workflow</h2>
+          <p>Each operational queue now opens as a focused page with its own actions and records.</p>
+        </div>
+      </div>
+      <div className="finance-overview-grid">
+        {items.map((item) => {
+          const Icon = item.icon;
+          return (
+            <button type="button" className="finance-overview-card" key={item.page} onClick={() => onOpen(item.page)}>
+              <span className={`finance-overview-icon ${item.tone}`}>
+                <Icon size={18} />
+              </span>
+              <span className="finance-overview-copy">
+                <strong>{item.title}</strong>
+                <span>{item.detail}</span>
+              </span>
+              <span className="finance-overview-count">
+                <strong>{item.count}</strong>
+                <span>open</span>
+              </span>
+              <ArrowRight className="finance-overview-arrow" size={17} />
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
 
 function ExpenseDetailDialog({ expense, close }: { expense: Expense; close: () => void }) {
-  const [detail, setDetail] = useState<{ approved_at?: string; paid_at?: string; approver_name?: string; serial_number?: string; product_type?: string; attachments: ExpenseAttachment[] } | null>(null); const [error, setError] = useState('');
+  const [detail, setDetail] = useState<{
+    approved_at?: string;
+    paid_at?: string;
+    approver_name?: string;
+    serial_number?: string;
+    product_type?: string;
+    attachments: ExpenseAttachment[];
+  } | null>(null);
+  const [error, setError] = useState('');
   const settings = useOrganizationSettings();
-  useEffect(() => { void fetch(`/api/finance/expenses/${expense.id}`, { cache: 'no-store' }).then(async response => { const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Unable to load expense detail.'); setDetail(data.expense); }).catch(loadError => setError(loadError instanceof Error ? loadError.message : 'Unable to load expense detail.')); }, [expense.id]);
-  const removeAttachment = async (attachment: ExpenseAttachment) => { if (!window.confirm(`Delete ${attachment.fileName}?`)) return; const response = await fetch(`/api/attachments/${attachment.id}`, { method: 'DELETE' }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to delete receipt.'); return; } setDetail(current => current ? { ...current, attachments: current.attachments.filter(item => item.id !== attachment.id) } : current); };
-  return <Dialog title={`${expense.number} details`} close={close}><div className="workflow-form"><div className="workflow-summary"><div><strong>{expense.submitter_name || 'Current user'}</strong>Submitter</div><div><strong>{formatCurrency(expense.amount, expense.currency || settings.currency)}</strong>Amount</div><div><strong>{expense.status}</strong>Status</div></div><Field label="Description"><textarea readOnly rows={3} value={`${expense.category} · ${expense.description}`}/></Field><p className="workflow-help">Affected serial: {detail?.serial_number || expense.serial_number || 'Not linked'}{detail?.product_type ? ` · ${detail.product_type}` : ''}</p><p className="workflow-help">Submitted {formatOrganizationDate(expense.submitted_at, settings)}{detail?.approver_name ? ` · Reviewed by ${detail.approver_name}` : ''}{detail?.paid_at ? ` · Paid ${formatOrganizationDate(detail.paid_at, settings)}` : ''}</p><div className="serial-picker"><strong>Receipts and attachments</strong>{detail?.attachments.map(attachment => <div className="attachment-row" key={attachment.id}><a href={`/api/attachments/${attachment.id}`} target="_blank" rel="noreferrer">{attachment.fileName} · {(attachment.sizeBytes / 1024).toFixed(0)} KB</a><div className="transfer-card-actions"><button type="button" className="row-action" onClick={() => window.open(`/api/attachments/${attachment.id}`, '_blank', 'noopener,noreferrer')}>Preview</button><button type="button" className="row-action" onClick={() => void removeAttachment(attachment)}>Delete</button></div></div>)}{detail && !detail.attachments.length && <span className="workflow-help">No receipt attached.</span>}</div>{error && <p className="workflow-error">{error}</p>}<div className="workflow-dialog-actions"><button type="button" className="ops-btn blue" onClick={close}>Close</button></div></div></Dialog>;
+  useEffect(() => {
+    void fetch(`/api/finance/expenses/${expense.id}`, { cache: 'no-store' })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Unable to load expense detail.');
+        setDetail(data.expense);
+      })
+      .catch((loadError) =>
+        setError(loadError instanceof Error ? loadError.message : 'Unable to load expense detail.'),
+      );
+  }, [expense.id]);
+  const removeAttachment = async (attachment: ExpenseAttachment) => {
+    if (!window.confirm(`Delete ${attachment.fileName}?`)) return;
+    const response = await fetch(`/api/attachments/${attachment.id}`, { method: 'DELETE' });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to delete receipt.');
+      return;
+    }
+    setDetail((current) =>
+      current ? { ...current, attachments: current.attachments.filter((item) => item.id !== attachment.id) } : current,
+    );
+  };
+  return (
+    <Dialog title={`${expense.number} details`} close={close}>
+      <div className="workflow-form">
+        <div className="workflow-summary">
+          <div>
+            <strong>{expense.submitter_name || 'Current user'}</strong>Submitter
+          </div>
+          <div>
+            <strong>{formatCurrency(expense.amount, expense.currency || settings.currency)}</strong>Amount
+          </div>
+          <div>
+            <strong>{expense.status}</strong>Status
+          </div>
+        </div>
+        <Field label="Description">
+          <textarea readOnly rows={3} value={`${expense.category} · ${expense.description}`} />
+        </Field>
+        <p className="workflow-help">
+          Affected serial: {detail?.serial_number || expense.serial_number || 'Not linked'}
+          {detail?.product_type ? ` · ${detail.product_type}` : ''}
+        </p>
+        <p className="workflow-help">
+          Submitted {formatOrganizationDate(expense.submitted_at, settings)}
+          {detail?.approver_name ? ` · Reviewed by ${detail.approver_name}` : ''}
+          {detail?.paid_at ? ` · Paid ${formatOrganizationDate(detail.paid_at, settings)}` : ''}
+        </p>
+        <div className="serial-picker">
+          <strong>Receipts and attachments</strong>
+          {detail?.attachments.map((attachment) => (
+            <div className="attachment-row" key={attachment.id}>
+              <a href={`/api/attachments/${attachment.id}`} target="_blank" rel="noreferrer">
+                {attachment.fileName} · {(attachment.sizeBytes / 1024).toFixed(0)} KB
+              </a>
+              <div className="transfer-card-actions">
+                <button
+                  type="button"
+                  className="row-action"
+                  onClick={() => window.open(`/api/attachments/${attachment.id}`, '_blank', 'noopener,noreferrer')}
+                >
+                  Preview
+                </button>
+                <button type="button" className="row-action" onClick={() => void removeAttachment(attachment)}>
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+          {detail && !detail.attachments.length && <span className="workflow-help">No receipt attached.</span>}
+        </div>
+        {error && <p className="workflow-error">{error}</p>}
+        <div className="workflow-dialog-actions">
+          <button type="button" className="ops-btn blue" onClick={close}>
+            Close
+          </button>
+        </div>
+      </div>
+    </Dialog>
+  );
 }
 
 function ExpenseEditDialog({ expense, close, saved }: { expense: Expense; close: () => void; saved: () => void }) {
-  const [form, setForm] = useState({ category: expense.category, description: expense.description }); const [error, setError] = useState('');
-  const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch(`/api/finance/expenses/${expense.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to update expense.'); return; } saved(); };
-  return <Dialog title={`Edit ${expense.number}`} close={close}><form className="workflow-form" onSubmit={submit}><Field label="Category"><input required value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}/></Field><Field label="Description"><textarea required rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}/></Field>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Save expense"/></form></Dialog>;
+  const [form, setForm] = useState({ category: expense.category, description: expense.description });
+  const [error, setError] = useState('');
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const response = await fetch(`/api/finance/expenses/${expense.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to update expense.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title={`Edit ${expense.number}`} close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Category">
+          <input required value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+        </Field>
+        <Field label="Description">
+          <textarea
+            required
+            rows={3}
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+          />
+        </Field>
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Save expense" />
+      </form>
+    </Dialog>
+  );
 }
 
 function ExpenseDialog({ close, saved }: { close: () => void; saved: () => void }) {
   const [form, setForm] = useState({ category: 'Travel', description: '', amount: '', serialNumber: '' });
-  const [file, setFile] = useState<File | null>(null); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
   const settings = useOrganizationSettings();
-  const submit = async (event: FormEvent) => { event.preventDefault(); setBusy(true); setError(''); try { const response = await fetch('/api/finance/expenses', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, amount: Number(form.amount), serialNumber: form.serialNumber.trim() || undefined }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Unable to submit expense.'); if (file) { const upload = new FormData(); upload.set('entityType', 'expense'); upload.set('entityId', data.expense.id); upload.set('file', file); const uploadResponse = await fetch('/api/attachments', { method: 'POST', body: upload }); if (!uploadResponse.ok) throw new Error('Expense saved, but the receipt upload failed.'); } saved(); } catch (submitError) { setError(submitError instanceof Error ? submitError.message : 'Unable to submit expense.'); } finally { setBusy(false); } };
-  return <Dialog title="Submit expense" close={close}><form className="workflow-form" onSubmit={submit}><Field label="Category"><select value={form.category} onChange={event => setForm({ ...form, category: event.target.value })}><option>Travel</option><option>Client meeting</option><option>Equipment</option><option>Office</option><option>Other</option></select></Field><Field label="Description"><textarea required rows={3} value={form.description} onChange={event => setForm({ ...form, description: event.target.value })}/></Field><Field label={`Amount (${settings.currency})`}><input required type="number" min="0.01" step="0.01" value={form.amount} onChange={event => setForm({ ...form, amount: event.target.value })}/></Field><Field label="Affected serial (recommended)"><input value={form.serialNumber} onChange={event => setForm({ ...form, serialNumber: event.target.value })} placeholder="Required for repair/replacement expenses"/></Field><Field label="Receipt (optional)"><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={event => setFile(event.target.files?.[0] || null)}/></Field>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label={busy ? 'Submitting…' : 'Submit expense'} disabled={busy}/></form></Dialog>;
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      const response = await fetch('/api/finance/expenses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...form,
+          amount: Number(form.amount),
+          serialNumber: form.serialNumber.trim() || undefined,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Unable to submit expense.');
+      if (file) {
+        const upload = new FormData();
+        upload.set('entityType', 'expense');
+        upload.set('entityId', data.expense.id);
+        upload.set('file', file);
+        const uploadResponse = await fetch('/api/attachments', { method: 'POST', body: upload });
+        if (!uploadResponse.ok) throw new Error('Expense saved, but the receipt upload failed.');
+      }
+      saved();
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : 'Unable to submit expense.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Dialog title="Submit expense" close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Category">
+          <select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}>
+            <option>Travel</option>
+            <option>Client meeting</option>
+            <option>Equipment</option>
+            <option>Office</option>
+            <option>Other</option>
+          </select>
+        </Field>
+        <Field label="Description">
+          <textarea
+            required
+            rows={3}
+            value={form.description}
+            onChange={(event) => setForm({ ...form, description: event.target.value })}
+          />
+        </Field>
+        <Field label={`Amount (${settings.currency})`}>
+          <input
+            required
+            type="number"
+            min="0.01"
+            step="0.01"
+            value={form.amount}
+            onChange={(event) => setForm({ ...form, amount: event.target.value })}
+          />
+        </Field>
+        <Field label="Affected serial (recommended)">
+          <input
+            value={form.serialNumber}
+            onChange={(event) => setForm({ ...form, serialNumber: event.target.value })}
+            placeholder="Required for repair/replacement expenses"
+          />
+        </Field>
+        <Field label="Receipt (optional)">
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp,application/pdf"
+            onChange={(event) => setFile(event.target.files?.[0] || null)}
+          />
+        </Field>
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label={busy ? 'Submitting…' : 'Submit expense'} disabled={busy} />
+      </form>
+    </Dialog>
+  );
 }
 
-function InvoiceDetailDialog({ invoice, close, openPayment }: { invoice: Invoice; close: () => void; openPayment: () => void }) {
-  const [payments, setPayments] = useState<Payment[]>([]); const [error, setError] = useState('');
+function InvoiceDetailDialog({
+  invoice,
+  close,
+  openPayment,
+}: {
+  invoice: Invoice;
+  close: () => void;
+  openPayment: () => void;
+}) {
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [error, setError] = useState('');
   const settings = useOrganizationSettings();
-  useEffect(() => { void fetch(`/api/crm/invoices/${invoice.id}/payments`, { cache: 'no-store' }).then(async response => { const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Unable to load payment history.'); setPayments(data.payments || []); }).catch(loadError => setError(loadError instanceof Error ? loadError.message : 'Unable to load payment history.')); }, [invoice.id]);
-  return <Dialog title={`Invoice ${invoice.number}`} close={close}><div className="workflow-form"><div className="workflow-summary"><div><strong>{invoice.client_name}</strong>Client</div><div><strong>{invoice.sale_number}</strong>Sale</div><div><strong>{formatCurrency(invoice.total, settings.currency)}</strong>Total</div><div><strong>{formatCurrency(invoice.outstanding, settings.currency)}</strong>Outstanding</div></div><p className="workflow-help">Status: <Status value={Number(invoice.outstanding) <= 0 ? 'Paid' : invoice.status}/>{invoice.due_at ? ` · Due ${formatOrganizationDate(invoice.due_at, settings)}` : ''}</p><div className="data-table"><TableHead labels={['Payment','Method','Reference','Recorded by']}/>{payments.map(payment => <div className="data-row" key={payment.id}><strong>{formatCurrency(payment.amount, settings.currency)}</strong><span>{payment.method}</span><span>{payment.reference || '—'}</span><span>{payment.recorded_by || '—'} · {formatOrganizationDate(payment.paid_at, settings)}</span></div>)}{!payments.length && !error && <p className="workflow-help">No payments recorded yet.</p>}</div>{error && <p className="workflow-error">{error}</p>}<div className="workflow-dialog-actions"><button type="button" className="ops-btn ghost" onClick={close}>Close</button><button type="button" className="ops-btn ghost" onClick={() => window.open(`/api/crm/invoices/${invoice.id}/pdf`, '_blank', 'noopener,noreferrer')}><FileText size={14}/> Open PDF</button><button type="button" className="ops-btn blue" disabled={invoice.status === 'Void' || Number(invoice.outstanding) <= 0} onClick={openPayment}><CircleDollarSign size={14}/> Record payment</button></div></div></Dialog>;
+  useEffect(() => {
+    void fetch(`/api/crm/invoices/${invoice.id}/payments`, { cache: 'no-store' })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Unable to load payment history.');
+        setPayments(data.payments || []);
+      })
+      .catch((loadError) =>
+        setError(loadError instanceof Error ? loadError.message : 'Unable to load payment history.'),
+      );
+  }, [invoice.id]);
+  return (
+    <Dialog title={`Invoice ${invoice.number}`} close={close}>
+      <div className="workflow-form">
+        <div className="workflow-summary">
+          <div>
+            <strong>{invoice.client_name}</strong>Client
+          </div>
+          <div>
+            <strong>{invoice.sale_number}</strong>Sale
+          </div>
+          <div>
+            <strong>{formatCurrency(invoice.total, settings.currency)}</strong>Total
+          </div>
+          <div>
+            <strong>{formatCurrency(invoice.outstanding, settings.currency)}</strong>Outstanding
+          </div>
+        </div>
+        <p className="workflow-help">
+          Status: <Status value={Number(invoice.outstanding) <= 0 ? 'Paid' : invoice.status} />
+          {invoice.due_at ? ` · Due ${formatOrganizationDate(invoice.due_at, settings)}` : ''}
+        </p>
+        <div className="data-table">
+          <TableHead labels={['Payment', 'Method', 'Reference', 'Recorded by']} />
+          {payments.map((payment) => (
+            <div className="data-row" key={payment.id}>
+              <strong>{formatCurrency(payment.amount, settings.currency)}</strong>
+              <span>{payment.method}</span>
+              <span>{payment.reference || '—'}</span>
+              <span>
+                {payment.recorded_by || '—'} · {formatOrganizationDate(payment.paid_at, settings)}
+              </span>
+            </div>
+          ))}
+          {!payments.length && !error && <p className="workflow-help">No payments recorded yet.</p>}
+        </div>
+        {error && <p className="workflow-error">{error}</p>}
+        <div className="workflow-dialog-actions">
+          <button type="button" className="ops-btn ghost" onClick={close}>
+            Close
+          </button>
+          <button
+            type="button"
+            className="ops-btn ghost"
+            onClick={() => window.open(`/api/crm/invoices/${invoice.id}/pdf`, '_blank', 'noopener,noreferrer')}
+          >
+            <FileText size={14} /> Open PDF
+          </button>
+          <button
+            type="button"
+            className="ops-btn blue"
+            disabled={invoice.status === 'Void' || Number(invoice.outstanding) <= 0}
+            onClick={openPayment}
+          >
+            <CircleDollarSign size={14} /> Record payment
+          </button>
+        </div>
+      </div>
+    </Dialog>
+  );
 }
 
 function DeliveryNoteDetailDialog({ note, close }: { note: DeliveryNote; close: () => void }) {
   const settings = useOrganizationSettings();
-  return <Dialog title={`Delivery note ${note.number}`} close={close}><div className="workflow-form"><div className="workflow-summary"><div><strong>{note.client_name}</strong>Client</div><div><strong>{note.sale_number}</strong>Sale</div><div><strong>{note.status}</strong>Status</div><div><strong>{formatOrganizationDate(note.created_at, settings)}</strong>Created</div></div><Field label="Delivery address"><textarea readOnly rows={3} value={note.delivery_address || 'No address recorded'}/></Field><div className="workflow-dialog-actions"><button type="button" className="ops-btn ghost" onClick={close}>Close</button><button type="button" className="ops-btn blue" onClick={() => window.open(`/api/crm/delivery-notes/${note.id}/pdf`, '_blank', 'noopener,noreferrer')}><FileText size={14}/> Open PDF</button></div></div></Dialog>;
+  return (
+    <Dialog title={`Delivery note ${note.number}`} close={close}>
+      <div className="workflow-form">
+        <div className="workflow-summary">
+          <div>
+            <strong>{note.client_name}</strong>Client
+          </div>
+          <div>
+            <strong>{note.sale_number}</strong>Sale
+          </div>
+          <div>
+            <strong>{note.status}</strong>Status
+          </div>
+          <div>
+            <strong>{formatOrganizationDate(note.created_at, settings)}</strong>Created
+          </div>
+        </div>
+        <Field label="Delivery address">
+          <textarea readOnly rows={3} value={note.delivery_address || 'No address recorded'} />
+        </Field>
+        <div className="workflow-dialog-actions">
+          <button type="button" className="ops-btn ghost" onClick={close}>
+            Close
+          </button>
+          <button
+            type="button"
+            className="ops-btn blue"
+            onClick={() => window.open(`/api/crm/delivery-notes/${note.id}/pdf`, '_blank', 'noopener,noreferrer')}
+          >
+            <FileText size={14} /> Open PDF
+          </button>
+        </div>
+      </div>
+    </Dialog>
+  );
 }
 
-function EmployeeEditDialog({ employee, allowCeo, close, saved }: { employee: Employee; allowCeo: boolean; close: () => void; saved: () => void }) {
-  const [form, setForm] = useState({ fullName: employee.full_name, email: employee.email, role: employee.role, isActive: employee.is_active }); const [error, setError] = useState('');
-  const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch(`/api/hr/employees/${employee.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to update employee.'); return; } saved(); };
-  return <Dialog title={`Edit ${employee.full_name}`} close={close}><form className="workflow-form" onSubmit={submit}><Field label="Full name"><input required value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })}/></Field><Field label="Email"><input required type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}/></Field><div className="workflow-form-grid"><Field label="Role"><select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}>{allowCeo && <option>ceo</option>}<option>manager</option><option>finance</option><option>sales_consultant</option></select></Field><Field label="Account"><select value={form.isActive ? 'Active' : 'Inactive'} onChange={e => setForm({ ...form, isActive: e.target.value === 'Active' })}><option>Active</option><option>Inactive</option></select></Field></div>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Save employee"/></form></Dialog>;
+function EmployeeEditDialog({
+  employee,
+  allowCeo,
+  close,
+  saved,
+}: {
+  employee: Employee;
+  allowCeo: boolean;
+  close: () => void;
+  saved: () => void;
+}) {
+  const [form, setForm] = useState({
+    fullName: employee.full_name,
+    email: employee.email,
+    role: employee.role,
+    isActive: employee.is_active,
+  });
+  const [error, setError] = useState('');
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const response = await fetch(`/api/hr/employees/${employee.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to update employee.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title={`Edit ${employee.full_name}`} close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Full name">
+          <input required value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
+        </Field>
+        <Field label="Email">
+          <input
+            required
+            type="email"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+          />
+        </Field>
+        <div className="workflow-form-grid">
+          <Field label="Role">
+            <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+              {allowCeo && <option>ceo</option>}
+              <option>manager</option>
+              <option>finance</option>
+              <option>sales_consultant</option>
+            </select>
+          </Field>
+          <Field label="Account">
+            <select
+              value={form.isActive ? 'Active' : 'Inactive'}
+              onChange={(e) => setForm({ ...form, isActive: e.target.value === 'Active' })}
+            >
+              <option>Active</option>
+              <option>Inactive</option>
+            </select>
+          </Field>
+        </div>
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Save employee" />
+      </form>
+    </Dialog>
+  );
 }
 
 function InviteEmployeeDialog({ allowCeo, close, saved }: { allowCeo: boolean; close: () => void; saved: () => void }) {
-  const [form, setForm] = useState({ fullName: '', email: '', role: 'sales_consultant' }); const [error, setError] = useState('');
-  const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch('/api/hr/invitations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to create invitation.'); return; } if (data.emailStatus === 'not_configured') { setError('Invitation created, but email delivery is not configured. Configure branded email delivery before asking the employee to activate the account.'); return; } if (data.emailStatus === 'failed') { setError('Invitation created, but email delivery failed. Check notification delivery and resend the invitation.'); return; } saved(); };
-  return <Dialog title="Invite employee" close={close}><form className="workflow-form" onSubmit={submit}><Field label="Full name"><input required value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })}/></Field><Field label="Work email"><input required type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}/></Field><Field label="Role"><select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}><option>sales_consultant</option><option>manager</option><option>finance</option>{allowCeo && <option>ceo</option>}</select></Field><p className="workflow-help">A branded, single-use invitation link will be emailed. It expires after 24 hours and the employee chooses their own password.</p>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Send invitation"/></form></Dialog>;
+  const [form, setForm] = useState({ fullName: '', email: '', role: 'sales_consultant' });
+  const [error, setError] = useState('');
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const response = await fetch('/api/hr/invitations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to create invitation.');
+      return;
+    }
+    if (data.emailStatus === 'not_configured') {
+      setError(
+        'Invitation created, but email delivery is not configured. Configure branded email delivery before asking the employee to activate the account.',
+      );
+      return;
+    }
+    if (data.emailStatus === 'failed') {
+      setError('Invitation created, but email delivery failed. Check notification delivery and resend the invitation.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title="Invite employee" close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Full name">
+          <input required value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
+        </Field>
+        <Field label="Work email">
+          <input
+            required
+            type="email"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+          />
+        </Field>
+        <Field label="Role">
+          <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+            <option>sales_consultant</option>
+            <option>manager</option>
+            <option>finance</option>
+            {allowCeo && <option>ceo</option>}
+          </select>
+        </Field>
+        <p className="workflow-help">
+          A branded, single-use invitation link will be emailed. It expires after 24 hours and the employee chooses
+          their own password.
+        </p>
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Send invitation" />
+      </form>
+    </Dialog>
+  );
 }
 
 function EmployeeHistoryDialog({ employee, close }: { employee: Employee; close: () => void }) {
-  const [events, setEvents] = useState<EmployeeEvent[]>([]); const [error, setError] = useState('');
+  const [events, setEvents] = useState<EmployeeEvent[]>([]);
+  const [error, setError] = useState('');
   const settings = useOrganizationSettings();
-  useEffect(() => { void fetch(`/api/hr/employees/${employee.id}/history`, { cache: 'no-store' }).then(async response => { const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Unable to load employee history.'); setEvents(data.events || []); }).catch(loadError => setError(loadError instanceof Error ? loadError.message : 'Unable to load employee history.')); }, [employee.id]);
-  return <Dialog title={`${employee.full_name} history`} close={close}><div className="workflow-form"><div className="workflow-summary"><div><strong>{employee.role}</strong>Role</div><div><strong>{employee.is_active ? 'Active' : 'Inactive'}</strong>Account</div></div>{error && <p className="workflow-error">{error}</p>}<div className="serial-picker">{events.map(event => <div className="workflow-order" key={event.id}><strong>{event.event_type} · {event.status}</strong><span>{formatOrganizationDate(event.effective_at, settings)}</span><small>{event.notes || 'No notes recorded'}{event.created_by_name ? ` · By ${event.created_by_name}` : ''}</small></div>)}{!events.length && !error && <span className="workflow-help">No lifecycle events recorded.</span>}</div><div className="workflow-dialog-actions"><button type="button" className="ops-btn blue" onClick={close}>Close</button></div></div></Dialog>;
+  useEffect(() => {
+    void fetch(`/api/hr/employees/${employee.id}/history`, { cache: 'no-store' })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Unable to load employee history.');
+        setEvents(data.events || []);
+      })
+      .catch((loadError) =>
+        setError(loadError instanceof Error ? loadError.message : 'Unable to load employee history.'),
+      );
+  }, [employee.id]);
+  return (
+    <Dialog title={`${employee.full_name} history`} close={close}>
+      <div className="workflow-form">
+        <div className="workflow-summary">
+          <div>
+            <strong>{employee.role}</strong>Role
+          </div>
+          <div>
+            <strong>{employee.is_active ? 'Active' : 'Inactive'}</strong>Account
+          </div>
+        </div>
+        {error && <p className="workflow-error">{error}</p>}
+        <div className="serial-picker">
+          {events.map((event) => (
+            <div className="workflow-order" key={event.id}>
+              <strong>
+                {event.event_type} · {event.status}
+              </strong>
+              <span>{formatOrganizationDate(event.effective_at, settings)}</span>
+              <small>
+                {event.notes || 'No notes recorded'}
+                {event.created_by_name ? ` · By ${event.created_by_name}` : ''}
+              </small>
+            </div>
+          ))}
+          {!events.length && !error && <span className="workflow-help">No lifecycle events recorded.</span>}
+        </div>
+        <div className="workflow-dialog-actions">
+          <button type="button" className="ops-btn blue" onClick={close}>
+            Close
+          </button>
+        </div>
+      </div>
+    </Dialog>
+  );
 }
 
 function PaymentDialog({ invoice, close, saved }: { invoice: Invoice; close: () => void; saved: () => void }) {
-  const [form, setForm] = useState({ amount: Number(invoice.outstanding).toFixed(2), method: 'Bank transfer', reference: '' }); const [error, setError] = useState(''); const idempotencyKey = useRef<string | null>(null);
+  const [form, setForm] = useState({
+    amount: Number(invoice.outstanding).toFixed(2),
+    method: 'Bank transfer',
+    reference: '',
+  });
+  const [error, setError] = useState('');
+  const idempotencyKey = useRef<string | null>(null);
   const settings = useOrganizationSettings();
-  const submit = async (event: FormEvent) => { event.preventDefault(); setError(''); const key = idempotencyKey.current || crypto.randomUUID(); idempotencyKey.current = key; const response = await fetch(`/api/crm/invoices/${invoice.id}/payments`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key }, body: JSON.stringify({ ...form, amount: Number(form.amount) }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to record payment.'); return; } saved(); };
-  return <Dialog title={`Record payment · ${invoice.number}`} close={close}><form className="workflow-form" onSubmit={submit}><p className="workflow-help">Outstanding balance: <strong>{formatCurrency(invoice.outstanding, settings.currency)}</strong></p><Field label={`Amount (${settings.currency})`}><input required type="number" min="0.01" max={invoice.outstanding} step="0.01" value={form.amount} onChange={event => setForm({ ...form, amount: event.target.value })}/></Field><Field label="Method"><select value={form.method} onChange={event => setForm({ ...form, method: event.target.value })}><option>Bank transfer</option><option>Cash</option><option>Card</option><option>Mobile money</option><option>Other</option></select></Field><Field label="Reference"><input value={form.reference} onChange={event => setForm({ ...form, reference: event.target.value })}/></Field>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Record payment"/></form></Dialog>;
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setError('');
+    const key = idempotencyKey.current || crypto.randomUUID();
+    idempotencyKey.current = key;
+    const response = await fetch(`/api/crm/invoices/${invoice.id}/payments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key },
+      body: JSON.stringify({ ...form, amount: Number(form.amount) }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to record payment.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title={`Record payment · ${invoice.number}`} close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <p className="workflow-help">
+          Outstanding balance: <strong>{formatCurrency(invoice.outstanding, settings.currency)}</strong>
+        </p>
+        <Field label={`Amount (${settings.currency})`}>
+          <input
+            required
+            type="number"
+            min="0.01"
+            max={invoice.outstanding}
+            step="0.01"
+            value={form.amount}
+            onChange={(event) => setForm({ ...form, amount: event.target.value })}
+          />
+        </Field>
+        <Field label="Method">
+          <select value={form.method} onChange={(event) => setForm({ ...form, method: event.target.value })}>
+            <option>Bank transfer</option>
+            <option>Cash</option>
+            <option>Card</option>
+            <option>Mobile money</option>
+            <option>Other</option>
+          </select>
+        </Field>
+        <Field label="Reference">
+          <input value={form.reference} onChange={(event) => setForm({ ...form, reference: event.target.value })} />
+        </Field>
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Record payment" />
+      </form>
+    </Dialog>
+  );
 }
 
-function RuleEditDialog({ rule, close, saved }: { rule: Rule; close: () => void; saved: () => void }) { const [form, setForm] = useState({ name: rule.name, rate: String(rule.rate), triggerStatus: rule.trigger_status, isActive: rule.is_active }); const [error, setError] = useState(''); const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch(`/api/finance/commission-rules/${rule.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, rate: Number(form.rate) }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to update rule.'); return; } saved(); }; return <Dialog title={`Edit ${rule.name}`} close={close}><form className="workflow-form" onSubmit={submit}><Field label="Rule name"><input required value={form.name} onChange={event => setForm({ ...form, name: event.target.value })}/></Field><Field label="Rate (%)"><input required type="number" min="0" max="100" step="0.01" value={form.rate} onChange={event => setForm({ ...form, rate: event.target.value })}/></Field><div className="workflow-form-grid"><Field label="Trigger"><select value={form.triggerStatus} onChange={event => setForm({ ...form, triggerStatus: event.target.value })}><option>Confirmed</option><option>Delivered</option><option>Paid</option></select></Field><Field label="Status"><select value={form.isActive ? 'Active' : 'Inactive'} onChange={event => setForm({ ...form, isActive: event.target.value === 'Active' })}><option>Active</option><option>Inactive</option></select></Field></div>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Save rule"/></form></Dialog>; }
-function RuleDialog({ close, saved }: { close: () => void; saved: () => void }) { const [form, setForm] = useState({ name: '', rate: '5', triggerStatus: 'Confirmed' }); const [error, setError] = useState(''); const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch('/api/finance/commission-rules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, rate: Number(form.rate) }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to create rule.'); return; } saved(); }; return <Dialog title="Add commission rule" close={close}><form className="workflow-form" onSubmit={submit}><Field label="Rule name"><input required value={form.name} onChange={event => setForm({ ...form, name: event.target.value })}/></Field><Field label="Rate (%)"><input required type="number" min="0" max="100" step="0.01" value={form.rate} onChange={event => setForm({ ...form, rate: event.target.value })}/></Field><Field label="Trigger"><select value={form.triggerStatus} onChange={event => setForm({ ...form, triggerStatus: event.target.value })}><option>Confirmed</option><option>Delivered</option><option>Paid</option></select></Field>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Save rule"/></form></Dialog>; }
-function TargetEditDialog({ target, users, close, saved }: { target: Target; users: User[]; close: () => void; saved: () => void }) { const [form, setForm] = useState({ consultantId: target.consultant_id || '', periodStart: String(target.period_start).slice(0, 10), periodEnd: String(target.period_end).slice(0, 10), targetAmount: String(target.target_amount) }); const [error, setError] = useState(''); const settings = useOrganizationSettings(); const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch(`/api/finance/targets/${target.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, targetAmount: Number(form.targetAmount) }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to update target.'); return; } saved(); }; return <Dialog title={`Edit target · ${target.consultant_name}`} close={close}><form className="workflow-form" onSubmit={submit}><Field label="Consultant"><select required value={form.consultantId} onChange={event => setForm({ ...form, consultantId: event.target.value })}>{users.map(user => <option key={user.id} value={user.id}>{user.full_name} · {user.role}</option>)}</select></Field><div className="workflow-form-grid"><Field label="Start date"><input required type="date" value={form.periodStart} onChange={event => setForm({ ...form, periodStart: event.target.value })}/></Field><Field label="End date"><input required type="date" value={form.periodEnd} onChange={event => setForm({ ...form, periodEnd: event.target.value })}/></Field></div><Field label={`Target amount (${settings.currency})`}><input required type="number" min="0" step="0.01" value={form.targetAmount} onChange={event => setForm({ ...form, targetAmount: event.target.value })}/></Field>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Save target"/></form></Dialog>; }
-function TargetDialog({ users, close, saved }: { users: User[]; close: () => void; saved: () => void }) { const [form, setForm] = useState({ consultantId: users[0]?.id || '', periodStart: `${new Date().getFullYear()}-01-01`, periodEnd: `${new Date().getFullYear()}-12-31`, targetAmount: '' }); const [error, setError] = useState(''); const settings = useOrganizationSettings(); const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch('/api/finance/targets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, targetAmount: Number(form.targetAmount) }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to create target.'); return; } saved(); }; return <Dialog title="Set consultant target" close={close}><form className="workflow-form" onSubmit={submit}><Field label="Consultant"><select required value={form.consultantId} onChange={event => setForm({ ...form, consultantId: event.target.value })}>{users.map(user => <option key={user.id} value={user.id}>{user.full_name} · {user.role}</option>)}</select></Field><div className="workflow-form-grid"><Field label="Start date"><input required type="date" value={form.periodStart} onChange={event => setForm({ ...form, periodStart: event.target.value })}/></Field><Field label="End date"><input required type="date" value={form.periodEnd} onChange={event => setForm({ ...form, periodEnd: event.target.value })}/></Field></div><Field label={`Target amount (${settings.currency})`}><input required type="number" min="0" step="0.01" value={form.targetAmount} onChange={event => setForm({ ...form, targetAmount: event.target.value })}/></Field>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Save target"/></form></Dialog>; }
-function OnboardingDialog({ users, close, saved }: { users: User[]; close: () => void; saved: () => void }) { const [form, setForm] = useState({ userId: users[0]?.id || '', title: '', category: 'General', dueAt: '' }); const [error, setError] = useState(''); const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch('/api/hr/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, dueAt: form.dueAt || undefined }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to create onboarding task.'); return; } saved(); }; return <Dialog title="Add onboarding task" close={close}><form className="workflow-form" onSubmit={submit}><Field label="Employee"><select required value={form.userId} onChange={event => setForm({ ...form, userId: event.target.value })}>{users.map(user => <option key={user.id} value={user.id}>{user.full_name} · {user.role}</option>)}</select></Field><Field label="Task"><input required value={form.title} onChange={event => setForm({ ...form, title: event.target.value })} placeholder="Access, equipment, induction…"/></Field><div className="workflow-form-grid"><Field label="Category"><input value={form.category} onChange={event => setForm({ ...form, category: event.target.value })}/></Field><Field label="Due date"><input type="date" value={form.dueAt} onChange={event => setForm({ ...form, dueAt: event.target.value })}/></Field></div>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Create task"/></form></Dialog>; }
+function RuleEditDialog({ rule, close, saved }: { rule: Rule; close: () => void; saved: () => void }) {
+  const [form, setForm] = useState({
+    name: rule.name,
+    rate: String(rule.rate),
+    triggerStatus: rule.trigger_status,
+    isActive: rule.is_active,
+  });
+  const [error, setError] = useState('');
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const response = await fetch(`/api/finance/commission-rules/${rule.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...form, rate: Number(form.rate) }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to update rule.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title={`Edit ${rule.name}`} close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Rule name">
+          <input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+        </Field>
+        <Field label="Rate (%)">
+          <input
+            required
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            value={form.rate}
+            onChange={(event) => setForm({ ...form, rate: event.target.value })}
+          />
+        </Field>
+        <div className="workflow-form-grid">
+          <Field label="Trigger">
+            <select
+              value={form.triggerStatus}
+              onChange={(event) => setForm({ ...form, triggerStatus: event.target.value })}
+            >
+              <option>Confirmed</option>
+              <option>Delivered</option>
+              <option>Paid</option>
+            </select>
+          </Field>
+          <Field label="Status">
+            <select
+              value={form.isActive ? 'Active' : 'Inactive'}
+              onChange={(event) => setForm({ ...form, isActive: event.target.value === 'Active' })}
+            >
+              <option>Active</option>
+              <option>Inactive</option>
+            </select>
+          </Field>
+        </div>
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Save rule" />
+      </form>
+    </Dialog>
+  );
+}
+function RuleDialog({ close, saved }: { close: () => void; saved: () => void }) {
+  const [form, setForm] = useState({ name: '', rate: '5', triggerStatus: 'Confirmed' });
+  const [error, setError] = useState('');
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const response = await fetch('/api/finance/commission-rules', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...form, rate: Number(form.rate) }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to create rule.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title="Add commission rule" close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Rule name">
+          <input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+        </Field>
+        <Field label="Rate (%)">
+          <input
+            required
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            value={form.rate}
+            onChange={(event) => setForm({ ...form, rate: event.target.value })}
+          />
+        </Field>
+        <Field label="Trigger">
+          <select
+            value={form.triggerStatus}
+            onChange={(event) => setForm({ ...form, triggerStatus: event.target.value })}
+          >
+            <option>Confirmed</option>
+            <option>Delivered</option>
+            <option>Paid</option>
+          </select>
+        </Field>
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Save rule" />
+      </form>
+    </Dialog>
+  );
+}
+function TargetEditDialog({
+  target,
+  users,
+  close,
+  saved,
+}: {
+  target: Target;
+  users: User[];
+  close: () => void;
+  saved: () => void;
+}) {
+  const [form, setForm] = useState({
+    consultantId: target.consultant_id || '',
+    periodStart: String(target.period_start).slice(0, 10),
+    periodEnd: String(target.period_end).slice(0, 10),
+    targetAmount: String(target.target_amount),
+  });
+  const [error, setError] = useState('');
+  const settings = useOrganizationSettings();
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const response = await fetch(`/api/finance/targets/${target.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...form, targetAmount: Number(form.targetAmount) }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to update target.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title={`Edit target · ${target.consultant_name}`} close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Consultant">
+          <select
+            required
+            value={form.consultantId}
+            onChange={(event) => setForm({ ...form, consultantId: event.target.value })}
+          >
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.full_name} · {user.role}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <div className="workflow-form-grid">
+          <Field label="Start date">
+            <input
+              required
+              type="date"
+              value={form.periodStart}
+              onChange={(event) => setForm({ ...form, periodStart: event.target.value })}
+            />
+          </Field>
+          <Field label="End date">
+            <input
+              required
+              type="date"
+              value={form.periodEnd}
+              onChange={(event) => setForm({ ...form, periodEnd: event.target.value })}
+            />
+          </Field>
+        </div>
+        <Field label={`Target amount (${settings.currency})`}>
+          <input
+            required
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.targetAmount}
+            onChange={(event) => setForm({ ...form, targetAmount: event.target.value })}
+          />
+        </Field>
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Save target" />
+      </form>
+    </Dialog>
+  );
+}
+function TargetDialog({ users, close, saved }: { users: User[]; close: () => void; saved: () => void }) {
+  const [form, setForm] = useState({
+    consultantId: users[0]?.id || '',
+    periodStart: `${new Date().getFullYear()}-01-01`,
+    periodEnd: `${new Date().getFullYear()}-12-31`,
+    targetAmount: '',
+  });
+  const [error, setError] = useState('');
+  const settings = useOrganizationSettings();
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const response = await fetch('/api/finance/targets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...form, targetAmount: Number(form.targetAmount) }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to create target.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title="Set consultant target" close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Consultant">
+          <select
+            required
+            value={form.consultantId}
+            onChange={(event) => setForm({ ...form, consultantId: event.target.value })}
+          >
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.full_name} · {user.role}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <div className="workflow-form-grid">
+          <Field label="Start date">
+            <input
+              required
+              type="date"
+              value={form.periodStart}
+              onChange={(event) => setForm({ ...form, periodStart: event.target.value })}
+            />
+          </Field>
+          <Field label="End date">
+            <input
+              required
+              type="date"
+              value={form.periodEnd}
+              onChange={(event) => setForm({ ...form, periodEnd: event.target.value })}
+            />
+          </Field>
+        </div>
+        <Field label={`Target amount (${settings.currency})`}>
+          <input
+            required
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.targetAmount}
+            onChange={(event) => setForm({ ...form, targetAmount: event.target.value })}
+          />
+        </Field>
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Save target" />
+      </form>
+    </Dialog>
+  );
+}
+function OnboardingDialog({ users, close, saved }: { users: User[]; close: () => void; saved: () => void }) {
+  const [form, setForm] = useState({ userId: users[0]?.id || '', title: '', category: 'General', dueAt: '' });
+  const [error, setError] = useState('');
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const response = await fetch('/api/hr/onboarding', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...form, dueAt: form.dueAt || undefined }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to create onboarding task.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title="Add onboarding task" close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Employee">
+          <select required value={form.userId} onChange={(event) => setForm({ ...form, userId: event.target.value })}>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.full_name} · {user.role}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Task">
+          <input
+            required
+            value={form.title}
+            onChange={(event) => setForm({ ...form, title: event.target.value })}
+            placeholder="Access, equipment, induction…"
+          />
+        </Field>
+        <div className="workflow-form-grid">
+          <Field label="Category">
+            <input value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} />
+          </Field>
+          <Field label="Due date">
+            <input
+              type="date"
+              value={form.dueAt}
+              onChange={(event) => setForm({ ...form, dueAt: event.target.value })}
+            />
+          </Field>
+        </div>
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Create task" />
+      </form>
+    </Dialog>
+  );
+}
 
-function FinanceOnlyView({ expenses, invoices, returns, commissions, pendingTotal, outstandingTotal, settings, dialog, setDialog, selectedExpense, setSelectedExpense, selectedInvoice, setSelectedInvoice, updateExpense, processRefund, saved }: { expenses: Expense[]; invoices: Invoice[]; returns: ReturnRecord[]; commissions: Commission[]; pendingTotal: number; outstandingTotal: number; settings: ReturnType<typeof useOrganizationSettings>; dialog: FinanceDialog; setDialog: Dispatch<SetStateAction<FinanceDialog>>; selectedExpense: Expense | null; setSelectedExpense: Dispatch<SetStateAction<Expense | null>>; selectedInvoice: Invoice | null; setSelectedInvoice: Dispatch<SetStateAction<Invoice | null>>; updateExpense: (expense: Expense, status: 'Approved' | 'Rejected' | 'Paid') => Promise<void>; processRefund: (record: ReturnRecord) => Promise<void>; saved: (message: string) => void }) {
-  const overdue = invoices.filter(invoice => Number(invoice.outstanding) > 0 && invoice.due_at && new Date(invoice.due_at).getTime() < Date.now());
+function FinanceOnlyView({
+  expenses,
+  invoices,
+  returns,
+  commissions,
+  pendingTotal,
+  outstandingTotal,
+  settings,
+  dialog,
+  setDialog,
+  selectedExpense,
+  setSelectedExpense,
+  selectedInvoice,
+  setSelectedInvoice,
+  updateExpense,
+  processRefund,
+  saved,
+}: {
+  expenses: Expense[];
+  invoices: Invoice[];
+  returns: ReturnRecord[];
+  commissions: Commission[];
+  pendingTotal: number;
+  outstandingTotal: number;
+  settings: ReturnType<typeof useOrganizationSettings>;
+  dialog: FinanceDialog;
+  setDialog: Dispatch<SetStateAction<FinanceDialog>>;
+  selectedExpense: Expense | null;
+  setSelectedExpense: Dispatch<SetStateAction<Expense | null>>;
+  selectedInvoice: Invoice | null;
+  setSelectedInvoice: Dispatch<SetStateAction<Invoice | null>>;
+  updateExpense: (expense: Expense, status: 'Approved' | 'Rejected' | 'Paid') => Promise<void>;
+  processRefund: (record: ReturnRecord) => Promise<void>;
+  saved: (message: string) => void;
+}) {
+  const overdue = invoices.filter(
+    (invoice) => Number(invoice.outstanding) > 0 && invoice.due_at && new Date(invoice.due_at).getTime() < Date.now(),
+  );
   const [section, setSection] = useState<'payables' | 'expenses' | 'returns'>('payables');
-  return <><div className="ops-kpis"><LiveKpi label="Pending expenses" value={formatCurrency(pendingTotal, settings.currency)} note="Awaiting finance review" icon={<FileText size={16}/>} tone="amber"/><LiveKpi label="Outstanding debtors" value={formatCurrency(outstandingTotal, settings.currency)} note="Open invoice balances" icon={<CircleDollarSign size={16}/>} tone="blue"/><LiveKpi label="Overdue debtors" value={overdue.length} note={formatCurrency(overdue.reduce((sum, invoice) => sum + Number(invoice.outstanding || 0), 0), settings.currency)} icon={<CircleDollarSign size={16}/>} tone="red"/><LiveKpi label="Commission entries" value={commissions.length.toString()} note="Settlement ledger" icon={<Users size={16}/>} tone="purple"/></div><div className="workflow-actions"><button className="ops-btn blue" onClick={() => setDialog('expense')}><Plus size={15}/> Submit expense</button></div><div className="ops-tabs finance-tabs" role="tablist" aria-label="Finance sections"><button type="button" role="tab" aria-selected={section === 'payables'} className={section === 'payables' ? 'active' : ''} onClick={() => setSection('payables')}>Payments</button><button type="button" role="tab" aria-selected={section === 'expenses'} className={section === 'expenses' ? 'active' : ''} onClick={() => setSection('expenses')}>Expenses</button><button type="button" role="tab" aria-selected={section === 'returns'} className={section === 'returns' ? 'active' : ''} onClick={() => setSection('returns')}>Returns</button></div><div className={`finance-sections finance-${section}`}><div className="ops-grid-two"><LivePanel className="finance-payables-panel" title="Payments and debtors" subtitle="Invoices, balances, and payment records"><div className="data-table labelled-cards"><TableHead labels={['Invoice','Client','Outstanding','Status','Action']}/>{invoices.map(invoice => <div className="data-row" key={invoice.id}><div data-label="Invoice"><strong>{invoice.number}</strong><small>{invoice.sale_number}</small></div><span data-label="Client">{invoice.client_name}</span><span data-label="Outstanding">{formatCurrency(invoice.outstanding, settings.currency)}</span><span data-label="Status"><Status value={Number(invoice.outstanding) <= 0 ? 'Paid' : invoice.status}/></span><div className="transfer-card-actions" data-label="Action"><button className="row-action" onClick={() => { setSelectedInvoice(invoice); setDialog('invoiceDetail'); }}>Details</button><ActionMenu label={`More actions for ${invoice.number}`}><ActionMenuItem disabled={invoice.status === 'Void' || Number(invoice.outstanding) <= 0} onClick={() => { setSelectedInvoice(invoice); setDialog('payment'); }}>Record payment</ActionMenuItem></ActionMenu></div></div>)}{!invoices.length && <Empty title="No invoices" detail="Confirmed-sale invoices will appear here." icon={<FileText size={22}/>}/>}</div></LivePanel><LivePanel className="finance-expenses-panel" title="Expense approvals" subtitle="Receipt-backed expense claims"><div className="data-table labelled-cards"><TableHead labels={['Expense','Description','Amount','Status','Action']}/>{expenses.map(expense => <div className="data-row" key={expense.id}><div data-label="Expense"><strong>{expense.number}</strong><small>{expense.category}</small></div><span data-label="Description">{expense.description}</span><span data-label="Amount">{formatCurrency(expense.amount, settings.currency)}</span><span data-label="Status"><Status value={expense.status}/></span><div className="transfer-card-actions" data-label="Action"><button className="row-action" onClick={() => { setSelectedExpense(expense); setDialog('expenseDetail'); }}>Details</button>{expense.status === 'Pending' && <ActionMenu label={`More actions for ${expense.number}`}><ActionMenuItem onClick={() => void updateExpense(expense, 'Approved')}><Check size={13}/> Approve</ActionMenuItem><ActionMenuItem onClick={() => void updateExpense(expense, 'Rejected')}><X size={13}/> Reject</ActionMenuItem></ActionMenu>}</div></div>)}{!expenses.length && <Empty title="No expenses" detail="No expense claims are waiting." icon={<CircleDollarSign size={22}/>}/>}</div></LivePanel></div><LivePanel className="finance-returns-panel" title="Returns and refunds" subtitle="Finance-controlled refund and credit-note processing"><div className="data-table labelled-cards"><TableHead labels={['Return','Client','Amount','Status','Action']}/>{returns.map(record => <div className="data-row" key={record.id}><strong data-label="Return">{record.number}</strong><span data-label="Client">{record.client_name}</span><span data-label="Amount">{formatCurrency(record.refund_amount, settings.currency)}</span><span data-label="Status"><Status value={record.refund_status}/></span><span data-label="Action">{record.refund_status === 'Pending' ? <button className="row-action" onClick={() => void processRefund(record)}>Process refund</button> : <span className="workflow-help">Recorded</span>}{record.credit_note_number && <button className="row-action" onClick={() => window.open(`/api/crm/returns/${record.id}/credit-note/pdf`, '_blank', 'noopener,noreferrer')}><FileText size={14}/> Credit note</button>}</span></div>)}{!returns.length && <Empty title="No returns" detail="Completed sales returns will appear here." icon={<RotateCcw size={22}/>}/>}</div></LivePanel></div>{dialog === 'expense' && <ExpenseDialog close={() => setDialog(null)} saved={() => saved('Expense submitted')}/>} {dialog === 'expenseDetail' && selectedExpense && <ExpenseDetailDialog expense={selectedExpense} close={() => setDialog(null)}/>} {dialog === 'payment' && selectedInvoice && <PaymentDialog invoice={selectedInvoice} close={() => setDialog(null)} saved={() => saved('Payment recorded')}/>} {dialog === 'invoiceDetail' && selectedInvoice && <InvoiceDetailDialog invoice={selectedInvoice} close={() => setDialog(null)} openPayment={() => setDialog('payment')}/>}</>;
+  return (
+    <>
+      <div className="ops-kpis">
+        <LiveKpi
+          label="Pending expenses"
+          value={formatCurrency(pendingTotal, settings.currency)}
+          note="Awaiting finance review"
+          icon={<FileText size={16} />}
+          tone="amber"
+        />
+        <LiveKpi
+          label="Outstanding debtors"
+          value={formatCurrency(outstandingTotal, settings.currency)}
+          note="Open invoice balances"
+          icon={<CircleDollarSign size={16} />}
+          tone="blue"
+        />
+        <LiveKpi
+          label="Overdue debtors"
+          value={overdue.length}
+          note={formatCurrency(
+            overdue.reduce((sum, invoice) => sum + Number(invoice.outstanding || 0), 0),
+            settings.currency,
+          )}
+          icon={<CircleDollarSign size={16} />}
+          tone="red"
+        />
+        <LiveKpi
+          label="Commission entries"
+          value={commissions.length.toString()}
+          note="Settlement ledger"
+          icon={<Users size={16} />}
+          tone="purple"
+        />
+      </div>
+      <div className="workflow-actions">
+        <button className="ops-btn blue" onClick={() => setDialog('expense')}>
+          <Plus size={15} /> Submit expense
+        </button>
+      </div>
+      <div className="ops-tabs finance-tabs" role="tablist" aria-label="Finance sections">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={section === 'payables'}
+          className={section === 'payables' ? 'active' : ''}
+          onClick={() => setSection('payables')}
+        >
+          Payments
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={section === 'expenses'}
+          className={section === 'expenses' ? 'active' : ''}
+          onClick={() => setSection('expenses')}
+        >
+          Expenses
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={section === 'returns'}
+          className={section === 'returns' ? 'active' : ''}
+          onClick={() => setSection('returns')}
+        >
+          Returns
+        </button>
+      </div>
+      <div className={`finance-sections finance-${section}`}>
+        <div className="ops-grid-two">
+          <LivePanel
+            className="finance-payables-panel"
+            title="Payments and debtors"
+            subtitle="Invoices, balances, and payment records"
+          >
+            <div className="data-table labelled-cards">
+              <TableHead labels={['Invoice', 'Client', 'Outstanding', 'Status', 'Action']} />
+              {invoices.map((invoice) => (
+                <div className="data-row" key={invoice.id}>
+                  <div data-label="Invoice">
+                    <strong>{invoice.number}</strong>
+                    <small>{invoice.sale_number}</small>
+                  </div>
+                  <span data-label="Client">{invoice.client_name}</span>
+                  <span data-label="Outstanding">{formatCurrency(invoice.outstanding, settings.currency)}</span>
+                  <span data-label="Status">
+                    <Status value={Number(invoice.outstanding) <= 0 ? 'Paid' : invoice.status} />
+                  </span>
+                  <div className="transfer-card-actions" data-label="Action">
+                    <button
+                      className="row-action"
+                      onClick={() => {
+                        setSelectedInvoice(invoice);
+                        setDialog('invoiceDetail');
+                      }}
+                    >
+                      Details
+                    </button>
+                    <ActionMenu label={`More actions for ${invoice.number}`}>
+                      <ActionMenuItem
+                        disabled={invoice.status === 'Void' || Number(invoice.outstanding) <= 0}
+                        onClick={() => {
+                          setSelectedInvoice(invoice);
+                          setDialog('payment');
+                        }}
+                      >
+                        Record payment
+                      </ActionMenuItem>
+                    </ActionMenu>
+                  </div>
+                </div>
+              ))}
+              {!invoices.length && (
+                <Empty
+                  title="No invoices"
+                  detail="Confirmed-sale invoices will appear here."
+                  icon={<FileText size={22} />}
+                />
+              )}
+            </div>
+          </LivePanel>
+          <LivePanel
+            className="finance-expenses-panel"
+            title="Expense approvals"
+            subtitle="Receipt-backed expense claims"
+          >
+            <div className="data-table labelled-cards">
+              <TableHead labels={['Expense', 'Description', 'Amount', 'Status', 'Action']} />
+              {expenses.map((expense) => (
+                <div className="data-row" key={expense.id}>
+                  <div data-label="Expense">
+                    <strong>{expense.number}</strong>
+                    <small>{expense.category}</small>
+                  </div>
+                  <span data-label="Description">{expense.description}</span>
+                  <span data-label="Amount">{formatCurrency(expense.amount, settings.currency)}</span>
+                  <span data-label="Status">
+                    <Status value={expense.status} />
+                  </span>
+                  <div className="transfer-card-actions" data-label="Action">
+                    <button
+                      className="row-action"
+                      onClick={() => {
+                        setSelectedExpense(expense);
+                        setDialog('expenseDetail');
+                      }}
+                    >
+                      Details
+                    </button>
+                    {expense.status === 'Pending' && (
+                      <ActionMenu label={`More actions for ${expense.number}`}>
+                        <ActionMenuItem onClick={() => void updateExpense(expense, 'Approved')}>
+                          <Check size={13} /> Approve
+                        </ActionMenuItem>
+                        <ActionMenuItem onClick={() => void updateExpense(expense, 'Rejected')}>
+                          <X size={13} /> Reject
+                        </ActionMenuItem>
+                      </ActionMenu>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {!expenses.length && (
+                <Empty
+                  title="No expenses"
+                  detail="No expense claims are waiting."
+                  icon={<CircleDollarSign size={22} />}
+                />
+              )}
+            </div>
+          </LivePanel>
+        </div>
+        <LivePanel
+          className="finance-returns-panel"
+          title="Returns and refunds"
+          subtitle="Finance-controlled refund and credit-note processing"
+        >
+          <div className="data-table labelled-cards">
+            <TableHead labels={['Return', 'Client', 'Amount', 'Status', 'Action']} />
+            {returns.map((record) => (
+              <div className="data-row" key={record.id}>
+                <strong data-label="Return">{record.number}</strong>
+                <span data-label="Client">{record.client_name}</span>
+                <span data-label="Amount">{formatCurrency(record.refund_amount, settings.currency)}</span>
+                <span data-label="Status">
+                  <Status value={record.refund_status} />
+                </span>
+                <span data-label="Action">
+                  {record.refund_status === 'Pending' ? (
+                    <button className="row-action" onClick={() => void processRefund(record)}>
+                      Process refund
+                    </button>
+                  ) : (
+                    <span className="workflow-help">Recorded</span>
+                  )}
+                  {record.credit_note_number && (
+                    <button
+                      className="row-action"
+                      onClick={() =>
+                        window.open(`/api/crm/returns/${record.id}/credit-note/pdf`, '_blank', 'noopener,noreferrer')
+                      }
+                    >
+                      <FileText size={14} /> Credit note
+                    </button>
+                  )}
+                </span>
+              </div>
+            ))}
+            {!returns.length && (
+              <Empty
+                title="No returns"
+                detail="Completed sales returns will appear here."
+                icon={<RotateCcw size={22} />}
+              />
+            )}
+          </div>
+        </LivePanel>
+      </div>
+      {dialog === 'expense' && <ExpenseDialog close={() => setDialog(null)} saved={() => saved('Expense submitted')} />}{' '}
+      {dialog === 'expenseDetail' && selectedExpense && (
+        <ExpenseDetailDialog expense={selectedExpense} close={() => setDialog(null)} />
+      )}{' '}
+      {dialog === 'payment' && selectedInvoice && (
+        <PaymentDialog
+          invoice={selectedInvoice}
+          close={() => setDialog(null)}
+          saved={() => saved('Payment recorded')}
+        />
+      )}{' '}
+      {dialog === 'invoiceDetail' && selectedInvoice && (
+        <InvoiceDetailDialog
+          invoice={selectedInvoice}
+          close={() => setDialog(null)}
+          openPayment={() => setDialog('payment')}
+        />
+      )}
+    </>
+  );
 }
 
-function InvitationTable({ invitations, resendInvitation, revokeInvitation }: { invitations: Invitation[]; resendInvitation: (invitation: Invitation) => Promise<void>; revokeInvitation: (invitation: Invitation) => Promise<void> }) {
-  const settings = useOrganizationSettings(); const pending = invitations.filter(invitation => invitation.status === 'Pending');
-  return <div className="data-table labelled-cards"><TableHead labels={['Invitation','Role','Expires','Action']}/>{pending.map(invitation => <div className="data-row" key={invitation.id}><div data-label="Invitation"><strong>{invitation.full_name}</strong><small>{invitation.email}</small></div><span data-label="Role">{invitation.role}</span><span data-label="Expires">{formatOrganizationDate(invitation.expires_at, settings)}</span><div className="transfer-card-actions" data-label="Action"><Status value={invitation.status}/><ActionMenu label={`More actions for ${invitation.email}`}><ActionMenuItem onClick={() => void resendInvitation(invitation)}>Resend invitation</ActionMenuItem><ActionMenuItem onClick={() => void revokeInvitation(invitation)}>Revoke invitation</ActionMenuItem></ActionMenu></div></div>)}{!pending.length && <p className="workflow-help">No pending invitations.</p>}</div>;
+function InvitationTable({
+  invitations,
+  resendInvitation,
+  revokeInvitation,
+}: {
+  invitations: Invitation[];
+  resendInvitation: (invitation: Invitation) => Promise<void>;
+  revokeInvitation: (invitation: Invitation) => Promise<void>;
+}) {
+  const settings = useOrganizationSettings();
+  const pending = invitations.filter((invitation) => invitation.status === 'Pending');
+  return (
+    <div className="data-table labelled-cards">
+      <TableHead labels={['Invitation', 'Role', 'Expires', 'Action']} />
+      {pending.map((invitation) => (
+        <div className="data-row" key={invitation.id}>
+          <div data-label="Invitation">
+            <strong>{invitation.full_name}</strong>
+            <small>{invitation.email}</small>
+          </div>
+          <span data-label="Role">{invitation.role}</span>
+          <span data-label="Expires">{formatOrganizationDate(invitation.expires_at, settings)}</span>
+          <div className="transfer-card-actions" data-label="Action">
+            <Status value={invitation.status} />
+            <ActionMenu label={`More actions for ${invitation.email}`}>
+              <ActionMenuItem onClick={() => void resendInvitation(invitation)}>Resend invitation</ActionMenuItem>
+              <ActionMenuItem onClick={() => void revokeInvitation(invitation)}>Revoke invitation</ActionMenuItem>
+            </ActionMenu>
+          </div>
+        </div>
+      ))}
+      {!pending.length && <p className="workflow-help">No pending invitations.</p>}
+    </div>
+  );
 }
 
-function ManagerControlView({ employees, invitations, tasks, rules, targets, users, dialog, setDialog, selectedEmployee, setSelectedEmployee, selectedRule, setSelectedRule, selectedTarget, setSelectedTarget, completeTask, offboard, resendInvitation, revokeInvitation, saved, notify }: { employees: Employee[]; invitations: Invitation[]; tasks: OnboardingTask[]; rules: Rule[]; targets: Target[]; users: User[]; dialog: FinanceDialog; setDialog: Dispatch<SetStateAction<FinanceDialog>>; selectedEmployee: Employee | null; setSelectedEmployee: Dispatch<SetStateAction<Employee | null>>; selectedRule: Rule | null; setSelectedRule: Dispatch<SetStateAction<Rule | null>>; selectedTarget: Target | null; setSelectedTarget: Dispatch<SetStateAction<Target | null>>; completeTask: (task: OnboardingTask) => Promise<void>; offboard: (employee: Employee) => Promise<void>; resendInvitation: (invitation: Invitation) => Promise<void>; revokeInvitation: (invitation: Invitation) => Promise<void>; saved: (message: string) => void; notify: (message: string) => void }) {
+function ManagerControlView({
+  employees,
+  invitations,
+  tasks,
+  rules,
+  targets,
+  users,
+  dialog,
+  setDialog,
+  selectedEmployee,
+  setSelectedEmployee,
+  selectedRule,
+  setSelectedRule,
+  selectedTarget,
+  setSelectedTarget,
+  completeTask,
+  offboard,
+  resendInvitation,
+  revokeInvitation,
+  saved,
+  notify,
+}: {
+  employees: Employee[];
+  invitations: Invitation[];
+  tasks: OnboardingTask[];
+  rules: Rule[];
+  targets: Target[];
+  users: User[];
+  dialog: FinanceDialog;
+  setDialog: Dispatch<SetStateAction<FinanceDialog>>;
+  selectedEmployee: Employee | null;
+  setSelectedEmployee: Dispatch<SetStateAction<Employee | null>>;
+  selectedRule: Rule | null;
+  setSelectedRule: Dispatch<SetStateAction<Rule | null>>;
+  selectedTarget: Target | null;
+  setSelectedTarget: Dispatch<SetStateAction<Target | null>>;
+  completeTask: (task: OnboardingTask) => Promise<void>;
+  offboard: (employee: Employee) => Promise<void>;
+  resendInvitation: (invitation: Invitation) => Promise<void>;
+  revokeInvitation: (invitation: Invitation) => Promise<void>;
+  saved: (message: string) => void;
+  notify: (message: string) => void;
+}) {
   const settings = useOrganizationSettings();
   const [tab, setTab] = useState<'people' | 'invitations' | 'onboarding' | 'rules' | 'targets'>('people');
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const visibleEmployees = useMemo(() => employees.filter(employee => {
-    const query = search.trim().toLowerCase();
-    const matchesSearch = !query || employee.full_name.toLowerCase().includes(query) || employee.email.toLowerCase().includes(query);
-    const matchesRole = roleFilter === 'all' || employee.role === roleFilter;
-    const matchesStatus = statusFilter === 'all' || (statusFilter === 'active' ? employee.is_active : !employee.is_active);
-    return matchesSearch && matchesRole && matchesStatus;
-  }), [employees, roleFilter, search, statusFilter]);
-  const pendingInvitations = invitations.filter(invitation => invitation.status === 'Pending');
-  const pendingTasks = tasks.filter(task => task.status === 'Pending');
-  const roleOptions = Array.from(new Set(employees.map(employee => employee.role))).filter(Boolean);
-  const initials = (name: string) => name.split(/\\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || '?';
-  const roleLabel = (role: string) => ({ ceo: 'CEO', manager: 'Manager', finance: 'Finance', sales_consultant: 'Sales Consultant' }[role] || role.replaceAll('_', ' ').replace(/\\b\\w/g, letter => letter.toUpperCase()));
-  const progressLabel = (employee: Employee) => employee.completed_tasks + employee.pending_tasks > 0 ? `${employee.completed_tasks} of ${employee.completed_tasks + employee.pending_tasks} tasks` : 'No tasks assigned';
-  const progressValue = (employee: Employee) => employee.completed_tasks + employee.pending_tasks > 0 ? Math.round((employee.completed_tasks / (employee.completed_tasks + employee.pending_tasks)) * 100) : 0;
-  const tabButton = (key: typeof tab, label: string, count?: number) => <button type="button" role="tab" aria-selected={tab === key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}{typeof count === 'number' && <span>{count}</span>}</button>;
+  const visibleEmployees = useMemo(
+    () =>
+      employees.filter((employee) => {
+        const query = search.trim().toLowerCase();
+        const matchesSearch =
+          !query || employee.full_name.toLowerCase().includes(query) || employee.email.toLowerCase().includes(query);
+        const matchesRole = roleFilter === 'all' || employee.role === roleFilter;
+        const matchesStatus =
+          statusFilter === 'all' || (statusFilter === 'active' ? employee.is_active : !employee.is_active);
+        return matchesSearch && matchesRole && matchesStatus;
+      }),
+    [employees, roleFilter, search, statusFilter],
+  );
+  const pendingInvitations = invitations.filter((invitation) => invitation.status === 'Pending');
+  const pendingTasks = tasks.filter((task) => task.status === 'Pending');
+  const roleOptions = Array.from(new Set(employees.map((employee) => employee.role))).filter(Boolean);
+  const initials = (name: string) =>
+    name
+      .split(/\\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join('')
+      .toUpperCase() || '?';
+  const roleLabel = (role: string) =>
+    ({ ceo: 'CEO', manager: 'Manager', finance: 'Finance', sales_consultant: 'Sales Consultant' })[role] ||
+    role.replaceAll('_', ' ').replace(/\\b\\w/g, (letter) => letter.toUpperCase());
+  const progressLabel = (employee: Employee) =>
+    employee.completed_tasks + employee.pending_tasks > 0
+      ? `${employee.completed_tasks} of ${employee.completed_tasks + employee.pending_tasks} tasks`
+      : 'No tasks assigned';
+  const progressValue = (employee: Employee) =>
+    employee.completed_tasks + employee.pending_tasks > 0
+      ? Math.round((employee.completed_tasks / (employee.completed_tasks + employee.pending_tasks)) * 100)
+      : 0;
+  const tabButton = (key: typeof tab, label: string, count?: number) => (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={tab === key}
+      className={tab === key ? 'active' : ''}
+      onClick={() => setTab(key)}
+    >
+      {label}
+      {typeof count === 'number' && <span>{count}</span>}
+    </button>
+  );
 
-  return <div className="finance-hr-workspace">
-    <div className="ops-kpis">
-      <LiveKpi label="Active people" value={employees.filter(employee => employee.is_active).length.toString()} note="Consultants and staff" icon={<Users size={16}/>} tone="purple"/>
-      <LiveKpi label="Pending onboarding" value={pendingTasks.length.toString()} note="Tasks needing follow-up" icon={<Check size={16}/>} tone="amber"/>
-      <LiveKpi label="Commission rules" value={rules.length.toString()} note="Manager-configured" icon={<CircleDollarSign size={16}/>} tone="blue"/>
-      <LiveKpi label="Consultant targets" value={targets.length.toString()} note="Current target plans" icon={<FileText size={16}/>} tone="green"/>
-    </div>
-    <div className="finance-hr-tabs" role="tablist" aria-label="Finance and HR workflows">
-      {tabButton('people', 'People', employees.length)}
-      {tabButton('invitations', 'Invitations', pendingInvitations.length)}
-      {tabButton('onboarding', 'Onboarding', pendingTasks.length)}
-      {tabButton('rules', 'Commission rules', rules.length)}
-      {tabButton('targets', 'Targets', targets.length)}
-    </div>
-
-    {tab === 'people' && <section className="ops-panel finance-people-panel">
-      <div className="ops-panel-head"><div><h2>People</h2><p>Manage consultant access, roles, onboarding progress, and lifecycle actions.</p></div><button className="ops-btn blue" onClick={() => setDialog('invite')}><Plus size={15}/> Add consultant</button></div>
-      <div className="finance-people-filters">
-        <label className="finance-search"><span className="sr-only">Search people</span><Search size={16}/><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search name or email" aria-label="Search people by name or email"/></label>
-        <label><span>Role</span><select value={roleFilter} onChange={event => setRoleFilter(event.target.value)} aria-label="Filter people by role"><option value="all">All roles</option>{roleOptions.map(role => <option key={role} value={role}>{roleLabel(role)}</option>)}</select></label>
-        <label><span>Status</span><select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} aria-label="Filter people by status"><option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
-        <span className="finance-result-count">{visibleEmployees.length} of {employees.length} people</span>
+  return (
+    <div className="finance-hr-workspace">
+      <div className="ops-kpis">
+        <LiveKpi
+          label="Active people"
+          value={employees.filter((employee) => employee.is_active).length.toString()}
+          note="Consultants and staff"
+          icon={<Users size={16} />}
+          tone="purple"
+        />
+        <LiveKpi
+          label="Pending onboarding"
+          value={pendingTasks.length.toString()}
+          note="Tasks needing follow-up"
+          icon={<Check size={16} />}
+          tone="amber"
+        />
+        <LiveKpi
+          label="Commission rules"
+          value={rules.length.toString()}
+          note="Manager-configured"
+          icon={<CircleDollarSign size={16} />}
+          tone="blue"
+        />
+        <LiveKpi
+          label="Consultant targets"
+          value={targets.length.toString()}
+          note="Current target plans"
+          icon={<FileText size={16} />}
+          tone="green"
+        />
       </div>
-      <div className="finance-user-list">{visibleEmployees.map(employee => <article className="finance-user-card" key={employee.id}>
-        <div className="finance-user-card-header">
-          <div className="finance-person"><span className="finance-avatar" aria-hidden="true">{initials(employee.full_name)}</span><span><strong>{employee.full_name}</strong><small title={employee.email}>{employee.email}</small></span></div>
-          <Status value={employee.is_active ? 'Active' : 'Inactive'}/>
-        </div>
-        <div className="finance-user-card-details">
-          <div><span className="finance-user-label">Role</span><span className="finance-role">{roleLabel(employee.role)}</span></div>
-          <div className="finance-user-progress"><span className="finance-user-label">Onboarding progress</span><span className="finance-progress-copy">{progressLabel(employee)}</span>{employee.completed_tasks + employee.pending_tasks > 0 && <span className="finance-progress" aria-label={`${progressValue(employee)} percent complete`}><i style={{ width: `${progressValue(employee)}%` }}/></span>}</div>
-          <div><span className="finance-user-label">Account</span><span className="finance-user-account">{employee.is_active ? 'Enabled' : 'Disabled'}</span></div>
-        </div>
-        <div className="finance-user-card-footer"><span className="finance-user-last-event">{employee.last_event || 'No lifecycle event'}</span><div className="transfer-card-actions"><button className="row-action" onClick={() => { setSelectedEmployee(employee); setDialog('employeeHistory'); }}>History</button><ActionMenu label={`More actions for ${employee.full_name}`}><ActionMenuItem onClick={() => { setSelectedEmployee(employee); setDialog('employeeEdit'); }}>Edit</ActionMenuItem>{employee.is_active && <ActionMenuItem className="destructive-action" onClick={() => void offboard(employee)}>Delete user</ActionMenuItem>}</ActionMenu></div></div>
-      </article>)}{!visibleEmployees.length && <Empty title={employees.length ? 'No matching people' : 'No people yet'} detail={employees.length ? 'Try a different search or filter.' : 'Add a consultant to begin managing workspace access.'} icon={<UserRound size={22}/>} />}</div>
-    </section>}
+      <div className="finance-hr-tabs" role="tablist" aria-label="Finance and HR workflows">
+        {tabButton('people', 'People', employees.length)}
+        {tabButton('invitations', 'Invitations', pendingInvitations.length)}
+        {tabButton('onboarding', 'Onboarding', pendingTasks.length)}
+        {tabButton('rules', 'Commission rules', rules.length)}
+        {tabButton('targets', 'Targets', targets.length)}
+      </div>
 
-    {tab === 'invitations' && <section className="ops-panel finance-people-panel">
-      <div className="ops-panel-head"><div><h2>Invitations</h2><p>Give new consultants secure access to the workspace.</p></div><button className="ops-btn blue" onClick={() => setDialog('invite')}><Plus size={15}/> Invite consultant</button></div>
-      <div className="data-table labelled-cards"><TableHead labels={['Invitation','Role','Expires','Actions']}/>{pendingInvitations.map(invitation => <div className="data-row" key={invitation.id}><div data-label="Invitation"><strong>{invitation.full_name}</strong><small>{invitation.email}</small></div><span data-label="Role"><span className="finance-role">{roleLabel(invitation.role)}</span></span><span data-label="Expires">{formatOrganizationDate(invitation.expires_at, settings)}</span><div className="transfer-card-actions" data-label="Actions"><Status value={invitation.status}/><ActionMenu label={`More actions for ${invitation.email}`}><ActionMenuItem onClick={() => void resendInvitation(invitation)}>Resend invitation</ActionMenuItem><ActionMenuItem className="destructive-action" onClick={() => void revokeInvitation(invitation)}>Revoke invitation</ActionMenuItem></ActionMenu></div></div>)}{!pendingInvitations.length && <Empty title="No pending invitations" detail="Invite a consultant to give them access to the workspace." icon={<Users size={22}/>} />}</div>
-    </section>}
+      {tab === 'people' && (
+        <section className="ops-panel finance-people-panel">
+          <div className="ops-panel-head">
+            <div>
+              <h2>People</h2>
+              <p>Manage consultant access, roles, onboarding progress, and lifecycle actions.</p>
+            </div>
+            <button className="ops-btn blue" onClick={() => setDialog('invite')}>
+              <Plus size={15} /> Add consultant
+            </button>
+          </div>
+          <div className="finance-people-filters">
+            <label className="finance-search">
+              <span className="sr-only">Search people</span>
+              <Search size={16} />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search name or email"
+                aria-label="Search people by name or email"
+              />
+            </label>
+            <label>
+              <span>Role</span>
+              <select
+                value={roleFilter}
+                onChange={(event) => setRoleFilter(event.target.value)}
+                aria-label="Filter people by role"
+              >
+                <option value="all">All roles</option>
+                {roleOptions.map((role) => (
+                  <option key={role} value={role}>
+                    {roleLabel(role)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Status</span>
+              <select
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value)}
+                aria-label="Filter people by status"
+              >
+                <option value="all">All statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </label>
+            <span className="finance-result-count">
+              {visibleEmployees.length} of {employees.length} people
+            </span>
+          </div>
+          <div className="finance-user-list">
+            {visibleEmployees.map((employee) => (
+              <article className="finance-user-card" key={employee.id}>
+                <div className="finance-user-card-header">
+                  <div className="finance-person">
+                    <span className="finance-avatar" aria-hidden="true">
+                      {initials(employee.full_name)}
+                    </span>
+                    <span>
+                      <strong>{employee.full_name}</strong>
+                      <small title={employee.email}>{employee.email}</small>
+                    </span>
+                  </div>
+                  <Status value={employee.is_active ? 'Active' : 'Inactive'} />
+                </div>
+                <div className="finance-user-card-details">
+                  <div>
+                    <span className="finance-user-label">Role</span>
+                    <span className="finance-role">{roleLabel(employee.role)}</span>
+                  </div>
+                  <div className="finance-user-progress">
+                    <span className="finance-user-label">Onboarding progress</span>
+                    <span className="finance-progress-copy">{progressLabel(employee)}</span>
+                    {employee.completed_tasks + employee.pending_tasks > 0 && (
+                      <span className="finance-progress" aria-label={`${progressValue(employee)} percent complete`}>
+                        <i style={{ width: `${progressValue(employee)}%` }} />
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <span className="finance-user-label">Account</span>
+                    <span className="finance-user-account">{employee.is_active ? 'Enabled' : 'Disabled'}</span>
+                  </div>
+                </div>
+                <div className="finance-user-card-footer">
+                  <span className="finance-user-last-event">{employee.last_event || 'No lifecycle event'}</span>
+                  <div className="transfer-card-actions">
+                    <button
+                      className="row-action"
+                      onClick={() => {
+                        setSelectedEmployee(employee);
+                        setDialog('employeeHistory');
+                      }}
+                    >
+                      History
+                    </button>
+                    <ActionMenu label={`More actions for ${employee.full_name}`}>
+                      <ActionMenuItem
+                        onClick={() => {
+                          setSelectedEmployee(employee);
+                          setDialog('employeeEdit');
+                        }}
+                      >
+                        Edit
+                      </ActionMenuItem>
+                      {employee.is_active && (
+                        <ActionMenuItem className="destructive-action" onClick={() => void offboard(employee)}>
+                          Delete user
+                        </ActionMenuItem>
+                      )}
+                    </ActionMenu>
+                  </div>
+                </div>
+              </article>
+            ))}
+            {!visibleEmployees.length && (
+              <Empty
+                title={employees.length ? 'No matching people' : 'No people yet'}
+                detail={
+                  employees.length
+                    ? 'Try a different search or filter.'
+                    : 'Add a consultant to begin managing workspace access.'
+                }
+                icon={<UserRound size={22} />}
+              />
+            )}
+          </div>
+        </section>
+      )}
 
-    {tab === 'onboarding' && <section className="ops-panel finance-people-panel">
-      <div className="ops-panel-head"><div><h2>Onboarding</h2><p>Guide new consultants through their first days with clear ownership and due dates.</p></div><button className="ops-btn blue" onClick={() => setDialog('onboarding')}><Plus size={15}/> Add onboarding task</button></div>
-      <div className="data-table labelled-cards"><TableHead labels={['Task','Person','Due date','Status','Actions']}/>{tasks.map(task => <div className="data-row" key={task.id}><strong data-label="Task">{task.title}</strong><span data-label="Person">{task.user_name}</span><span data-label="Due date">{task.due_at || 'No due date'}</span><Status value={task.status}/><div className="transfer-card-actions" data-label="Actions">{task.status === 'Pending' ? <button className="row-action" onClick={() => void completeTask(task)}><Check size={13}/> Complete</button> : <span className="workflow-help">Completed</span>}</div></div>)}{!tasks.length && <Empty title="No onboarding tasks" detail="Create tasks to guide new consultants through their first days." icon={<Check size={22}/>} />}</div>
-    </section>}
+      {tab === 'invitations' && (
+        <section className="ops-panel finance-people-panel">
+          <div className="ops-panel-head">
+            <div>
+              <h2>Invitations</h2>
+              <p>Give new consultants secure access to the workspace.</p>
+            </div>
+            <button className="ops-btn blue" onClick={() => setDialog('invite')}>
+              <Plus size={15} /> Invite consultant
+            </button>
+          </div>
+          <div className="data-table labelled-cards">
+            <TableHead labels={['Invitation', 'Role', 'Expires', 'Actions']} />
+            {pendingInvitations.map((invitation) => (
+              <div className="data-row" key={invitation.id}>
+                <div data-label="Invitation">
+                  <strong>{invitation.full_name}</strong>
+                  <small>{invitation.email}</small>
+                </div>
+                <span data-label="Role">
+                  <span className="finance-role">{roleLabel(invitation.role)}</span>
+                </span>
+                <span data-label="Expires">{formatOrganizationDate(invitation.expires_at, settings)}</span>
+                <div className="transfer-card-actions" data-label="Actions">
+                  <Status value={invitation.status} />
+                  <ActionMenu label={`More actions for ${invitation.email}`}>
+                    <ActionMenuItem onClick={() => void resendInvitation(invitation)}>Resend invitation</ActionMenuItem>
+                    <ActionMenuItem className="destructive-action" onClick={() => void revokeInvitation(invitation)}>
+                      Revoke invitation
+                    </ActionMenuItem>
+                  </ActionMenu>
+                </div>
+              </div>
+            ))}
+            {!pendingInvitations.length && (
+              <Empty
+                title="No pending invitations"
+                detail="Invite a consultant to give them access to the workspace."
+                icon={<Users size={22} />}
+              />
+            )}
+          </div>
+        </section>
+      )}
 
-    {tab === 'rules' && <section className="ops-panel finance-people-panel">
-      <div className="ops-panel-head"><div><h2>Commission rules</h2><p>Define how sales commissions are calculated and when they can be approved.</p></div><button className="ops-btn blue" onClick={() => setDialog('rule')}><Plus size={15}/> Add commission rule</button></div>
-      <div className="data-table labelled-cards"><TableHead labels={['Rule','Rate','Trigger','Status','Actions']}/>{rules.map(rule => <div className="data-row" key={rule.id}><strong data-label="Rule">{rule.name}</strong><span data-label="Rate">{Number(rule.rate).toFixed(2)}%</span><span data-label="Trigger">{rule.trigger_status}</span><Status value={rule.is_active ? 'Active' : 'Inactive'}/><div className="transfer-card-actions" data-label="Actions"><ActionMenu label={`More actions for ${rule.name}`}><ActionMenuItem onClick={() => { setSelectedRule(rule); setDialog('ruleEdit'); }}>Edit rule</ActionMenuItem></ActionMenu></div></div>)}{!rules.length && <Empty title="No commission rules" detail="Add a rule to calculate consultant commissions from confirmed sales." icon={<CircleDollarSign size={22}/>} />}</div>
-    </section>}
+      {tab === 'onboarding' && (
+        <section className="ops-panel finance-people-panel">
+          <div className="ops-panel-head">
+            <div>
+              <h2>Onboarding</h2>
+              <p>Guide new consultants through their first days with clear ownership and due dates.</p>
+            </div>
+            <button className="ops-btn blue" onClick={() => setDialog('onboarding')}>
+              <Plus size={15} /> Add onboarding task
+            </button>
+          </div>
+          <div className="data-table labelled-cards">
+            <TableHead labels={['Task', 'Person', 'Due date', 'Status', 'Actions']} />
+            {tasks.map((task) => (
+              <div className="data-row" key={task.id}>
+                <strong data-label="Task">{task.title}</strong>
+                <span data-label="Person">{task.user_name}</span>
+                <span data-label="Due date">{task.due_at || 'No due date'}</span>
+                <Status value={task.status} />
+                <div className="transfer-card-actions" data-label="Actions">
+                  {task.status === 'Pending' ? (
+                    <button className="row-action" onClick={() => void completeTask(task)}>
+                      <Check size={13} /> Complete
+                    </button>
+                  ) : (
+                    <span className="workflow-help">Completed</span>
+                  )}
+                </div>
+              </div>
+            ))}
+            {!tasks.length && (
+              <Empty
+                title="No onboarding tasks"
+                detail="Create tasks to guide new consultants through their first days."
+                icon={<Check size={22} />}
+              />
+            )}
+          </div>
+        </section>
+      )}
 
-    {tab === 'targets' && <section className="ops-panel finance-people-panel">
-      <div className="ops-panel-head"><div><h2>Consultant targets</h2><p>Track target periods, achievement, and accountability by consultant.</p></div><button className="ops-btn blue" onClick={() => setDialog('target')}><Plus size={15}/> Set target</button></div>
-      <div className="data-table labelled-cards"><TableHead labels={['Consultant','Period','Target','Progress','Actions']}/>{targets.map(target => <div className="data-row" key={target.id}><strong data-label="Consultant">{target.consultant_name}</strong><span data-label="Period">{target.period_start} → {target.period_end}</span><span data-label="Target">{formatCurrency(target.target_amount, settings.currency)}</span><span data-label="Progress" className="green-text">{formatCurrency(target.achieved, settings.currency)}</span><div className="transfer-card-actions" data-label="Actions"><ActionMenu label={`More actions for ${target.consultant_name}`}><ActionMenuItem onClick={() => { setSelectedTarget(target); setDialog('targetEdit'); }}>Edit target</ActionMenuItem></ActionMenu></div></div>)}{!targets.length && <Empty title="No consultant targets" detail="Set a target to make progress visible for your sales team." icon={<FileText size={22}/>} />}</div>
-    </section>}
+      {tab === 'rules' && (
+        <section className="ops-panel finance-people-panel">
+          <div className="ops-panel-head">
+            <div>
+              <h2>Commission rules</h2>
+              <p>Define how sales commissions are calculated and when they can be approved.</p>
+            </div>
+            <button className="ops-btn blue" onClick={() => setDialog('rule')}>
+              <Plus size={15} /> Add commission rule
+            </button>
+          </div>
+          <div className="data-table labelled-cards">
+            <TableHead labels={['Rule', 'Rate', 'Trigger', 'Status', 'Actions']} />
+            {rules.map((rule) => (
+              <div className="data-row" key={rule.id}>
+                <strong data-label="Rule">{rule.name}</strong>
+                <span data-label="Rate">{Number(rule.rate).toFixed(2)}%</span>
+                <span data-label="Trigger">{rule.trigger_status}</span>
+                <Status value={rule.is_active ? 'Active' : 'Inactive'} />
+                <div className="transfer-card-actions" data-label="Actions">
+                  <ActionMenu label={`More actions for ${rule.name}`}>
+                    <ActionMenuItem
+                      onClick={() => {
+                        setSelectedRule(rule);
+                        setDialog('ruleEdit');
+                      }}
+                    >
+                      Edit rule
+                    </ActionMenuItem>
+                  </ActionMenu>
+                </div>
+              </div>
+            ))}
+            {!rules.length && (
+              <Empty
+                title="No commission rules"
+                detail="Add a rule to calculate consultant commissions from confirmed sales."
+                icon={<CircleDollarSign size={22} />}
+              />
+            )}
+          </div>
+        </section>
+      )}
 
-    {dialog === 'invite' && <InviteEmployeeDialog allowCeo={false} close={() => setDialog(null)} saved={() => saved('Invitation created')}/>}
-    {dialog === 'employeeEdit' && selectedEmployee && <EmployeeEditDialog allowCeo={false} employee={selectedEmployee} close={() => { setDialog(null); setSelectedEmployee(null); }} saved={() => { setDialog(null); setSelectedEmployee(null); notify('Employee updated'); }}/>}
-    {dialog === 'employeeHistory' && selectedEmployee && <EmployeeHistoryDialog employee={selectedEmployee} close={() => { setDialog(null); setSelectedEmployee(null); }}/>}
-    {dialog === 'onboarding' && <OnboardingDialog users={users} close={() => setDialog(null)} saved={() => saved('Onboarding task created')}/>}
-    {dialog === 'rule' && <RuleDialog close={() => setDialog(null)} saved={() => saved('Commission rule created')}/>}
-    {dialog === 'ruleEdit' && selectedRule && <RuleEditDialog rule={selectedRule} close={() => setDialog(null)} saved={() => saved('Commission rule updated')}/>}
-    {dialog === 'target' && <TargetDialog users={users} close={() => setDialog(null)} saved={() => saved('Consultant target created')}/>}
-    {dialog === 'targetEdit' && selectedTarget && <TargetEditDialog target={selectedTarget} users={users} close={() => { setDialog(null); setSelectedTarget(null); }} saved={() => saved('Consultant target updated')}/>}
-  </div>;
+      {tab === 'targets' && (
+        <section className="ops-panel finance-people-panel">
+          <div className="ops-panel-head">
+            <div>
+              <h2>Consultant targets</h2>
+              <p>Track target periods, achievement, and accountability by consultant.</p>
+            </div>
+            <button className="ops-btn blue" onClick={() => setDialog('target')}>
+              <Plus size={15} /> Set target
+            </button>
+          </div>
+          <div className="data-table labelled-cards">
+            <TableHead labels={['Consultant', 'Period', 'Target', 'Progress', 'Actions']} />
+            {targets.map((target) => (
+              <div className="data-row" key={target.id}>
+                <strong data-label="Consultant">{target.consultant_name}</strong>
+                <span data-label="Period">
+                  {target.period_start} → {target.period_end}
+                </span>
+                <span data-label="Target">{formatCurrency(target.target_amount, settings.currency)}</span>
+                <span data-label="Progress" className="green-text">
+                  {formatCurrency(target.achieved, settings.currency)}
+                </span>
+                <div className="transfer-card-actions" data-label="Actions">
+                  <ActionMenu label={`More actions for ${target.consultant_name}`}>
+                    <ActionMenuItem
+                      onClick={() => {
+                        setSelectedTarget(target);
+                        setDialog('targetEdit');
+                      }}
+                    >
+                      Edit target
+                    </ActionMenuItem>
+                  </ActionMenu>
+                </div>
+              </div>
+            ))}
+            {!targets.length && (
+              <Empty
+                title="No consultant targets"
+                detail="Set a target to make progress visible for your sales team."
+                icon={<FileText size={22} />}
+              />
+            )}
+          </div>
+        </section>
+      )}
+
+      {dialog === 'invite' && (
+        <InviteEmployeeDialog
+          allowCeo={false}
+          close={() => setDialog(null)}
+          saved={() => saved('Invitation created')}
+        />
+      )}
+      {dialog === 'employeeEdit' && selectedEmployee && (
+        <EmployeeEditDialog
+          allowCeo={false}
+          employee={selectedEmployee}
+          close={() => {
+            setDialog(null);
+            setSelectedEmployee(null);
+          }}
+          saved={() => {
+            setDialog(null);
+            setSelectedEmployee(null);
+            notify('Employee updated');
+          }}
+        />
+      )}
+      {dialog === 'employeeHistory' && selectedEmployee && (
+        <EmployeeHistoryDialog
+          employee={selectedEmployee}
+          close={() => {
+            setDialog(null);
+            setSelectedEmployee(null);
+          }}
+        />
+      )}
+      {dialog === 'onboarding' && (
+        <OnboardingDialog users={users} close={() => setDialog(null)} saved={() => saved('Onboarding task created')} />
+      )}
+      {dialog === 'rule' && <RuleDialog close={() => setDialog(null)} saved={() => saved('Commission rule created')} />}
+      {dialog === 'ruleEdit' && selectedRule && (
+        <RuleEditDialog
+          rule={selectedRule}
+          close={() => setDialog(null)}
+          saved={() => saved('Commission rule updated')}
+        />
+      )}
+      {dialog === 'target' && (
+        <TargetDialog users={users} close={() => setDialog(null)} saved={() => saved('Consultant target created')} />
+      )}
+      {dialog === 'targetEdit' && selectedTarget && (
+        <TargetEditDialog
+          target={selectedTarget}
+          users={users}
+          close={() => {
+            setDialog(null);
+            setSelectedTarget(null);
+          }}
+          saved={() => saved('Consultant target updated')}
+        />
+      )}
+    </div>
+  );
 }
 
-function Dialog({ title, children, close }: { title: string; children: React.ReactNode; close: () => void }) { const dialogRef = useDialogFocus<HTMLDivElement>(close); return <div className="workflow-dialog-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) close(); }}><div ref={dialogRef} className="workflow-dialog" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}><div className="workflow-dialog-head"><h3>{title}</h3><button onClick={close} aria-label="Close"><X size={16}/></button></div>{children}</div></div>; }
-function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="workflow-field"><span>{label}</span>{children}</label>; }
-function Actions({ close, label, disabled }: { close: () => void; label: string; disabled?: boolean }) { return <div className="workflow-dialog-actions"><button type="button" className="ops-btn ghost" onClick={close}>Cancel</button><button className="ops-btn blue" disabled={disabled}>{label}</button></div>; }
-function LivePanel({ title, subtitle, children, className = '' }: { title: string; subtitle: string; children: React.ReactNode; className?: string }) { return <section className={`ops-panel ${className}`}><div className="ops-panel-head"><div><h2>{title}</h2><p>{subtitle}</p></div></div>{children}</section>; }
-function TableHead({ labels }: { labels: string[] }) { return <div className="table-head ops-table-head">{labels.map(label => <span key={label}>{label}</span>)}</div>; }
-function Status({ value }: { value: string }) { const key = value.toLowerCase().replaceAll(' ', '-'); return <span className={`status ${key}`}>{value}</span>; }
-function LiveKpi({ label, value, note, icon, tone }: { label: string; value: string | number; note: string; icon: React.ReactNode; tone: string }) { return <div className="ops-kpi"><span className={`kpi-icon ${tone}`}>{icon}</span><strong>{value}</strong><span>{label}</span><small>{note}</small></div>; }
-function Empty({ title, detail, icon }: { title: string; detail: string; icon: React.ReactNode }) { return <div className="empty-state">{icon}<strong>{title}</strong><span>{detail}</span></div>; }
+function Dialog({ title, children, close }: { title: string; children: React.ReactNode; close: () => void }) {
+  const dialogRef = useDialogFocus<HTMLDivElement>(close);
+  return (
+    <div
+      className="workflow-dialog-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) close();
+      }}
+    >
+      <div ref={dialogRef} className="workflow-dialog" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}>
+        <div className="workflow-dialog-head">
+          <h3>{title}</h3>
+          <button onClick={close} aria-label="Close">
+            <X size={16} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="workflow-field">
+      <span>{label}</span>
+      {children}
+    </label>
+  );
+}
+function Actions({ close, label, disabled }: { close: () => void; label: string; disabled?: boolean }) {
+  return (
+    <div className="workflow-dialog-actions">
+      <button type="button" className="ops-btn ghost" onClick={close}>
+        Cancel
+      </button>
+      <button className="ops-btn blue" disabled={disabled}>
+        {label}
+      </button>
+    </div>
+  );
+}
+function LivePanel({
+  title,
+  subtitle,
+  children,
+  className = '',
+}: {
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={`ops-panel ${className}`}>
+      <div className="ops-panel-head">
+        <div>
+          <h2>{title}</h2>
+          <p>{subtitle}</p>
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+function TableHead({ labels }: { labels: string[] }) {
+  return (
+    <div className="table-head ops-table-head">
+      {labels.map((label) => (
+        <span key={label}>{label}</span>
+      ))}
+    </div>
+  );
+}
+function Status({ value }: { value: string }) {
+  const key = value.toLowerCase().replaceAll(' ', '-');
+  return <span className={`status ${key}`}>{value}</span>;
+}
+function LiveKpi({
+  label,
+  value,
+  note,
+  icon,
+  tone,
+}: {
+  label: string;
+  value: string | number;
+  note: string;
+  icon: React.ReactNode;
+  tone: string;
+}) {
+  return (
+    <div className="ops-kpi">
+      <span className={`kpi-icon ${tone}`}>{icon}</span>
+      <strong>{value}</strong>
+      <span>{label}</span>
+      <small>{note}</small>
+    </div>
+  );
+}
+function Empty({ title, detail, icon }: { title: string; detail: string; icon: React.ReactNode }) {
+  return (
+    <div className="empty-state">
+      {icon}
+      <strong>{title}</strong>
+      <span>{detail}</span>
+    </div>
+  );
+}

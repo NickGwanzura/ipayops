@@ -12,20 +12,12 @@ export const metadata: Metadata = {
     default: 'iPayTech Operations',
     template: '%s | iPayTech Operations',
   },
-  description:
-    'iPayTech Operations control centre for serialized inventory, sales, jobs, warranties, finance, and HR.',
+  description: 'iPayTech Operations control centre for serialized inventory, sales, jobs, warranties, finance, and HR.',
   applicationName: 'iPayTech Operations',
   authors: [{ name: 'iPayTech' }],
   creator: 'iPayTech',
   publisher: 'iPayTech',
-  keywords: [
-    'iPayTech',
-    'operations management',
-    'serialized inventory',
-    'sales CRM',
-    'warranty management',
-    'Harare',
-  ],
+  keywords: ['iPayTech', 'operations management', 'serialized inventory', 'sales CRM', 'warranty management', 'Harare'],
   alternates: { canonical: '/' },
   robots: {
     index: false,
@@ -42,19 +34,23 @@ export const metadata: Metadata = {
     url: '/',
     siteName: 'iPayTech Operations',
     title: 'iPayTech Operations',
-    description:
-      'Operations control centre for serialized inventory, sales, jobs, warranties, finance, and HR.',
+    description: 'Operations control centre for serialized inventory, sales, jobs, warranties, finance, and HR.',
     images: [{ url: '/iPaytechLogo.jpg', width: 1000, height: 420, alt: 'iPayTech Operations' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'iPayTech Operations',
-    description:
-      'Operations control centre for serialized inventory, sales, jobs, warranties, finance, and HR.',
+    description: 'Operations control centre for serialized inventory, sales, jobs, warranties, finance, and HR.',
     images: ['/iPaytechLogo.jpg'],
   },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body><OrganizationSettingsProvider>{children}</OrganizationSettingsProvider></body></html>;
+  return (
+    <html lang="en">
+      <body>
+        <OrganizationSettingsProvider>{children}</OrganizationSettingsProvider>
+      </body>
+    </html>
+  );
 }
