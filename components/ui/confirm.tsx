@@ -10,7 +10,15 @@ type Request =
       options: Required<Pick<ConfirmOptions, 'title' | 'message' | 'confirmLabel' | 'tone'>>;
       resolve: (value: boolean) => void;
     }
-  | { kind: 'prompt'; message: string; defaultValue: string; resolve: (value: string | null) => void };
+  | { kind: 'prompt'; message: string; defaultValue: string; resolve: (value: string | null) => void }
+  | {
+      kind: 'select';
+      title: string;
+      message: string;
+      options: Array<{ value: string; label: string }>;
+      confirmLabel: string;
+      resolve: (value: string | null) => void;
+    };
 
 let open: ((request: Request) => void) | null = null;
 
@@ -53,6 +61,20 @@ export function promptText(message: string, defaultValue = ''): Promise<string |
   return new Promise((resolve) => request({ kind: 'prompt', message, defaultValue, resolve }));
 }
 
+/** Lets the user pick one of several options; resolves to the chosen value or null when dismissed. */
+export function selectOption(input: {
+  title: string;
+  message: string;
+  options: Array<{ value: string; label: string }>;
+  confirmLabel?: string;
+}): Promise<string | null> {
+  if (!open) return Promise.resolve(null);
+  const request = open;
+  return new Promise((resolve) =>
+    request({ kind: 'select', ...input, confirmLabel: input.confirmLabel || 'Continue', resolve }),
+  );
+}
+
 /** Mount once near the root; renders whichever confirm/prompt dialog is currently requested. */
 export function ConfirmHost() {
   const [request, setRequest] = useState<Request | null>(null);
@@ -70,7 +92,13 @@ export function ConfirmHost() {
   };
   return (
     <ConfirmDialog
-      key={request.kind === 'confirm' ? request.options.message : request.message}
+      key={
+        request.kind === 'confirm'
+          ? request.options.message
+          : request.kind === 'select'
+            ? request.title + request.message
+            : request.message
+      }
       request={request}
       finish={finish}
     />
@@ -79,11 +107,14 @@ export function ConfirmHost() {
 
 function ConfirmDialog({ request, finish }: { request: Request; finish: (value: boolean | string | null) => void }) {
   const titleId = useId();
-  const [text, setText] = useState(request.kind === 'prompt' ? request.defaultValue : '');
+  const [text, setText] = useState(
+    request.kind === 'prompt' ? request.defaultValue : request.kind === 'select' ? request.options[0]?.value || '' : '',
+  );
   const cancel = () => finish(request.kind === 'confirm' ? false : null);
   const dialog = useDialogFocus<HTMLDivElement>(cancel);
   const confirmRef = useRef<HTMLButtonElement>(null);
-  const title = request.kind === 'confirm' ? request.options.title : 'Enter details';
+  const title =
+    request.kind === 'confirm' ? request.options.title : request.kind === 'select' ? request.title : 'Enter details';
   return (
     <div
       className="workflow-dialog-backdrop"
@@ -114,6 +145,18 @@ function ConfirmDialog({ request, finish }: { request: Request; finish: (value: 
               </p>
             </div>
           </div>
+          {request.kind === 'select' && (
+            <label className="workflow-field">
+              <span>Choose</span>
+              <select value={text} onChange={(event) => setText(event.target.value)}>
+                {request.options.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           {request.kind === 'prompt' && (
             <label className="workflow-field">
               <span>Reference</span>
@@ -136,7 +179,11 @@ function ConfirmDialog({ request, finish }: { request: Request; finish: (value: 
                 request.kind === 'confirm' && request.options.tone === 'danger' ? 'ops-btn blue danger' : 'ops-btn blue'
               }
             >
-              {request.kind === 'confirm' ? request.options.confirmLabel : 'Continue'}
+              {request.kind === 'confirm'
+                ? request.options.confirmLabel
+                : request.kind === 'select'
+                  ? request.confirmLabel
+                  : 'Continue'}
             </button>
           </div>
         </form>

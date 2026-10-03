@@ -21,11 +21,11 @@ import {
   X,
 } from 'lucide-react';
 import { formatCurrency, formatOrganizationDate, useOrganizationSettings } from '../organization-settings';
-import { normalizeRole } from '@/lib/rbac';
+import { normalizeRole, roleLabel } from '@/lib/rbac';
 import { useDialogFocus } from '../dialog-focus';
 import { ActionMenu, ActionMenuItem } from './action-menu';
 import { Field, TableHead, Status, LiveKpi, Empty } from '@/components/ui';
-import { confirmAction, promptText } from '@/components/ui/confirm';
+import { confirmAction, promptText, selectOption } from '@/components/ui/confirm';
 import { matchesQuery } from '@/components/ui/search';
 
 type Expense = {
@@ -357,11 +357,34 @@ export default function FinanceWorkspace({
       ))
     )
       return;
+    // Open opportunities, leads and quotes would stall with the leaver, so offer to hand them to a colleague.
+    const successors = employees.filter(
+      (person) =>
+        person.is_active && person.id !== employee.id && ['sales_consultant', 'manager'].includes(person.role),
+    );
+    let reassignToUserId = '';
+    if (successors.length) {
+      const chosen = await selectOption({
+        title: 'Hand over open work',
+        message: `Who should take over ${employee.full_name}'s open opportunities, leads and quotations?`,
+        confirmLabel: 'Delete user',
+        options: [
+          { value: '', label: 'No one (leave open work unassigned)' },
+          ...successors.map((person) => ({
+            value: person.id,
+            label: `${person.full_name} (${roleLabel(person.role)})`,
+          })),
+        ],
+      });
+      if (chosen === null) return;
+      reassignToUserId = chosen;
+    }
     const response = await fetch(`/api/hr/employees/${employee.id}/offboard`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         notes: 'User deleted from the People workspace; account archived with lifecycle history retained.',
+        reassignToUserId: reassignToUserId || undefined,
       }),
     });
     const data = await response.json();
@@ -369,7 +392,14 @@ export default function FinanceWorkspace({
       notify(data.error || 'Unable to delete user.');
       return;
     }
-    notify(`${employee.full_name} deleted`);
+    const moved = data.reassigned
+      ? data.reassigned.opportunities + data.reassigned.leads + data.reassigned.quotations
+      : 0;
+    notify(
+      moved > 0
+        ? `${employee.full_name} deleted; ${moved} open record${moved === 1 ? '' : 's'} handed over`
+        : `${employee.full_name} deleted`,
+    );
     void load();
   };
   const resendInvitation = async (invitation: Invitation) => {
