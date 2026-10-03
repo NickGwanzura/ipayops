@@ -43,6 +43,7 @@ import { canAccessConfiguration, canAccessModule, isLeadershipRole, modulesForRo
 import type { OpsModule } from '@/lib/ops-data';
 import { useRouter } from 'next/navigation';
 import { useThemePreference } from '@/components/ui/theme';
+import { CommandPalette } from '@/components/ui/command-palette';
 
 const moduleNav: Array<{ label: OpsModule; icon: React.ElementType }> = [
   { label: 'Sales & CRM', icon: BriefcaseBusiness },
@@ -190,17 +191,6 @@ export default function Home() {
       })
       .catch((error) => notify(error instanceof Error ? error.message : 'Live dashboard data is unavailable.'));
   }, [user]);
-  useEffect(() => {
-    const handleShortcut = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        searchRef.current?.focus();
-        searchRef.current?.select();
-      }
-    };
-    window.addEventListener('keydown', handleShortcut);
-    return () => window.removeEventListener('keydown', handleShortcut);
-  }, []);
   const logout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
@@ -234,6 +224,7 @@ export default function Home() {
   const approvalTarget = user && canAccessModule(user.role, 'Finance & HR') ? 'Finance & HR' : 'Reports';
   return (
     <div className={dark ? 'shell dark' : 'shell'}>
+      <CommandPalette />
       <aside className={menu ? 'sidebar open' : 'sidebar'}>
         <div className="brand">
           <Image className="brand-logo" src="/iPaytechLogo.jpg" alt="iPayTech" width={150} height={63} priority />

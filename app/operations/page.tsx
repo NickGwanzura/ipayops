@@ -40,6 +40,7 @@ import './ops-responsive.css';
 import './ops-tokens.css';
 import './dashboard-redesign.css';
 import './cards.css';
+import { CommandPalette } from '@/components/ui/command-palette';
 
 const modules: OpsModule[] = [...ALL_OPS_MODULES, 'Audit Logs'];
 type User = { fullName: string; role: string };
@@ -48,7 +49,7 @@ export default function OperationsPage() {
   const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
   const requested = params?.get('module') as OpsModule | null;
   const [module, setModule] = useState<OpsModule>(requested && modules.includes(requested) ? requested : 'Inventory');
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(params?.get('q') || '');
   const [toast, setToast] = useState('');
   const [user, setUser] = useState<User | null>(null);
   const [newRecordSignal, setNewRecordSignal] = useState(0);
@@ -82,18 +83,6 @@ export default function OperationsPage() {
     setModule(fallback);
     window.history.replaceState(null, '', `/operations?module=${encodeURIComponent(fallback)}`);
   }, [user, module, visibleModules]);
-
-  useEffect(() => {
-    const handleShortcut = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        searchRef.current?.focus();
-        searchRef.current?.select();
-      }
-    };
-    window.addEventListener('keydown', handleShortcut);
-    return () => window.removeEventListener('keydown', handleShortcut);
-  }, []);
 
   const notify = (message: string) => {
     setToast(message);
@@ -153,6 +142,7 @@ export default function OperationsPage() {
 
   return (
     <div className="ops-shell">
+      <CommandPalette />
       <aside className="ops-rail">
         <Link className="ops-brand" href="/">
           <Image className="ops-logo" src="/iPaytechLogo.jpg" alt="iPayTech" width={160} height={67} priority />
