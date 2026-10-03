@@ -75,7 +75,29 @@ type Quote = {
 };
 type SaleItem = { id: string; serialNumber: string; sku: string; description: string; returned: boolean };
 type Sale = { id: string; number: string; status: string; total: string; client_name: string; items: SaleItem[] };
-type Inventory = { id: string; serial_number: string; sku: string; description: string; status: string };
+type Inventory = {
+  id: string;
+  serial_number: string;
+  sku: string;
+  description: string;
+  status: string;
+  location?: string;
+};
+
+/** Available units for the given SKUs (queried per SKU so stock beyond the first inventory page is not missed). */
+async function fetchAvailableUnits(skus: string[]) {
+  const pages = await Promise.all(
+    Array.from(new Set(skus)).map((sku) =>
+      fetch(`/api/inventory?status=Available&pageSize=100&q=${encodeURIComponent(sku)}`, { cache: 'no-store' }).then(
+        (response) => response.json() as Promise<{ inventory?: Inventory[] }>,
+      ),
+    ),
+  );
+  const units = new Map<string, Inventory>();
+  for (const page of pages)
+    for (const unit of page.inventory || []) if (skus.includes(unit.sku)) units.set(unit.id, unit);
+  return Array.from(units.values());
+}
 type Lead = {
   id: string;
   name: string;
@@ -161,6 +183,7 @@ export default function CrmWorkspace({
     | 'quotation'
     | 'quoteEdit'
     | 'convert'
+    | 'reserve'
     | 'return'
     | 'clientEdit'
     | 'clientHistory'
@@ -634,6 +657,17 @@ export default function CrmWorkspace({
                   >
                     <Check size={14} /> Convert
                   </button>
+                  {['Draft', 'Sent', 'Accepted'].includes(quote.status) && (
+                    <button
+                      className="row-action"
+                      onClick={() => {
+                        setSelectedQuote(quote);
+                        setDialog('reserve');
+                      }}
+                    >
+                      Reserve
+                    </button>
+                  )}
                   {!['Converted', 'Cancelled'].includes(quote.status) && (
                     <button className="row-action" onClick={() => void archiveQuote(quote)}>
                       Cancel
@@ -775,6 +809,9 @@ export default function CrmWorkspace({
           close={() => setDialog(null)}
           saved={() => saved('Opportunity updated')}
         />
+      )}
+      {dialog === 'reserve' && selectedQuote && (
+        <ReserveDialog quote={selectedQuote} close={() => setDialog(null)} saved={(message) => saved(message)} />
       )}
       {dialog === 'convert' && selectedQuote && (
         <ConvertDialog
@@ -1516,10 +1553,27 @@ function ConvertDialog({ quote, close, saved }: { quote: Quote; close: () => voi
   const [selected, setSelected] = useState<Record<string, string[]>>({});
   const [error, setError] = useState('');
   useEffect(() => {
-    void fetch('/api/inventory?status=Available', { cache: 'no-store' })
-      .then((response) => response.json())
-      .then((data) => setInventory(data.inventory || []));
-  }, []);
+    // Units held for this quotation are offered first and pre-selected, then other available stock for the same SKUs.
+    void Promise.all([
+      fetchAvailableUnits(quote.items.map((item) => item.sku)),
+      fetch(`/api/crm/quotations/${quote.id}/reserve`, { cache: 'no-store' }).then(
+        (response) => response.json() as Promise<{ reserved?: Inventory[] }>,
+      ),
+    ]).then(([available, held]) => {
+      const reserved = held.reserved || [];
+      const units = new Map<string, Inventory>();
+      for (const unit of [...reserved, ...available]) units.set(unit.id, unit);
+      setInventory(Array.from(units.values()));
+      const chosen: Record<string, string[]> = {};
+      for (const item of quote.items) {
+        chosen[item.id] = reserved
+          .filter((unit) => unit.sku === item.sku)
+          .slice(0, item.quantity)
+          .map((unit) => unit.id);
+      }
+      setSelected(chosen);
+    });
+  }, [quote]);
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const items = quote.items.map((item) => ({ quotationItemId: item.id, inventoryItemIds: selected[item.id] || [] }));
@@ -1571,6 +1625,108 @@ function ConvertDialog({ quote, close, saved }: { quote: Quote; close: () => voi
         ))}
         {error && <p className="workflow-error">{error}</p>}
         <Actions close={close} label="Confirm sale" />
+      </form>
+    </Dialog>
+  );
+}
+function ReserveDialog({ quote, close, saved }: { quote: Quote; close: () => void; saved: (message: string) => void }) {
+  const [available, setAvailable] = useState<Inventory[]>([]);
+  const [held, setHeld] = useState<Inventory[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    void Promise.all([
+      fetchAvailableUnits(quote.items.map((item) => item.sku)),
+      fetch(`/api/crm/quotations/${quote.id}/reserve`, { cache: 'no-store' }).then(
+        (response) => response.json() as Promise<{ reserved?: Inventory[] }>,
+      ),
+    ])
+      .then(([units, current]) => {
+        setAvailable(units);
+        setHeld(current.reserved || []);
+      })
+      .catch(() => setError('Unable to load stock for this quotation.'))
+      .finally(() => setLoading(false));
+  }, [quote]);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!selected.length) {
+      setError('Choose at least one unit to reserve.');
+      return;
+    }
+    const response = await fetch(`/api/crm/quotations/${quote.id}/reserve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inventoryItemIds: selected }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to reserve these units.');
+      return;
+    }
+    saved(
+      `${data.reserved} unit${data.reserved === 1 ? '' : 's'} reserved for ${quote.number} (${data.holdDays} days)`,
+    );
+  };
+  const release = async () => {
+    const response = await fetch(`/api/crm/quotations/${quote.id}/reserve`, { method: 'DELETE' });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to release the reservation.');
+      return;
+    }
+    saved(`Reservation released for ${quote.number}`);
+  };
+  return (
+    <Dialog title={`Reserve stock for ${quote.number}`} close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <p className="workflow-help">
+          Held units cannot be sold on another quotation. Reservations expire after 7 days or when the quotation closes.
+        </p>
+        {loading && <p className="workflow-help">Loading stock…</p>}
+        {held.length > 0 && (
+          <div className="serial-picker">
+            <strong>Currently reserved ({held.length})</strong>
+            <span className="workflow-help">{held.map((unit) => unit.serial_number).join(', ')}</span>
+            <button type="button" className="ops-btn ghost" onClick={() => void release()}>
+              Release all
+            </button>
+          </div>
+        )}
+        {quote.items.map((item) => {
+          const units = available.filter((unit) => unit.sku === item.sku);
+          const heldCount = held.filter((unit) => unit.sku === item.sku).length;
+          const chosenCount = units.filter((unit) => selected.includes(unit.id)).length;
+          return (
+            <div className="serial-picker" key={item.id}>
+              <strong>
+                {item.sku} · {item.description} · {item.quantity} needed · {heldCount} held
+              </strong>
+              {units.slice(0, 40).map((unit) => (
+                <label key={unit.id}>
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(unit.id)}
+                    disabled={!selected.includes(unit.id) && heldCount + chosenCount >= item.quantity}
+                    onChange={(event) =>
+                      setSelected((current) =>
+                        event.target.checked ? [...current, unit.id] : current.filter((id) => id !== unit.id),
+                      )
+                    }
+                  />
+                  {unit.serial_number}
+                  {unit.location ? ` · ${unit.location}` : ''}
+                </label>
+              ))}
+              {!loading && units.length === 0 && (
+                <span className="workflow-help">No available serials match this SKU.</span>
+              )}
+            </div>
+          );
+        })}
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Reserve selected" />
       </form>
     </Dialog>
   );
