@@ -250,18 +250,29 @@ export default function OperationsPage() {
             <InventoryWorkspace query={searchableQuery} notify={notify} newRecordSignal={newRecordSignal} />
           )}{' '}
           {module === 'Sales & CRM' && (
-            <CrmWorkspace notify={notify} newRecordSignal={newRecordSignal} role={user?.role || 'sales_consultant'} />
+            <CrmWorkspace
+              notify={notify}
+              newRecordSignal={newRecordSignal}
+              role={user?.role || 'sales_consultant'}
+              query={searchableQuery}
+            />
           )}{' '}
           {module === 'Job cards' && (
             <JobsWorkspace notify={notify} newRecordSignal={newRecordSignal} role={user?.role || 'sales_consultant'} />
           )}{' '}
           {module === 'Warranty' && <WarrantyWorkspace notify={notify} newRecordSignal={newRecordSignal} />}{' '}
           {module === 'Finance & HR' && (
-            <FinanceWorkspace notify={notify} newRecordSignal={newRecordSignal} role={user?.role || 'finance'} />
+            <FinanceWorkspace
+              notify={notify}
+              newRecordSignal={newRecordSignal}
+              role={user?.role || 'finance'}
+              query={searchableQuery}
+            />
           )}{' '}
           {module === 'People & HR' && (
             <FinanceWorkspace
               section="hr"
+              query={searchableQuery}
               notify={notify}
               newRecordSignal={newRecordSignal}
               role={user?.role || 'manager'}

@@ -26,6 +26,7 @@ import { useDialogFocus } from '../dialog-focus';
 import { ActionMenu, ActionMenuItem } from './action-menu';
 import { Field, TableHead, Status, LiveKpi, Empty } from '@/components/ui';
 import { confirmAction, promptText } from '@/components/ui/confirm';
+import { matchesQuery } from '@/components/ui/search';
 
 type Expense = {
   id: string;
@@ -183,10 +184,12 @@ export default function FinanceWorkspace({
   newRecordSignal = 0,
   role = 'finance',
   section = 'all',
+  query = '',
 }: {
   notify: (message: string) => void;
   newRecordSignal?: number;
   role?: string;
+  query?: string;
   section?: 'all' | 'hr';
 }) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -426,6 +429,7 @@ export default function FinanceWorkspace({
   if (section === 'hr' && canManagePeople)
     return (
       <ManagerControlView
+        query={query}
         employees={employees}
         invitations={invitations}
         tasks={tasks}
@@ -451,6 +455,7 @@ export default function FinanceWorkspace({
   if (normalizedRole === 'manager')
     return (
       <ManagerControlView
+        query={query}
         employees={employees}
         invitations={invitations}
         tasks={tasks}
@@ -542,43 +547,53 @@ export default function FinanceWorkspace({
           </div>
           <div className="data-table labelled-cards">
             <TableHead labels={['Sale', 'Consultant', 'Rate', 'Amount', 'Action']} />
-            {commissions.map((commission) => (
-              <div className="data-row" key={commission.id}>
-                <div data-label="Sale">
-                  <strong>{commission.sale_number}</strong>
-                  <small>{commission.client_name}</small>
-                </div>
-                <span data-label="Consultant">{commission.consultant_name || 'Unassigned'}</span>
-                <span data-label="Rate">{Number(commission.rate).toFixed(2)}%</span>
-                <span data-label="Amount">
-                  {formatCurrency(commission.amount, settings.currency)}
-                  {Number(commission.clawback_amount) > 0 && (
-                    <small className="workflow-error">
-                      {' '}
-                      − {formatCurrency(commission.clawback_amount, settings.currency)} clawback due
-                    </small>
-                  )}
-                </span>
-                <div className="transfer-card-actions" data-label="Action">
-                  <Status value={commission.status} />
-                  {commission.status === 'Provisional' && (
-                    <>
-                      <button className="row-action" onClick={() => void updateCommission(commission, 'Approved')}>
-                        <Check size={13} /> Approve
+            {commissions
+              .filter((commission) =>
+                matchesQuery(
+                  query,
+                  commission.sale_number,
+                  commission.client_name,
+                  commission.consultant_name,
+                  commission.status,
+                ),
+              )
+              .map((commission) => (
+                <div className="data-row" key={commission.id}>
+                  <div data-label="Sale">
+                    <strong>{commission.sale_number}</strong>
+                    <small>{commission.client_name}</small>
+                  </div>
+                  <span data-label="Consultant">{commission.consultant_name || 'Unassigned'}</span>
+                  <span data-label="Rate">{Number(commission.rate).toFixed(2)}%</span>
+                  <span data-label="Amount">
+                    {formatCurrency(commission.amount, settings.currency)}
+                    {Number(commission.clawback_amount) > 0 && (
+                      <small className="workflow-error">
+                        {' '}
+                        − {formatCurrency(commission.clawback_amount, settings.currency)} clawback due
+                      </small>
+                    )}
+                  </span>
+                  <div className="transfer-card-actions" data-label="Action">
+                    <Status value={commission.status} />
+                    {commission.status === 'Provisional' && (
+                      <>
+                        <button className="row-action" onClick={() => void updateCommission(commission, 'Approved')}>
+                          <Check size={13} /> Approve
+                        </button>
+                        <button className="row-action" onClick={() => void updateCommission(commission, 'Voided')}>
+                          <X size={13} /> Void
+                        </button>
+                      </>
+                    )}
+                    {commission.status === 'Approved' && (
+                      <button className="row-action" onClick={() => void updateCommission(commission, 'Paid')}>
+                        <CircleDollarSign size={13} /> Paid
                       </button>
-                      <button className="row-action" onClick={() => void updateCommission(commission, 'Voided')}>
-                        <X size={13} /> Void
-                      </button>
-                    </>
-                  )}
-                  {commission.status === 'Approved' && (
-                    <button className="row-action" onClick={() => void updateCommission(commission, 'Paid')}>
-                      <CircleDollarSign size={13} /> Paid
-                    </button>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
             {!commissions.length && (
               <Empty
                 title="No commission entries"
@@ -606,46 +621,48 @@ export default function FinanceWorkspace({
           </div>
           <div className="data-table labelled-cards finance-ceo-people">
             <TableHead labels={['Employee', 'Role', 'Tasks', 'Account']} />
-            {employees.map((employee) => (
-              <div className="data-row" key={employee.id}>
-                <div data-label="Employee">
-                  <strong>{employee.full_name}</strong>
-                  <small>
-                    {employee.email} · {employee.last_event || 'No lifecycle event'}
-                  </small>
-                </div>
-                <span data-label="Role">{employee.role}</span>
-                <span data-label="Tasks">
-                  {employee.completed_tasks} done · {employee.pending_tasks} pending
-                </span>
-                <div className="transfer-card-actions" data-label="Account">
-                  <Status value={employee.is_active ? 'Active' : 'Inactive'} />
-                  <button
-                    className="row-action"
-                    onClick={() => {
-                      setSelectedEmployee(employee);
-                      setDialog('employeeHistory');
-                    }}
-                  >
-                    History
-                  </button>
-                  <button
-                    className="row-action"
-                    onClick={() => {
-                      setSelectedEmployee(employee);
-                      setDialog('employeeEdit');
-                    }}
-                  >
-                    Edit
-                  </button>
-                  {employee.is_active && (
-                    <button className="row-action destructive-action" onClick={() => void offboard(employee)}>
-                      <Users size={13} /> Delete user
+            {employees
+              .filter((employee) => matchesQuery(query, employee.full_name, employee.email, employee.role))
+              .map((employee) => (
+                <div className="data-row" key={employee.id}>
+                  <div data-label="Employee">
+                    <strong>{employee.full_name}</strong>
+                    <small>
+                      {employee.email} · {employee.last_event || 'No lifecycle event'}
+                    </small>
+                  </div>
+                  <span data-label="Role">{employee.role}</span>
+                  <span data-label="Tasks">
+                    {employee.completed_tasks} done · {employee.pending_tasks} pending
+                  </span>
+                  <div className="transfer-card-actions" data-label="Account">
+                    <Status value={employee.is_active ? 'Active' : 'Inactive'} />
+                    <button
+                      className="row-action"
+                      onClick={() => {
+                        setSelectedEmployee(employee);
+                        setDialog('employeeHistory');
+                      }}
+                    >
+                      History
                     </button>
-                  )}
+                    <button
+                      className="row-action"
+                      onClick={() => {
+                        setSelectedEmployee(employee);
+                        setDialog('employeeEdit');
+                      }}
+                    >
+                      Edit
+                    </button>
+                    {employee.is_active && (
+                      <button className="row-action destructive-action" onClick={() => void offboard(employee)}>
+                        <Users size={13} /> Delete user
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
           </div>
           <InvitationTable
             invitations={invitations}
@@ -693,60 +710,64 @@ export default function FinanceWorkspace({
         >
           <div className="data-table">
             <TableHead labels={['Expense', 'Submitter', 'Amount', 'Status', 'Action']} />
-            {expenses.map((expense) => (
-              <div className="data-row" key={expense.id}>
-                <div>
-                  <strong>{expense.number}</strong>
-                  <small>
-                    {expense.category} · {expense.description}
-                  </small>
-                </div>
-                <span>{expense.submitter_name || 'Current user'}</span>
-                <span>{formatCurrency(expense.amount, expense.currency || settings.currency)}</span>
-                <Status value={expense.status} />
-                <div className="transfer-card-actions">
-                  {expense.attachment_count ? (
-                    <span title="Receipt attached">
-                      <Paperclip size={13} />
-                      {expense.attachment_count}
-                    </span>
-                  ) : null}
-                  <button
-                    className="row-action"
-                    onClick={() => {
-                      setSelectedExpense(expense);
-                      setDialog('expenseDetail');
-                    }}
-                  >
-                    <FileText size={14} /> Details
-                  </button>
-                  {expense.status === 'Pending' && (
-                    <>
-                      <button
-                        className="row-action"
-                        onClick={() => {
-                          setSelectedExpense(expense);
-                          setDialog('expenseEdit');
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <button className="row-action" onClick={() => void updateExpense(expense, 'Approved')}>
-                        <Check size={14} /> Approve
-                      </button>
-                      <button className="row-action" onClick={() => void updateExpense(expense, 'Rejected')}>
-                        <X size={14} /> Reject
-                      </button>
-                    </>
-                  )}
-                  {expense.status === 'Approved' && (
-                    <button className="row-action" onClick={() => void updateExpense(expense, 'Paid')}>
-                      <CircleDollarSign size={14} /> Mark paid
+            {expenses
+              .filter((expense) =>
+                matchesQuery(query, expense.number, expense.description, expense.submitter_name, expense.status),
+              )
+              .map((expense) => (
+                <div className="data-row" key={expense.id}>
+                  <div>
+                    <strong>{expense.number}</strong>
+                    <small>
+                      {expense.category} · {expense.description}
+                    </small>
+                  </div>
+                  <span>{expense.submitter_name || 'Current user'}</span>
+                  <span>{formatCurrency(expense.amount, expense.currency || settings.currency)}</span>
+                  <Status value={expense.status} />
+                  <div className="transfer-card-actions">
+                    {expense.attachment_count ? (
+                      <span title="Receipt attached">
+                        <Paperclip size={13} />
+                        {expense.attachment_count}
+                      </span>
+                    ) : null}
+                    <button
+                      className="row-action"
+                      onClick={() => {
+                        setSelectedExpense(expense);
+                        setDialog('expenseDetail');
+                      }}
+                    >
+                      <FileText size={14} /> Details
                     </button>
-                  )}
+                    {expense.status === 'Pending' && (
+                      <>
+                        <button
+                          className="row-action"
+                          onClick={() => {
+                            setSelectedExpense(expense);
+                            setDialog('expenseEdit');
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button className="row-action" onClick={() => void updateExpense(expense, 'Approved')}>
+                          <Check size={14} /> Approve
+                        </button>
+                        <button className="row-action" onClick={() => void updateExpense(expense, 'Rejected')}>
+                          <X size={14} /> Reject
+                        </button>
+                      </>
+                    )}
+                    {expense.status === 'Approved' && (
+                      <button className="row-action" onClick={() => void updateExpense(expense, 'Paid')}>
+                        <CircleDollarSign size={14} /> Mark paid
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
             {!expenses.length && (
               <Empty
                 title="No expense claims"
@@ -763,44 +784,50 @@ export default function FinanceWorkspace({
         >
           <div className="data-table">
             <TableHead labels={['Invoice', 'Client', 'Total', 'Outstanding', 'Action']} />
-            {invoices.map((invoice) => (
-              <div className="data-row" key={invoice.id}>
-                <div>
-                  <strong>{invoice.number}</strong>
-                  <small>{invoice.sale_number}</small>
+            {invoices
+              .filter((invoice) =>
+                matchesQuery(query, invoice.number, invoice.client_name, invoice.sale_number, invoice.status),
+              )
+              .map((invoice) => (
+                <div className="data-row" key={invoice.id}>
+                  <div>
+                    <strong>{invoice.number}</strong>
+                    <small>{invoice.sale_number}</small>
+                  </div>
+                  <span>{invoice.client_name}</span>
+                  <span>{formatCurrency(invoice.total, settings.currency)}</span>
+                  <Status value={Number(invoice.outstanding) <= 0 ? 'Paid' : invoice.status} />
+                  <div className="transfer-card-actions">
+                    <button
+                      className="row-action"
+                      onClick={() => {
+                        setSelectedInvoice(invoice);
+                        setDialog('invoiceDetail');
+                      }}
+                    >
+                      <FileText size={14} /> Details
+                    </button>
+                    <button
+                      className="row-action"
+                      onClick={() =>
+                        window.open(`/api/crm/invoices/${invoice.id}/pdf`, '_blank', 'noopener,noreferrer')
+                      }
+                    >
+                      <FileText size={14} /> PDF
+                    </button>
+                    <button
+                      className="row-action"
+                      disabled={invoice.status === 'Void' || Number(invoice.outstanding) <= 0}
+                      onClick={() => {
+                        setSelectedInvoice(invoice);
+                        setDialog('payment');
+                      }}
+                    >
+                      <CircleDollarSign size={14} /> Record payment
+                    </button>
+                  </div>
                 </div>
-                <span>{invoice.client_name}</span>
-                <span>{formatCurrency(invoice.total, settings.currency)}</span>
-                <Status value={Number(invoice.outstanding) <= 0 ? 'Paid' : invoice.status} />
-                <div className="transfer-card-actions">
-                  <button
-                    className="row-action"
-                    onClick={() => {
-                      setSelectedInvoice(invoice);
-                      setDialog('invoiceDetail');
-                    }}
-                  >
-                    <FileText size={14} /> Details
-                  </button>
-                  <button
-                    className="row-action"
-                    onClick={() => window.open(`/api/crm/invoices/${invoice.id}/pdf`, '_blank', 'noopener,noreferrer')}
-                  >
-                    <FileText size={14} /> PDF
-                  </button>
-                  <button
-                    className="row-action"
-                    disabled={invoice.status === 'Void' || Number(invoice.outstanding) <= 0}
-                    onClick={() => {
-                      setSelectedInvoice(invoice);
-                      setDialog('payment');
-                    }}
-                  >
-                    <CircleDollarSign size={14} /> Record payment
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))}
             {!invoices.length && (
               <Empty
                 title="No invoices"
@@ -818,36 +845,40 @@ export default function FinanceWorkspace({
       >
         <div className="data-table">
           <TableHead labels={['Delivery note', 'Client', 'Address', 'Status', 'Action']} />
-          {deliveryNotes.map((note) => (
-            <div className="data-row" key={note.id}>
-              <div>
-                <strong>{note.number}</strong>
-                <small>
-                  {note.sale_number} · {formatOrganizationDate(note.created_at, settings)}
-                </small>
+          {deliveryNotes
+            .filter((note) => matchesQuery(query, note.number, note.client_name, note.sale_number, note.status))
+            .map((note) => (
+              <div className="data-row" key={note.id}>
+                <div>
+                  <strong>{note.number}</strong>
+                  <small>
+                    {note.sale_number} · {formatOrganizationDate(note.created_at, settings)}
+                  </small>
+                </div>
+                <span>{note.client_name}</span>
+                <span>{note.delivery_address || 'No address recorded'}</span>
+                <Status value={note.status} />
+                <div className="transfer-card-actions">
+                  <button
+                    className="row-action"
+                    onClick={() => {
+                      setSelectedDeliveryNote(note);
+                      setDialog('deliveryDetail');
+                    }}
+                  >
+                    <FileText size={14} /> Details
+                  </button>
+                  <button
+                    className="row-action"
+                    onClick={() =>
+                      window.open(`/api/crm/delivery-notes/${note.id}/pdf`, '_blank', 'noopener,noreferrer')
+                    }
+                  >
+                    <FileText size={14} /> PDF
+                  </button>
+                </div>
               </div>
-              <span>{note.client_name}</span>
-              <span>{note.delivery_address || 'No address recorded'}</span>
-              <Status value={note.status} />
-              <div className="transfer-card-actions">
-                <button
-                  className="row-action"
-                  onClick={() => {
-                    setSelectedDeliveryNote(note);
-                    setDialog('deliveryDetail');
-                  }}
-                >
-                  <FileText size={14} /> Details
-                </button>
-                <button
-                  className="row-action"
-                  onClick={() => window.open(`/api/crm/delivery-notes/${note.id}/pdf`, '_blank', 'noopener,noreferrer')}
-                >
-                  <FileText size={14} /> PDF
-                </button>
-              </div>
-            </div>
-          ))}
+            ))}
           {!deliveryNotes.length && (
             <Empty
               title="No delivery notes"
@@ -864,29 +895,39 @@ export default function FinanceWorkspace({
       >
         <div className="data-table">
           <TableHead labels={['Return', 'Client / sale', 'Amount', 'Status', 'Action']} />
-          {returns.map((returnRecord) => (
-            <div className="data-row" key={returnRecord.id}>
-              <div>
-                <strong>{returnRecord.number}</strong>
-                <small>{returnRecord.reason}</small>
+          {returns
+            .filter((returnRecord) =>
+              matchesQuery(
+                query,
+                returnRecord.number,
+                returnRecord.client_name,
+                returnRecord.sale_number,
+                returnRecord.credit_note_number,
+              ),
+            )
+            .map((returnRecord) => (
+              <div className="data-row" key={returnRecord.id}>
+                <div>
+                  <strong>{returnRecord.number}</strong>
+                  <small>{returnRecord.reason}</small>
+                </div>
+                <span>
+                  {returnRecord.client_name} · {returnRecord.sale_number}
+                </span>
+                <span>{formatCurrency(returnRecord.refund_amount, settings.currency)}</span>
+                <Status value={returnRecord.refund_status} />
+                <div className="transfer-card-actions">
+                  {returnRecord.credit_note_number ? (
+                    <span className="workflow-help">{returnRecord.credit_note_number}</span>
+                  ) : null}
+                  {returnRecord.refund_status === 'Pending' && (
+                    <button className="row-action" onClick={() => void processRefund(returnRecord)}>
+                      Process refund
+                    </button>
+                  )}
+                </div>
               </div>
-              <span>
-                {returnRecord.client_name} · {returnRecord.sale_number}
-              </span>
-              <span>{formatCurrency(returnRecord.refund_amount, settings.currency)}</span>
-              <Status value={returnRecord.refund_status} />
-              <div className="transfer-card-actions">
-                {returnRecord.credit_note_number ? (
-                  <span className="workflow-help">{returnRecord.credit_note_number}</span>
-                ) : null}
-                {returnRecord.refund_status === 'Pending' && (
-                  <button className="row-action" onClick={() => void processRefund(returnRecord)}>
-                    Process refund
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
+            ))}
           {!returns.length && (
             <Empty
               title="No returns"
@@ -2441,6 +2482,7 @@ function InvitationTable({
 }
 
 function ManagerControlView({
+  query,
   employees,
   invitations,
   tasks,
@@ -2462,6 +2504,7 @@ function ManagerControlView({
   saved,
   notify,
 }: {
+  query: string;
   employees: Employee[];
   invitations: Invitation[];
   tasks: OnboardingTask[];
@@ -2630,70 +2673,72 @@ function ManagerControlView({
             </span>
           </div>
           <div className="finance-user-list">
-            {visibleEmployees.map((employee) => (
-              <article className="finance-user-card" key={employee.id}>
-                <div className="finance-user-card-header">
-                  <div className="finance-person">
-                    <span className="finance-avatar" aria-hidden="true">
-                      {initials(employee.full_name)}
-                    </span>
-                    <span>
-                      <strong>{employee.full_name}</strong>
-                      <small title={employee.email}>{employee.email}</small>
-                    </span>
-                  </div>
-                  <Status value={employee.is_active ? 'Active' : 'Inactive'} />
-                </div>
-                <div className="finance-user-card-details">
-                  <div>
-                    <span className="finance-user-label">Role</span>
-                    <span className="finance-role">{roleLabel(employee.role)}</span>
-                  </div>
-                  <div className="finance-user-progress">
-                    <span className="finance-user-label">Onboarding progress</span>
-                    <span className="finance-progress-copy">{progressLabel(employee)}</span>
-                    {employee.completed_tasks + employee.pending_tasks > 0 && (
-                      <span className="finance-progress" aria-label={`${progressValue(employee)} percent complete`}>
-                        <i style={{ width: `${progressValue(employee)}%` }} />
+            {visibleEmployees
+              .filter((employee) => matchesQuery(query, employee.full_name, employee.email, employee.role))
+              .map((employee) => (
+                <article className="finance-user-card" key={employee.id}>
+                  <div className="finance-user-card-header">
+                    <div className="finance-person">
+                      <span className="finance-avatar" aria-hidden="true">
+                        {initials(employee.full_name)}
                       </span>
-                    )}
+                      <span>
+                        <strong>{employee.full_name}</strong>
+                        <small title={employee.email}>{employee.email}</small>
+                      </span>
+                    </div>
+                    <Status value={employee.is_active ? 'Active' : 'Inactive'} />
                   </div>
-                  <div>
-                    <span className="finance-user-label">Account</span>
-                    <span className="finance-user-account">{employee.is_active ? 'Enabled' : 'Disabled'}</span>
+                  <div className="finance-user-card-details">
+                    <div>
+                      <span className="finance-user-label">Role</span>
+                      <span className="finance-role">{roleLabel(employee.role)}</span>
+                    </div>
+                    <div className="finance-user-progress">
+                      <span className="finance-user-label">Onboarding progress</span>
+                      <span className="finance-progress-copy">{progressLabel(employee)}</span>
+                      {employee.completed_tasks + employee.pending_tasks > 0 && (
+                        <span className="finance-progress" aria-label={`${progressValue(employee)} percent complete`}>
+                          <i style={{ width: `${progressValue(employee)}%` }} />
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <span className="finance-user-label">Account</span>
+                      <span className="finance-user-account">{employee.is_active ? 'Enabled' : 'Disabled'}</span>
+                    </div>
                   </div>
-                </div>
-                <div className="finance-user-card-footer">
-                  <span className="finance-user-last-event">{employee.last_event || 'No lifecycle event'}</span>
-                  <div className="transfer-card-actions">
-                    <button
-                      className="row-action"
-                      onClick={() => {
-                        setSelectedEmployee(employee);
-                        setDialog('employeeHistory');
-                      }}
-                    >
-                      History
-                    </button>
-                    <ActionMenu label={`More actions for ${employee.full_name}`}>
-                      <ActionMenuItem
+                  <div className="finance-user-card-footer">
+                    <span className="finance-user-last-event">{employee.last_event || 'No lifecycle event'}</span>
+                    <div className="transfer-card-actions">
+                      <button
+                        className="row-action"
                         onClick={() => {
                           setSelectedEmployee(employee);
-                          setDialog('employeeEdit');
+                          setDialog('employeeHistory');
                         }}
                       >
-                        Edit
-                      </ActionMenuItem>
-                      {employee.is_active && (
-                        <ActionMenuItem className="destructive-action" onClick={() => void offboard(employee)}>
-                          Delete user
+                        History
+                      </button>
+                      <ActionMenu label={`More actions for ${employee.full_name}`}>
+                        <ActionMenuItem
+                          onClick={() => {
+                            setSelectedEmployee(employee);
+                            setDialog('employeeEdit');
+                          }}
+                        >
+                          Edit
                         </ActionMenuItem>
-                      )}
-                    </ActionMenu>
+                        {employee.is_active && (
+                          <ActionMenuItem className="destructive-action" onClick={() => void offboard(employee)}>
+                            Delete user
+                          </ActionMenuItem>
+                        )}
+                      </ActionMenu>
+                    </div>
                   </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              ))}
             {!visibleEmployees.length && (
               <Empty
                 title={employees.length ? 'No matching people' : 'No people yet'}

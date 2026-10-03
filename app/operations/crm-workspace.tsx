@@ -22,6 +22,7 @@ import { useDialogFocus } from '../dialog-focus';
 import { ActionMenu, ActionMenuItem } from './action-menu';
 import { Field, Panel, TableHead, Status, LiveKpi } from '@/components/ui';
 import { confirmAction } from '@/components/ui/confirm';
+import { matchesQuery } from '@/components/ui/search';
 
 type Client = {
   id: string;
@@ -139,10 +140,12 @@ export default function CrmWorkspace({
   notify,
   newRecordSignal = 0,
   role = 'sales_consultant',
+  query = '',
 }: {
   notify: (message: string) => void;
   newRecordSignal?: number;
   role?: string;
+  query?: string;
 }) {
   const [clients, setClients] = useState<Client[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -423,47 +426,51 @@ export default function CrmWorkspace({
           subtitle="Open a client card for contacts, finance history, receipts, and statements"
         >
           <div className="client-card-grid">
-            {clients.map((client) => (
-              <article className="client-card" key={client.id}>
-                <div className="client-card-top">
-                  <span className="client-card-icon">
-                    <Users size={17} />
+            {clients
+              .filter((client) =>
+                matchesQuery(query, client.name, client.code, client.email, client.phone, client.contact_name),
+              )
+              .map((client) => (
+                <article className="client-card" key={client.id}>
+                  <div className="client-card-top">
+                    <span className="client-card-icon">
+                      <Users size={17} />
+                    </span>
+                    <Status value={client.status} />
+                  </div>
+                  <strong>{client.name}</strong>
+                  <span className="client-card-code">
+                    {client.code} · {client.client_type || 'Organisation'}
                   </span>
-                  <Status value={client.status} />
-                </div>
-                <strong>{client.name}</strong>
-                <span className="client-card-code">
-                  {client.code} · {client.client_type || 'Organisation'}
-                </span>
-                <span className="client-card-contact">
-                  {client.contact_name || 'No contact'} · {client.phone || client.email || 'No contact details'}
-                </span>
-                <div className="client-card-actions">
-                  <button
-                    className="row-action"
-                    onClick={() => {
-                      setSelectedClient(client);
-                      setDialog('clientHistory');
-                    }}
-                  >
-                    <Receipt size={13} /> Finance history
-                  </button>
-                  <ActionMenu label={`More actions for ${client.name}`}>
-                    <ActionMenuItem
+                  <span className="client-card-contact">
+                    {client.contact_name || 'No contact'} · {client.phone || client.email || 'No contact details'}
+                  </span>
+                  <div className="client-card-actions">
+                    <button
+                      className="row-action"
                       onClick={() => {
                         setSelectedClient(client);
-                        setDialog('clientEdit');
+                        setDialog('clientHistory');
                       }}
                     >
-                      Edit
-                    </ActionMenuItem>
-                    {client.status === 'Active' && (
-                      <ActionMenuItem onClick={() => void archiveRecord('clients', client)}>Archive</ActionMenuItem>
-                    )}
-                  </ActionMenu>
-                </div>
-              </article>
-            ))}
+                      <Receipt size={13} /> Finance history
+                    </button>
+                    <ActionMenu label={`More actions for ${client.name}`}>
+                      <ActionMenuItem
+                        onClick={() => {
+                          setSelectedClient(client);
+                          setDialog('clientEdit');
+                        }}
+                      >
+                        Edit
+                      </ActionMenuItem>
+                      {client.status === 'Active' && (
+                        <ActionMenuItem onClick={() => void archiveRecord('clients', client)}>Archive</ActionMenuItem>
+                      )}
+                    </ActionMenu>
+                  </div>
+                </article>
+              ))}
             {!clients.length && (
               <div className="empty-state">
                 <Users size={22} />
@@ -480,42 +487,46 @@ export default function CrmWorkspace({
         >
           <div className="data-table labelled-cards">
             <TableHead labels={['Lead', 'Client', 'Source', 'Stage / action']} />
-            {leads.map((lead) => (
-              <div className="data-row" key={lead.id}>
-                <div data-label="Lead">
-                  <strong>{lead.name}</strong>
-                  <small>{lead.owner_name || 'Current owner'}</small>
-                </div>
-                <span data-label="Client">{lead.client_name || 'Unassigned'}</span>
-                <span data-label="Source">{lead.source || '—'}</span>
-                <div className="transfer-card-actions" data-label="Stage / action">
-                  <select value={lead.status} onChange={(event) => void updateLead(lead, event.target.value)}>
-                    <option>New</option>
-                    <option>Qualified</option>
-                    <option>Converted</option>
-                    <option>Lost</option>
-                  </select>
-                  {lead.status !== 'Converted' && (
-                    <button className="row-action" onClick={() => void convertLead(lead)}>
-                      <BriefcaseBusiness size={14} /> Convert
-                    </button>
-                  )}
-                  <ActionMenu label={`More actions for ${lead.name}`}>
-                    <ActionMenuItem
-                      onClick={() => {
-                        setSelectedLead(lead);
-                        setDialog('leadEdit');
-                      }}
-                    >
-                      Edit
-                    </ActionMenuItem>
-                    {!['Converted', 'Lost'].includes(lead.status) && (
-                      <ActionMenuItem onClick={() => void archiveRecord('leads', lead)}>Archive</ActionMenuItem>
+            {leads
+              .filter((lead) =>
+                matchesQuery(query, lead.name, lead.source, lead.status, lead.client_name, lead.owner_name),
+              )
+              .map((lead) => (
+                <div className="data-row" key={lead.id}>
+                  <div data-label="Lead">
+                    <strong>{lead.name}</strong>
+                    <small>{lead.owner_name || 'Current owner'}</small>
+                  </div>
+                  <span data-label="Client">{lead.client_name || 'Unassigned'}</span>
+                  <span data-label="Source">{lead.source || '—'}</span>
+                  <div className="transfer-card-actions" data-label="Stage / action">
+                    <select value={lead.status} onChange={(event) => void updateLead(lead, event.target.value)}>
+                      <option>New</option>
+                      <option>Qualified</option>
+                      <option>Converted</option>
+                      <option>Lost</option>
+                    </select>
+                    {lead.status !== 'Converted' && (
+                      <button className="row-action" onClick={() => void convertLead(lead)}>
+                        <BriefcaseBusiness size={14} /> Convert
+                      </button>
                     )}
-                  </ActionMenu>
+                    <ActionMenu label={`More actions for ${lead.name}`}>
+                      <ActionMenuItem
+                        onClick={() => {
+                          setSelectedLead(lead);
+                          setDialog('leadEdit');
+                        }}
+                      >
+                        Edit
+                      </ActionMenuItem>
+                      {!['Converted', 'Lost'].includes(lead.status) && (
+                        <ActionMenuItem onClick={() => void archiveRecord('leads', lead)}>Archive</ActionMenuItem>
+                      )}
+                    </ActionMenu>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
             {!leads.length && (
               <div className="empty-state">
                 <Users size={22} />
@@ -533,42 +544,44 @@ export default function CrmWorkspace({
       >
         <div className="data-table labelled-cards">
           <TableHead labels={['Opportunity', 'Client', 'Stage', 'Value', 'Actions']} />
-          {opportunities.map((opportunity) => (
-            <div className="data-row" key={opportunity.id}>
-              <strong data-label="Opportunity">{opportunity.name}</strong>
-              <span data-label="Client">{opportunity.client_name || 'Unassigned'}</span>
-              <select
-                data-label="Stage"
-                value={opportunity.stage}
-                onChange={(event) => void updateOpportunity(opportunity, event.target.value)}
-              >
-                <option>Discovery</option>
-                <option>Qualified</option>
-                <option>Quotation</option>
-                <option>Negotiation</option>
-                <option>Won</option>
-                <option>Lost</option>
-              </select>
-              <span data-label="Value">{formatCurrency(opportunity.value || 0, settings.currency)}</span>
-              <div className="transfer-card-actions" data-label="Actions">
-                <ActionMenu label={`More actions for ${opportunity.name}`}>
-                  <ActionMenuItem
-                    onClick={() => {
-                      setSelectedOpportunity(opportunity);
-                      setDialog('opportunityEdit');
-                    }}
-                  >
-                    Edit
-                  </ActionMenuItem>
-                  {!['Won', 'Lost'].includes(opportunity.stage) && (
-                    <ActionMenuItem onClick={() => void archiveRecord('opportunities', opportunity)}>
-                      Archive
+          {opportunities
+            .filter((opportunity) => matchesQuery(query, opportunity.name, opportunity.stage, opportunity.client_name))
+            .map((opportunity) => (
+              <div className="data-row" key={opportunity.id}>
+                <strong data-label="Opportunity">{opportunity.name}</strong>
+                <span data-label="Client">{opportunity.client_name || 'Unassigned'}</span>
+                <select
+                  data-label="Stage"
+                  value={opportunity.stage}
+                  onChange={(event) => void updateOpportunity(opportunity, event.target.value)}
+                >
+                  <option>Discovery</option>
+                  <option>Qualified</option>
+                  <option>Quotation</option>
+                  <option>Negotiation</option>
+                  <option>Won</option>
+                  <option>Lost</option>
+                </select>
+                <span data-label="Value">{formatCurrency(opportunity.value || 0, settings.currency)}</span>
+                <div className="transfer-card-actions" data-label="Actions">
+                  <ActionMenu label={`More actions for ${opportunity.name}`}>
+                    <ActionMenuItem
+                      onClick={() => {
+                        setSelectedOpportunity(opportunity);
+                        setDialog('opportunityEdit');
+                      }}
+                    >
+                      Edit
                     </ActionMenuItem>
-                  )}
-                </ActionMenu>
+                    {!['Won', 'Lost'].includes(opportunity.stage) && (
+                      <ActionMenuItem onClick={() => void archiveRecord('opportunities', opportunity)}>
+                        Archive
+                      </ActionMenuItem>
+                    )}
+                  </ActionMenu>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
           {!opportunities.length && (
             <div className="empty-state">
               <BriefcaseBusiness size={22} />
@@ -585,79 +598,93 @@ export default function CrmWorkspace({
       >
         <div className="data-table">
           <TableHead labels={['Record', 'Client', 'Total', 'Status', 'Actions']} />
-          {quotes.map((quote) => (
-            <div className="data-row" key={quote.id}>
-              <div>
-                <strong>{quote.number}</strong>
-                <small>
-                  {quote.items.length} line(s) ·{' '}
-                  {quote.valid_until ? `Valid to ${formatOrganizationDate(quote.valid_until, settings)}` : 'No expiry'}
-                </small>
-              </div>
-              <span>{quote.client_name}</span>
-              <span>{formatCurrency(quote.total, settings.currency)}</span>
-              <Status value={quote.status} />
-              <div className="transfer-card-actions">
-                <button
-                  className="row-action"
-                  onClick={() => {
-                    setSelectedQuote(quote);
-                    setDialog('quoteEdit');
-                  }}
-                >
-                  Edit
-                </button>
-                <button
-                  className="row-action"
-                  disabled={quote.status === 'Converted'}
-                  onClick={() => {
-                    setSelectedQuote(quote);
-                    setDialog('convert');
-                  }}
-                >
-                  <Check size={14} /> Convert
-                </button>
-                {!['Converted', 'Cancelled'].includes(quote.status) && (
-                  <button className="row-action" onClick={() => void archiveQuote(quote)}>
-                    Cancel
+          {quotes
+            .filter((quote) => matchesQuery(query, quote.number, quote.client_name, quote.status))
+            .map((quote) => (
+              <div className="data-row" key={quote.id}>
+                <div>
+                  <strong>{quote.number}</strong>
+                  <small>
+                    {quote.items.length} line(s) ·{' '}
+                    {quote.valid_until
+                      ? `Valid to ${formatOrganizationDate(quote.valid_until, settings)}`
+                      : 'No expiry'}
+                  </small>
+                </div>
+                <span>{quote.client_name}</span>
+                <span>{formatCurrency(quote.total, settings.currency)}</span>
+                <Status value={quote.status} />
+                <div className="transfer-card-actions">
+                  <button
+                    className="row-action"
+                    onClick={() => {
+                      setSelectedQuote(quote);
+                      setDialog('quoteEdit');
+                    }}
+                  >
+                    Edit
                   </button>
-                )}
-              </div>
-            </div>
-          ))}
-          {sales.map((sale) => (
-            <div className="data-row" key={sale.id}>
-              <div>
-                <strong>{sale.number}</strong>
-                <small>{sale.items.length} serial(s)</small>
-              </div>
-              <span>{sale.client_name}</span>
-              <span>{formatCurrency(sale.total, settings.currency)}</span>
-              <Status value={sale.status} />
-              <div className="transfer-card-actions">
-                <button className="row-action" onClick={() => void createDocument(sale.id, 'invoice')}>
-                  <FileText size={14} /> Invoice
-                </button>
-                <button className="row-action" onClick={() => void createDocument(sale.id, 'delivery-note')}>
-                  <FileText size={14} /> Delivery note
-                </button>
-                {canCalculateCommission && (
-                  <button className="row-action" onClick={() => void createCommission(sale.id)}>
-                    <Check size={14} /> Commission
+                  <button
+                    className="row-action"
+                    disabled={quote.status === 'Converted'}
+                    onClick={() => {
+                      setSelectedQuote(quote);
+                      setDialog('convert');
+                    }}
+                  >
+                    <Check size={14} /> Convert
                   </button>
-                )}
-                <button
-                  className="row-action"
-                  onClick={() => {
-                    setSelectedSale(sale);
-                    setDialog('return');
-                  }}
-                >
-                  <RotateCcw size={14} /> Return
-                </button>
+                  {!['Converted', 'Cancelled'].includes(quote.status) && (
+                    <button className="row-action" onClick={() => void archiveQuote(quote)}>
+                      Cancel
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          {sales
+            .filter((sale) =>
+              matchesQuery(
+                query,
+                sale.number,
+                sale.client_name,
+                sale.status,
+                ...sale.items.map((item) => item.serialNumber),
+              ),
+            )
+            .map((sale) => (
+              <div className="data-row" key={sale.id}>
+                <div>
+                  <strong>{sale.number}</strong>
+                  <small>{sale.items.length} serial(s)</small>
+                </div>
+                <span>{sale.client_name}</span>
+                <span>{formatCurrency(sale.total, settings.currency)}</span>
+                <Status value={sale.status} />
+                <div className="transfer-card-actions">
+                  <button className="row-action" onClick={() => void createDocument(sale.id, 'invoice')}>
+                    <FileText size={14} /> Invoice
+                  </button>
+                  <button className="row-action" onClick={() => void createDocument(sale.id, 'delivery-note')}>
+                    <FileText size={14} /> Delivery note
+                  </button>
+                  {canCalculateCommission && (
+                    <button className="row-action" onClick={() => void createCommission(sale.id)}>
+                      <Check size={14} /> Commission
+                    </button>
+                  )}
+                  <button
+                    className="row-action"
+                    onClick={() => {
+                      setSelectedSale(sale);
+                      setDialog('return');
+                    }}
+                  >
+                    <RotateCcw size={14} /> Return
+                  </button>
+                </div>
+              </div>
+            ))}
           {!quotes.length && !sales.length && (
             <div className="empty-state">
               <FileText size={22} />
@@ -674,22 +701,26 @@ export default function CrmWorkspace({
       >
         <div className="data-table labelled-cards">
           <TableHead labels={['Return', 'Client / sale', 'Amount', 'Refund status', 'Credit note']} />
-          {returns.map((record) => (
-            <div className="data-row" key={record.id}>
-              <div data-label="Return">
-                <strong>{record.number}</strong>
-                <small>{record.reason}</small>
+          {returns
+            .filter((record) =>
+              matchesQuery(query, record.number, record.sale_number, record.client_name, record.credit_note_number),
+            )
+            .map((record) => (
+              <div className="data-row" key={record.id}>
+                <div data-label="Return">
+                  <strong>{record.number}</strong>
+                  <small>{record.reason}</small>
+                </div>
+                <span data-label="Client / sale">
+                  {record.client_name} · {record.sale_number}
+                </span>
+                <span data-label="Amount">{formatCurrency(record.refund_amount, settings.currency)}</span>
+                <span data-label="Refund status">
+                  <Status value={record.refund_status} />
+                </span>
+                <span data-label="Credit note">{record.credit_note_number || 'Pending finance review'}</span>
               </div>
-              <span data-label="Client / sale">
-                {record.client_name} · {record.sale_number}
-              </span>
-              <span data-label="Amount">{formatCurrency(record.refund_amount, settings.currency)}</span>
-              <span data-label="Refund status">
-                <Status value={record.refund_status} />
-              </span>
-              <span data-label="Credit note">{record.credit_note_number || 'Pending finance review'}</span>
-            </div>
-          ))}
+            ))}
           {!returns.length && (
             <div className="empty-state">
               <RotateCcw size={22} />

@@ -41,6 +41,8 @@ import RoleDashboard from './role-dashboard';
 import { DashboardQuickActions } from './dashboard-guidance';
 import { canAccessConfiguration, canAccessModule, isLeadershipRole, modulesForRole, roleLabel } from '@/lib/rbac';
 import type { OpsModule } from '@/lib/ops-data';
+import { useRouter } from 'next/navigation';
+import { useThemePreference } from '@/components/ui/theme';
 
 const moduleNav: Array<{ label: OpsModule; icon: React.ElementType }> = [
   { label: 'Sales & CRM', icon: BriefcaseBusiness },
@@ -140,7 +142,8 @@ function StatCard({
 
 export default function Home() {
   const [active, setActive] = useState('Overview');
-  const [dark, setDark] = useState(false);
+  const [dark, setDark] = useThemePreference();
+  const router = useRouter();
   const [menu, setMenu] = useState(false);
   const [query, setQuery] = useState('');
   const [toast, setToast] = useState('');
@@ -208,21 +211,26 @@ export default function Home() {
   const goToModule = (label: string) => {
     if (label !== 'Overview' && user && !canAccessModule(user.role, label as OpsModule)) return;
     if (label !== 'Overview') {
-      window.location.href = `/operations?module=${encodeURIComponent(label)}`;
+      router.push(`/operations?module=${encodeURIComponent(label)}`);
       return;
     }
     setActive(label);
   };
   const goToProfile = () => {
-    window.location.href = '/profile';
+    router.push('/profile');
   };
   const goToConfiguration = () => {
-    window.location.href = '/configuration';
+    router.push('/configuration');
   };
   const displayName = user?.fullName || 'Loading workspace';
   const displayRole = user ? roleLabel(user.role) : 'Authenticated user';
   const workspaceName = settings.organizationName || 'Workspace';
   const canSell = Boolean(user && canAccessModule(user.role, 'Sales & CRM'));
+  // Only the CEO dashboard loads approval counts; reservations are not approvals, so they are excluded.
+  const pendingApprovals =
+    user && isLeadershipRole(user.role)
+      ? dashboard.approvals.purchase_orders + dashboard.approvals.expenses + dashboard.approvals.warranty_exceptions
+      : 0;
   const approvalTarget = user && canAccessModule(user.role, 'Finance & HR') ? 'Finance & HR' : 'Reports';
   return (
     <div className={dark ? 'shell dark' : 'shell'}>
@@ -321,11 +329,11 @@ export default function Home() {
             </button>
             <button
               className="icon-btn notification"
-              aria-label="Open approvals"
+              aria-label={pendingApprovals ? `Open approvals (${pendingApprovals} pending)` : 'Open approvals'}
               onClick={() => goToModule(approvalTarget)}
             >
               <Bell size={18} />
-              <i />
+              {pendingApprovals > 0 && <i />}
             </button>
             <button className="top-avatar" onClick={goToProfile} aria-label="Open profile">
               {initials(displayName)}
