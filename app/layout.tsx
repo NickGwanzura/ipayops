@@ -49,6 +49,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
+      <head>
+        <link rel="preload" href="/fonts/delight-vf.ttf" as="font" type="font/ttf" crossOrigin="anonymous" />
+      </head>
       <body>
         <OrganizationSettingsProvider>{children}</OrganizationSettingsProvider>
         <ConfirmHost />

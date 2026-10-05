@@ -77,6 +77,6 @@ export const config = {
   runtime: 'nodejs',
   matcher: [
     '/api/:path*',
-    '/((?!api|login|verify|invite|forgot-password|reset-password|_next/static|_next/image|favicon.ico|iPaytechLogo.jpg|pos-login-hero.webp).*)',
+    '/((?!api|login|verify|invite|forgot-password|reset-password|_next/static|_next/image|fonts/|favicon.ico|iPaytechLogo.jpg|pos-login-hero.webp).*)',
   ],
 };
