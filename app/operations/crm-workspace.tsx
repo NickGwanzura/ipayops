@@ -355,6 +355,8 @@ export default function CrmWorkspace({
       <div className="ops-kpis">
         <LiveKpi
           label="Live clients"
+          onClick={() => openCrmPage('clients')}
+          help="Active client accounts. Open a client for finance history, receipts and statements."
           value={clients.length}
           note="CRM accounts in PostgreSQL"
           icon={<Users size={16} />}
@@ -362,6 +364,8 @@ export default function CrmWorkspace({
         />
         <LiveKpi
           label="Leads"
+          onClick={() => openCrmPage('leads')}
+          help="Prospects not yet qualified. Convert a lead to create an opportunity."
           value={leads.length}
           note="Source and owner tracked"
           icon={<Users size={16} />}
@@ -369,6 +373,8 @@ export default function CrmWorkspace({
         />
         <LiveKpi
           label="Quotations"
+          onClick={() => openCrmPage('sales')}
+          help="Pre-sale quotes. Reserve stock to hold units, then convert after choosing exact serials to create the sale, invoice and warranty."
           value={quotes.length}
           note="Quote-to-sale workflow"
           icon={<FileText size={16} />}
@@ -376,6 +382,8 @@ export default function CrmWorkspace({
         />
         <LiveKpi
           label="Confirmed sales"
+          onClick={() => openCrmPage('sales')}
+          help="Quotes converted into sales with serialized units allocated. Returns reduce the invoice and commission."
           value={sales.length}
           note="Serialized conversion records"
           icon={<Check size={16} />}

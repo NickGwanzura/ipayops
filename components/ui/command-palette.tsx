@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
 import { Search } from 'lucide-react';
 import { useDialogFocus } from '@/app/dialog-focus';
 
@@ -24,8 +23,6 @@ export function CommandPalette() {
 }
 
 function PaletteDialog({ close }: { close: () => void }) {
-  const router = useRouter();
-  const pathname = usePathname();
   const dialog = useDialogFocus<HTMLDivElement>(close);
   const listId = useId();
   const input = useRef<HTMLInputElement>(null);
@@ -64,9 +61,8 @@ function PaletteDialog({ close }: { close: () => void }) {
 
   const go = (hit: Hit) => {
     close();
-    // Workspaces read the module/view from the URL when they mount, so a hit on the page we are already on needs a full load.
-    if (pathname === '/operations') window.location.assign(hit.href);
-    else router.push(hit.href);
+    // Workspaces read the module, tab and search from window.location when they mount, so use a full page load.
+    window.location.assign(hit.href);
   };
 
   return (

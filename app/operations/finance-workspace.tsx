@@ -514,6 +514,8 @@ export default function FinanceWorkspace({
       <div className="ops-kpis">
         <LiveKpi
           label="Pending expenses"
+          onClick={() => openFinancePage('expenses')}
+          help="Expense claims submitted and awaiting approval or rejection."
           value={formatCurrency(pendingTotal, settings.currency)}
           note={`${expenses.filter((expense) => expense.status === 'Pending').length} awaiting review`}
           icon={<CircleDollarSign size={16} />}
@@ -521,6 +523,8 @@ export default function FinanceWorkspace({
         />
         <LiveKpi
           label="Outstanding invoices"
+          onClick={() => openFinancePage('invoices')}
+          help="Issued invoice totals minus payments received. Overdue is the part past its due date; void invoices are excluded."
           value={formatCurrency(outstandingTotal, settings.currency)}
           note={`${invoices.filter((invoice) => Number(invoice.outstanding) > 0).length} accounts receivable`}
           icon={<FileText size={16} />}
@@ -528,6 +532,8 @@ export default function FinanceWorkspace({
         />
         <LiveKpi
           label="Recorded invoices"
+          onClick={() => openFinancePage('invoices')}
+          help="Every invoice on record, including paid and void ones."
           value={invoices.length.toString()}
           note="Payment lifecycle enabled"
           icon={<Check size={16} />}
@@ -535,6 +541,8 @@ export default function FinanceWorkspace({
         />
         <LiveKpi
           label="Provisional commissions"
+          onClick={() => openFinancePage('commissions')}
+          help="Calculated but not yet approved. Flow: Provisional → Approved → Paid. If goods are returned after payout, a clawback is recorded instead of changing the paid amount."
           value={commissions.filter((commission) => commission.status === 'Provisional').length.toString()}
           note="Awaiting manager approval"
           icon={<Paperclip size={16} />}

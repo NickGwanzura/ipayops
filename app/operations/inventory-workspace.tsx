@@ -83,6 +83,7 @@ export default function InventoryWorkspace({
   const [error, setError] = useState('');
   const [intakeOpen, setIntakeOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<'stock' | 'movement'>('stock');
+  const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 50, total: 0, hasMore: false });
 
@@ -93,7 +94,7 @@ export default function InventoryWorkspace({
         await Promise.all([
           fetch('/api/inventory/summary', { cache: 'no-store' }),
           fetch(
-            `/api/inventory?${new URLSearchParams({ ...(query ? { q: query } : {}), page: String(page), pageSize: String(pagination.pageSize) })}`,
+            `/api/inventory?${new URLSearchParams({ ...(query ? { q: query } : {}), ...(statusFilter ? { status: statusFilter } : {}), page: String(page), pageSize: String(pagination.pageSize) })}`,
             { cache: 'no-store' },
           ),
           fetch('/api/inventory/transfers', { cache: 'no-store' }),
@@ -125,10 +126,15 @@ export default function InventoryWorkspace({
 
   useEffect(() => {
     setPage(1);
-  }, [query]);
+  }, [query, statusFilter]);
   useEffect(() => {
     void load();
-  }, [query, page]);
+  }, [query, page, statusFilter]);
+  /** KPI drilldown: show only units in this status (click again to clear). */
+  const showStatus = (status: string) => {
+    setActiveSection('stock');
+    setStatusFilter((current) => (current === status ? '' : status));
+  };
   useEffect(() => {
     if (newRecordSignal > 0) setIntakeOpen(true);
   }, [newRecordSignal]);
@@ -238,6 +244,9 @@ export default function InventoryWorkspace({
       <div className="ops-kpis">
         <LiveKpi
           label="Available devices"
+          onClick={() => showStatus('Available')}
+          active={statusFilter === 'Available'}
+          help="Units ready to sell or transfer. Reserved, sold, in-transit and warranty units are not counted."
           value={summary.available}
           note={`${summary.total} total serialized units`}
           icon={<Boxes size={16} />}
@@ -245,6 +254,9 @@ export default function InventoryWorkspace({
         />
         <LiveKpi
           label="Reserved"
+          onClick={() => showStatus('Reserved')}
+          active={statusFilter === 'Reserved'}
+          help="Held for a quotation or manual reservation. They cannot be sold elsewhere until released or converted; reservations expire automatically."
           value={summary.reserved}
           note={`${summary.in_transit} in transit`}
           icon={<ClipboardCheck size={16} />}
@@ -252,6 +264,9 @@ export default function InventoryWorkspace({
         />
         <LiveKpi
           label="Installed / sold"
+          onClick={() => showStatus('Sold')}
+          active={statusFilter === 'Sold'}
+          help="Units delivered to clients. Selling a unit starts its warranty."
           value={summary.installed + summary.sold}
           note={`${summary.warranty} in warranty service`}
           icon={<Truck size={16} />}
@@ -259,6 +274,9 @@ export default function InventoryWorkspace({
         />
         <LiveKpi
           label="Serialized stock"
+          onClick={() => setStatusFilter('')}
+          active={statusFilter === ''}
+          help="Every serial number received, in any status. Click to clear the status filter."
           value={summary.total}
           note="Live PostgreSQL count"
           icon={<CircleDollarSign size={16} />}
@@ -329,6 +347,7 @@ export default function InventoryWorkspace({
           )}
           <Panel
             title="Live device register"
+            help="Life of a unit: Available → Reserved (held for a quote) → Sold (delivered, warranty starts) → Installed. In transit means moving between locations; Quarantined means returned damaged."
             subtitle="Every row is read from serialized inventory"
             actions={
               <div className="inventory-panel-actions">
@@ -341,6 +360,18 @@ export default function InventoryWorkspace({
               </div>
             }
           >
+            {statusFilter && (
+              <div className="filter-chip-row">
+                <span>Showing</span>
+                <button
+                  className="filter-chip"
+                  onClick={() => setStatusFilter('')}
+                  aria-label={`Clear ${statusFilter} filter`}
+                >
+                  {statusFilter} <X size={12} />
+                </button>
+              </div>
+            )}
             <div className="data-table labelled-cards">
               <TableHead labels={['Serial / product', 'Location', 'Status', 'Client', 'Action']} />
               {items.map((item) => (

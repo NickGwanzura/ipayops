@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { HelpTip } from './help-tip';
 
 /** Labelled form control wrapper used by every workflow dialog. */
 export function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -10,17 +11,19 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   );
 }
 
-/** Titled workspace section with an optional actions slot in the header. */
+/** Titled workspace section with an optional help tip and actions slot in the header. */
 export function Panel({
   title,
   subtitle,
   actions,
+  help,
   className = '',
   children,
 }: {
   title: string;
   subtitle: string;
   actions?: ReactNode;
+  help?: string;
   className?: string;
   children: ReactNode;
 }) {
@@ -28,7 +31,10 @@ export function Panel({
     <section className={`ops-panel ${className}`.trim()}>
       <div className="ops-panel-head">
         <div>
-          <h2>{title}</h2>
+          <h2>
+            {title}
+            {help && <HelpTip text={help} label={title} />}
+          </h2>
           <p>{subtitle}</p>
         </div>
         {actions}
@@ -54,26 +60,59 @@ export function Status({ value }: { value: string }) {
   return <span className={`status ${key}`}>{value}</span>;
 }
 
+/** Workspace KPI tile. With onClick it becomes a drilldown button; `active` marks the filter it currently applies. */
 export function LiveKpi({
   label,
   value,
   note,
   icon,
   tone,
+  onClick,
+  active = false,
+  help,
 }: {
   label: string;
   value: string | number;
   note: string;
   icon: ReactNode;
   tone: string;
+  onClick?: () => void;
+  active?: boolean;
+  help?: string;
 }) {
-  return (
-    <div className="ops-kpi">
+  const body = (
+    <>
       <span className={`kpi-icon ${tone}`}>{icon}</span>
       <strong>{typeof value === 'number' ? value.toLocaleString() : value}</strong>
-      <span>{label}</span>
+      <span>
+        {label}
+        {help && !onClick && <HelpTip text={help} label={label} />}
+      </span>
       <small>{note}</small>
+    </>
+  );
+  if (!onClick) return <div className="ops-kpi">{body}</div>;
+  const button = (
+    <button
+      type="button"
+      className={`ops-kpi ops-kpi-action${active ? ' active' : ''}`}
+      onClick={onClick}
+      aria-pressed={active}
+      title={`Show ${label.toLowerCase()}`}
+    >
+      {body}
+    </button>
+  );
+  // A button cannot contain another button, so the help tip sits beside the clickable tile, not inside it.
+  return help ? (
+    <div className="kpi-shell">
+      {button}
+      <span className="kpi-help">
+        <HelpTip text={help} label={label} align="right" />
+      </span>
     </div>
+  ) : (
+    button
   );
 }
 

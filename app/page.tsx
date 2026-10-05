@@ -46,6 +46,7 @@ import { useThemePreference } from '@/components/ui/theme';
 import { CommandPalette } from '@/components/ui/command-palette';
 import { useCurrentUser } from '@/components/ui/current-user';
 import { StatCard } from '@/components/ui/stat-card';
+import { HelpTip } from '@/components/ui/help-tip';
 
 const moduleNav: Array<{ label: OpsModule; icon: React.ElementType }> = [
   { label: 'Sales & CRM', icon: BriefcaseBusiness },
@@ -102,6 +103,15 @@ function initials(name: string) {
   );
 }
 
+/** Where a recent-activity row should take the user. */
+function activityTarget(event: string): { module: OpsModule; view?: string; q?: string } {
+  const number = event.split(' ').pop() || '';
+  if (event.startsWith('Sale ')) return { module: 'Sales & CRM', view: 'sales', q: number };
+  if (event.startsWith('Goods received')) return { module: 'Procurement', view: 'receiving' };
+  if (event.startsWith('Warranty claim')) return { module: 'Warranty', q: number };
+  return { module: 'Inventory' };
+}
+
 export default function Home() {
   const [active, setActive] = useState('Overview');
   const [dark, setDark] = useThemePreference();
@@ -148,10 +158,19 @@ export default function Home() {
   const goToModule = (label: string) => {
     if (label !== 'Overview' && user && !canAccessModule(user.role, label as OpsModule)) return;
     if (label !== 'Overview') {
-      router.push(`/operations?module=${encodeURIComponent(label)}`);
+      // Full page load: the workspaces read module, tab and search from window.location when they mount, which a client-side navigation has not updated yet.
+      window.location.assign(`/operations?module=${encodeURIComponent(label)}`);
       return;
     }
     setActive(label);
+  };
+  /** Drilldown: open a workspace, optionally on a tab (view) and pre-filtered by a search term. */
+  const openWorkspace = (module: OpsModule, options: { view?: string; q?: string } = {}) => {
+    if (user && !canAccessModule(user.role, module)) return;
+    const params = new URLSearchParams({ module });
+    if (options.view) params.set('view', options.view);
+    if (options.q) params.set('q', options.q);
+    window.location.assign(`/operations?${params.toString()}`);
   };
   const goToProfile = () => {
     router.push('/profile');
@@ -316,6 +335,8 @@ export default function Home() {
                   change="Live"
                   note="Confirmed sales · current month"
                   icon={<CircleDollarSign size={17} />}
+                  onClick={() => openWorkspace('Reports')}
+                  help="Value of units sold this month in your time zone. Returned items are excluded and cancelled sales do not count."
                 />
                 <StatCard
                   label="Confirmed sales"
@@ -324,6 +345,8 @@ export default function Home() {
                   note="Database-backed transactions"
                   icon={<Activity size={17} />}
                   tone="green"
+                  onClick={() => openWorkspace('Sales & CRM', { view: 'sales' })}
+                  help="Quotes converted into sales this month. Fully returned or cancelled sales are not counted."
                 />
                 <StatCard
                   label="Units in stock"
@@ -332,6 +355,8 @@ export default function Home() {
                   note="Available and reserved inventory"
                   icon={<Boxes size={17} />}
                   tone="amber"
+                  onClick={() => openWorkspace('Inventory')}
+                  help="Serialized units that are Available or Reserved. Sold, in-transit and warranty units are not included."
                 />
                 <StatCard
                   label="Open job cards"
@@ -340,14 +365,25 @@ export default function Home() {
                   note="Scheduled and in progress"
                   icon={<ClipboardCheck size={17} />}
                   tone="purple"
+                  onClick={() => openWorkspace('Job cards')}
+                  help="Installation job cards that are Scheduled or In progress."
                 />
               </div>
-              <CeoProfitabilityOversight settings={settings} />
+              <CeoProfitabilityOversight
+                settings={settings}
+                onOpenSku={(sku) => openWorkspace('Inventory', { q: sku })}
+              />
               <div className="grid-main">
                 <section className="panel performance">
                   <div className="panel-header">
                     <div>
-                      <h2>Performance overview</h2>
+                      <h2>
+                        Performance overview
+                        <HelpTip
+                          text="Daily revenue from confirmed sales (net of returns) and units received into stock over the last 30 days."
+                          label="performance overview"
+                        />
+                      </h2>
                       <p>Live revenue and stock receipts over the last 30 days</p>
                     </div>
                     <button className="select" onClick={() => goToModule('Reports')}>
@@ -413,7 +449,13 @@ export default function Home() {
                 <section className="panel approvals">
                   <div className="panel-header">
                     <div>
-                      <h2>Approval inbox</h2>
+                      <h2>
+                        Approval inbox
+                        <HelpTip
+                          text="Purchase orders waiting for approval, pending expense claims, open warranty claims and active reservations. Click a row to act on it."
+                          label="approval inbox"
+                        />
+                      </h2>
                       <p>Live items requiring attention</p>
                     </div>
                     <button className="text-btn" onClick={() => goToModule('Finance & HR')}>
@@ -468,7 +510,13 @@ export default function Home() {
                 <section className="panel table-panel">
                   <div className="panel-header">
                     <div>
-                      <h2>Recent activity</h2>
+                      <h2>
+                        Recent activity
+                        <HelpTip
+                          text="Latest sales, goods receipts, warranty claims and stock transfers. Click a row to open the related records."
+                          label="recent activity"
+                        />
+                      </h2>
                       <p>Latest events from the database</p>
                     </div>
                     <button className="text-btn" onClick={() => goToModule('Reports')}>
@@ -484,7 +532,21 @@ export default function Home() {
                     </div>
                     {filtered.length ? (
                       filtered.map((a, i) => (
-                        <div className="table-row" key={`${a.event}-${a.occurred_at}`}>
+                        <div
+                          className="table-row row-link"
+                          key={`${a.event}-${a.occurred_at}`}
+                          role="link"
+                          tabIndex={0}
+                          onClick={() => {
+                            const target = activityTarget(a.event);
+                            openWorkspace(target.module, target);
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key !== 'Enter') return;
+                            const target = activityTarget(a.event);
+                            openWorkspace(target.module, target);
+                          }}
+                        >
                           <span className="event-cell">
                             <span className={`event-icon e${i % 4}`}>
                               <Activity size={14} />
@@ -506,7 +568,13 @@ export default function Home() {
                 <section className="panel stock-panel">
                   <div className="panel-header">
                     <div>
-                      <h2>Stock by category</h2>
+                      <h2>
+                        Stock by category
+                        <HelpTip
+                          text="Available units by product type. Click a bar to see those units in Inventory."
+                          label="stock by category"
+                        />
+                      </h2>
                       <p>Current available inventory</p>
                     </div>
                     <button className="text-btn" onClick={() => goToModule('Inventory')}>
@@ -526,7 +594,14 @@ export default function Home() {
                           width={58}
                         />
                         <Tooltip cursor={{ fill: 'transparent' }} />
-                        <Bar dataKey="value" fill="#2f7cf6" radius={[0, 4, 4, 0]} barSize={14} />
+                        <Bar
+                          dataKey="value"
+                          fill="#2f7cf6"
+                          radius={[0, 4, 4, 0]}
+                          barSize={14}
+                          cursor="pointer"
+                          onClick={(entry: { name?: string }) => openWorkspace('Inventory', { q: entry?.name || '' })}
+                        />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -706,7 +781,13 @@ type ProfitabilityData = {
   }>;
 };
 
-function CeoProfitabilityOversight({ settings }: { settings: ReturnType<typeof useOrganizationSettings> }) {
+function CeoProfitabilityOversight({
+  settings,
+  onOpenSku,
+}: {
+  settings: ReturnType<typeof useOrganizationSettings>;
+  onOpenSku: (sku: string) => void;
+}) {
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: settings.timezone }).format(new Date());
   const monthStart = `${today.slice(0, 8)}01`;
   const [filters, setFilters] = useState({ from: monthStart, to: today, region: '', product: '' });
@@ -729,7 +810,13 @@ function CeoProfitabilityOversight({ settings }: { settings: ReturnType<typeof u
     <section className="panel profitability-oversight">
       <div className="panel-header">
         <div>
-          <h2>CEO profitability oversight</h2>
+          <h2>
+            CEO profitability oversight
+            <HelpTip
+              text="Gross profit = selling price minus the buying cost of the exact serial sold (the cost on the purchase order). Returned items are excluded. Region filters by stock location. Click a row to see its units."
+              label="profitability"
+            />
+          </h2>
           <p>Gross margin from confirmed sales less serialized buying cost.</p>
         </div>
         <span className="workflow-help">CEO only · live sales ledger</span>
@@ -802,7 +889,16 @@ function CeoProfitabilityOversight({ settings }: { settings: ReturnType<typeof u
               <span>Gross profit</span>
             </div>
             {data.rows.map((row) => (
-              <div className="table-row" key={`${row.product_type}-${row.sku}`}>
+              <div
+                className="table-row row-link"
+                key={`${row.product_type}-${row.sku}`}
+                role="link"
+                tabIndex={0}
+                onClick={() => onOpenSku(row.sku)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') onOpenSku(row.sku);
+                }}
+              >
                 <span>
                   <strong>{row.description}</strong>
                   <small>

@@ -1,7 +1,15 @@
-/* Delight Sans: one variable font file covers weights 100-900. */
+/* Geist (SIL OFL 1.1, see /fonts/GEIST-LICENSE.txt): one variable file per family covers weights 100-900. */
 @font-face {
-  font-family: 'Delight Sans';
-  src: url('/fonts/delight-vf.ttf') format('truetype');
+  font-family: 'Geist Sans';
+  src: url('/fonts/geist-sans-vf.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('/fonts/geist-mono-vf.woff2') format('woff2');
   font-style: normal;
   font-weight: 100 900;
   font-display: swap;
@@ -76,7 +84,7 @@ button,
 input,
 select,
 textarea {
-  font-family: 'Delight Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Geist Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 .font-data,
@@ -84,7 +92,7 @@ textarea {
 .serial-picker,
 .coverage-copy strong,
 .mono-data {
-  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: 'Geist Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .font-data,

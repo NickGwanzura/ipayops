@@ -1,7 +1,11 @@
 import type { ReactNode } from 'react';
 import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { HelpTip } from './help-tip';
 
-/** Dashboard KPI tile. Clickable (renders a button) when onClick is given; `change` is "Live" or a signed delta like "-4%". */
+/**
+ * Dashboard KPI tile. Clickable (renders a button) when onClick is given, which is the drilldown to the records
+ * behind the number. `help` adds an explanatory "?" tip; `change` is "Live" or a signed delta like "-4%".
+ */
 export function StatCard({
   label,
   value,
@@ -10,6 +14,7 @@ export function StatCard({
   tone = 'blue',
   change = 'Live',
   onClick,
+  help,
 }: {
   label: string;
   value: string;
@@ -18,6 +23,7 @@ export function StatCard({
   tone?: string;
   change?: string;
   onClick?: () => void;
+  help?: string;
 }) {
   const content = (
     <>
@@ -37,15 +43,28 @@ export function StatCard({
         )}
       </div>
       <div className="stat-value">{value}</div>
-      <div className="stat-label">{label}</div>
+      <div className="stat-label">
+        {label}
+        {help && !onClick && <HelpTip text={help} label={label} />}
+      </div>
       <div className="stat-note">{note}</div>
     </>
   );
-  return onClick ? (
-    <button className="stat-card role-stat-action" onClick={onClick}>
+  if (!onClick) return <div className="stat-card">{content}</div>;
+  // A button cannot contain another button, so the help tip sits beside the clickable card, not inside it.
+  const card = (
+    <button className="stat-card role-stat-action" onClick={onClick} title={`Open ${label}`}>
       {content}
     </button>
+  );
+  return help ? (
+    <div className="kpi-shell">
+      {card}
+      <span className="kpi-help">
+        <HelpTip text={help} label={label} align="right" />
+      </span>
+    </div>
   ) : (
-    <div className="stat-card">{content}</div>
+    card
   );
 }

@@ -146,6 +146,7 @@ function ManagerDashboard({
       <div className="stats-grid">
         <StatCard
           label="Active people"
+          help="Employees with an active account. Deactivated people are not counted."
           value={String(employees.filter((employee) => employee.is_active).length)}
           note="Consultants and staff"
           icon={<Users size={17} />}
@@ -154,6 +155,7 @@ function ManagerDashboard({
         />
         <StatCard
           label="Pending onboarding"
+          help="Onboarding tasks still open for new staff. New sales consultants get a default checklist when they accept their invitation."
           value={String(tasks.filter((task) => task.status === 'Pending').length)}
           note="Tasks requiring follow-up"
           icon={<Check size={17} />}
@@ -162,6 +164,7 @@ function ManagerDashboard({
         />
         <StatCard
           label="Available stock"
+          help="Serialized units ready to sell or transfer. Reserved units are shown beneath."
           value={String(inventory.available || 0)}
           note={`${inventory.reserved || 0} reserved`}
           icon={<Boxes size={17} />}
@@ -170,6 +173,7 @@ function ManagerDashboard({
         />
         <StatCard
           label="Open jobs"
+          help="Installation job cards that are Scheduled or In progress."
           value={String(jobs.filter((job) => ['Scheduled', 'In progress'].includes(job.status)).length)}
           note="Installation workload"
           icon={<ClipboardCheck size={17} />}
@@ -261,6 +265,7 @@ function FinanceDashboard({
       <div className="stats-grid">
         <StatCard
           label="Outstanding debtors"
+          help="Issued invoice totals minus payments received, across all open invoices. Void invoices are excluded."
           value={formatCurrency(outstanding, settings.currency, 0)}
           note="Open invoice balances"
           icon={<CircleDollarSign size={17} />}
@@ -269,6 +274,7 @@ function FinanceDashboard({
         />
         <StatCard
           label="Overdue debtors"
+          help="Open invoices past their due date, with the amount still owed."
           value={String(overdueCount)}
           note={formatCurrency(overdueAmount, settings.currency, 0)}
           icon={<CircleDollarSign size={17} />}
@@ -277,6 +283,7 @@ function FinanceDashboard({
         />
         <StatCard
           label="Pending expenses"
+          help="Expense claims submitted and waiting for review."
           value={String(expenses.filter((expense) => expense.status === 'Pending').length)}
           note="Awaiting review"
           icon={<FileText size={17} />}
@@ -285,6 +292,7 @@ function FinanceDashboard({
         />
         <StatCard
           label="Commission entries"
+          help="Commission records in the ledger, excluding voided ones."
           value={String(commissions.length)}
           note="Visible finance ledger"
           icon={<Check size={17} />}
@@ -369,6 +377,7 @@ function SalesDashboard({
       <div className="stats-grid">
         <StatCard
           label="Open opportunities"
+          help="Pipeline deals that are not yet Won or Lost."
           value={String(opportunities.length)}
           note="Active pipeline"
           icon={<BriefcaseBusiness size={17} />}
@@ -377,6 +386,7 @@ function SalesDashboard({
         />
         <StatCard
           label="Pre-sales"
+          help="Quotes in Draft, Sent or Accepted status that have not been converted or cancelled."
           value={String(quotations.length)}
           note="Quotes in progress"
           icon={<FileText size={17} />}
@@ -385,6 +395,7 @@ function SalesDashboard({
         />
         <StatCard
           label="Confirmed sales"
+          help="Your sales that are not cancelled or fully returned."
           value={String(sales.length)}
           note="Converted transactions"
           icon={<ShoppingCart size={17} />}
@@ -393,6 +404,7 @@ function SalesDashboard({
         />
         <StatCard
           label="My commission"
+          help="Your commission after any clawbacks, excluding voided entries. Status flows Provisional → Approved → Paid."
           value={formatCurrency(
             commissions.reduce((sum, commission) => sum + netCommission(commission), 0),
             settings.currency,

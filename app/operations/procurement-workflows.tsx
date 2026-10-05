@@ -222,6 +222,8 @@ export default function ProcurementWorkflows({
       <div className="ops-kpis">
         <LiveKpi
           label="Open purchase orders"
+          onClick={() => openProcurementPage('purchase-orders')}
+          help="Orders not yet fully received or cancelled. A different manager or the CEO must approve an order before stock can be received."
           value={String(visibleOrders.filter((order) => !['Closed', 'Received'].includes(order.status)).length)}
           note={`${visibleOrders.filter((order) => order.received_quantity < order.ordered_quantity).length} with outstanding units`}
           icon={<ShoppingCart size={16} />}
@@ -229,6 +231,8 @@ export default function ProcurementWorkflows({
         />
         <LiveKpi
           label="Units outstanding"
+          onClick={() => openProcurementPage('receiving')}
+          help="Ordered units that have not yet been received with serial numbers."
           value={String(outstandingUnits)}
           note="Partial receipts preserved"
           icon={<PackageCheck size={16} />}
@@ -236,6 +240,8 @@ export default function ProcurementWorkflows({
         />
         <LiveKpi
           label="Suppliers"
+          onClick={() => openProcurementPage('suppliers')}
+          help="Active suppliers available for new purchase orders."
           value={String(suppliers.length)}
           note="Live supplier directory"
           icon={<Users size={16} />}

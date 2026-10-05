@@ -30,7 +30,7 @@ function VerifyContent() {
         padding: 24,
         background: '#0b1f3a',
         color: '#f7fafc',
-        fontFamily: "'Delight Sans', ui-sans-serif, system-ui",
+        fontFamily: "'Geist Sans', ui-sans-serif, system-ui",
       }}
     >
       <section
@@ -86,7 +86,7 @@ export default function VerifyPage() {
             placeItems: 'center',
             background: '#0b1f3a',
             color: '#f7fafc',
-            fontFamily: "'Delight Sans', ui-sans-serif, system-ui",
+            fontFamily: "'Geist Sans', ui-sans-serif, system-ui",
           }}
         >
           Checking document…
