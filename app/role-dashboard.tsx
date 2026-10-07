@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowUpRight, Boxes, BriefcaseBusiness, Check, CircleDollarSign, ClipboardCheck, FileText, ShieldCheck, ShoppingCart, Users } from 'lucide-react';
+import { ArrowUpRight, Boxes, BriefcaseBusiness, Check, CircleDollarSign, FileText, ShieldCheck, ShoppingCart, Truck, Users } from 'lucide-react';
 import { formatCurrency, type OrganizationSettings } from './organization-settings';
 import { normalizeRole, roleLabel } from '@/lib/rbac';
 import type { OpsModule } from '@/lib/ops-data';
@@ -10,7 +10,7 @@ import { DashboardQuickActions } from './dashboard-guidance';
 type Props = { role: string; settings: OrganizationSettings; query: string; onNavigate: (module: OpsModule) => void };
 type Payload = Record<string, unknown>;
 type InventorySummary = { total?: number; available?: number; reserved?: number; installed?: number };
-type Job = { id: string; number: string; title: string; status: string; client_name?: string; scheduled_for?: string };
+type Dispatch = { id: string; number: string; status: string; destination_town: string; driver_name: string; sale_number?: string; client_name?: string; payment_status?: string };
 type Expense = { number: string; amount: string | number; status: string; description: string };
 type Invoice = { number: string; outstanding: string | number; status: string; client_name?: string; due_at?: string };
 type Employee = { full_name: string; role: string; is_active: boolean; pending_tasks?: number };
@@ -40,9 +40,9 @@ export default function RoleDashboard({ role, settings, query, onNavigate }: Pro
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const paths = useMemo(() => {
-    if (normalizedRole === 'manager') return ['/api/inventory/summary', '/api/hr/employees', '/api/hr/onboarding', '/api/finance/commission-rules', '/api/finance/targets', '/api/purchase-orders', '/api/jobs'];
+    if (normalizedRole === 'manager') return ['/api/inventory/summary', '/api/hr/employees', '/api/hr/onboarding', '/api/finance/commission-rules', '/api/finance/targets', '/api/purchase-orders', '/api/dispatches'];
     if (normalizedRole === 'finance') return ['/api/finance/expenses', '/api/crm/invoices', '/api/finance/commissions', '/api/crm/returns'];
-    return ['/api/crm/opportunities', '/api/crm/quotations', '/api/crm/sales', '/api/jobs', '/api/finance/commissions'];
+    return ['/api/crm/opportunities', '/api/crm/quotations', '/api/crm/sales', '/api/dispatches', '/api/finance/commissions'];
   }, [normalizedRole]);
 
   useEffect(() => {
@@ -75,10 +75,10 @@ function ManagerDashboard({ data, settings, query, onNavigate, error }: Omit<Pro
   const rules = list<unknown>(data, '/api/finance/commission-rules', 'rules');
   const targets = list<unknown>(data, '/api/finance/targets', 'targets');
   const orders = list<{ number: string; status: string; supplier_name?: string }>(data, '/api/purchase-orders', 'orders');
-  const jobs = list<Job>(data, '/api/jobs', 'jobs');
+  const dispatches = list<Dispatch>(data, '/api/dispatches', 'dispatches');
   return <RoleFrame eyebrow="Management cockpit" title="Manager dashboard" subtitle="People, stock, onboarding, commissions, and operational control" role="manager" onNavigate={onNavigate} error={error}>
-    <div className="stats-grid"><RoleStat label="Active people" value={String(employees.filter(employee => employee.is_active).length)} note="Consultants and staff" icon={<Users size={17}/>} tone="purple" onClick={() => onNavigate('Finance & HR')}/><RoleStat label="Pending onboarding" value={String(tasks.filter(task => task.status === 'Pending').length)} note="Tasks requiring follow-up" icon={<Check size={17}/>} tone="amber" onClick={() => onNavigate('Finance & HR')}/><RoleStat label="Available stock" value={String(inventory.available || 0)} note={`${inventory.reserved || 0} reserved`} icon={<Boxes size={17}/>} tone="blue" onClick={() => onNavigate('Inventory')}/><RoleStat label="Open jobs" value={String(jobs.filter(job => ['Scheduled', 'In progress'].includes(job.status)).length)} note="Installation workload" icon={<ClipboardCheck size={17}/>} tone="green" onClick={() => onNavigate('Job cards')}/></div>
-    <div className="grid-main"><RolePanel title="Control centre" subtitle="Manager-owned settings and queues" action={{ label: 'Open controls', onClick: () => onNavigate('Finance & HR') }}><div className="role-summary-grid"><div><strong>{rules.length}</strong><span>commission rules</span></div><div><strong>{targets.length}</strong><span>consultant targets</span></div><div><strong>{orders.filter(order => order.status === 'Pending approval').length}</strong><span>PO approvals</span></div></div></RolePanel><RolePanel title="Next actions" subtitle={`Showing ${Math.min(jobs.length, 5)} of ${jobs.length} job cards`} action={{ label: 'View all jobs', onClick: () => onNavigate('Job cards') }}><RoleList items={jobs.filter(job => !query || `${job.number} ${job.title} ${job.status}`.toLowerCase().includes(query.toLowerCase())).slice(0, 5).map(job => ({ title: job.number, detail: `${job.title} · ${job.status}`, module: 'Job cards' as OpsModule }))} empty="No jobs require attention." onNavigate={onNavigate}/></RolePanel></div>
+    <div className="stats-grid"><RoleStat label="Active people" value={String(employees.filter(employee => employee.is_active).length)} note="Consultants and staff" icon={<Users size={17}/>} tone="purple" onClick={() => onNavigate('Finance & HR')}/><RoleStat label="Pending onboarding" value={String(tasks.filter(task => task.status === 'Pending').length)} note="Tasks requiring follow-up" icon={<Check size={17}/>} tone="amber" onClick={() => onNavigate('Finance & HR')}/><RoleStat label="Available stock" value={String(inventory.available || 0)} note={`${inventory.reserved || 0} reserved`} icon={<Boxes size={17}/>} tone="blue" onClick={() => onNavigate('Inventory')}/><RoleStat label="Open dispatches" value={String(dispatches.filter(dispatch => ['Prepared', 'In transit'].includes(dispatch.status)).length)} note="Town delivery workload" icon={<Truck size={17}/>} tone="green" onClick={() => onNavigate('Dispatch')}/></div>
+    <div className="grid-main"><RolePanel title="Control centre" subtitle="Manager-owned settings and queues" action={{ label: 'Open controls', onClick: () => onNavigate('Finance & HR') }}><div className="role-summary-grid"><div><strong>{rules.length}</strong><span>commission rules</span></div><div><strong>{targets.length}</strong><span>consultant targets</span></div><div><strong>{orders.filter(order => order.status === 'Pending approval').length}</strong><span>PO approvals</span></div></div></RolePanel><RolePanel title="Next dispatch actions" subtitle={`Showing ${Math.min(dispatches.length, 5)} of ${dispatches.length} dispatches`} action={{ label: 'View dispatches', onClick: () => onNavigate('Dispatch') }}><RoleList items={dispatches.filter(dispatch => !query || `${dispatch.number} ${dispatch.destination_town} ${dispatch.driver_name} ${dispatch.status}`.toLowerCase().includes(query.toLowerCase())).slice(0, 5).map(dispatch => ({ title: dispatch.number, detail: `${dispatch.destination_town} · ${dispatch.driver_name} · ${dispatch.status}`, module: 'Dispatch' as OpsModule }))} empty="No dispatches require attention." onNavigate={onNavigate}/></RolePanel></div>
   </RoleFrame>;
 }
 
@@ -98,11 +98,11 @@ function SalesDashboard({ data, settings, query, onNavigate, error }: Omit<Props
   const opportunities = list<unknown>(data, '/api/crm/opportunities', 'opportunities');
   const quotations = list<unknown>(data, '/api/crm/quotations', 'quotations');
   const sales = list<Sale>(data, '/api/crm/sales', 'sales');
-  const jobs = list<Job>(data, '/api/jobs', 'jobs');
+  const dispatches = list<Dispatch>(data, '/api/dispatches', 'dispatches');
   const commissions = list<Commission>(data, '/api/finance/commissions', 'commissions');
-  return <RoleFrame eyebrow="Sales workspace" title="Sales consultant dashboard" subtitle="CRM, pre-sales, confirmed sales, job cards, and your commission" role="sales_consultant" onNavigate={onNavigate} error={error}>
+  return <RoleFrame eyebrow="Sales workspace" title="Sales consultant dashboard" subtitle="CRM, pre-sales, confirmed sales, dispatch tracking, and your commission" role="sales_consultant" onNavigate={onNavigate} error={error}>
     <div className="stats-grid"><RoleStat label="Open opportunities" value={String(opportunities.length)} note="Active pipeline" icon={<BriefcaseBusiness size={17}/>} tone="blue" onClick={() => onNavigate('Sales & CRM')}/><RoleStat label="Pre-sales" value={String(quotations.length)} note="Quotes in progress" icon={<FileText size={17}/>} tone="purple" onClick={() => onNavigate('Sales & CRM')}/><RoleStat label="Confirmed sales" value={String(sales.length)} note="Converted transactions" icon={<ShoppingCart size={17}/>} tone="green" onClick={() => onNavigate('Sales & CRM')}/><RoleStat label="My commission" value={formatCurrency(commissions.reduce((sum, commission) => sum + Number(commission.amount || 0), 0), settings.currency, 0)} note={`${commissions.length} entries`} icon={<CircleDollarSign size={17}/>} tone="amber" onClick={() => onNavigate('Reports')}/></div>
-    <div className="grid-main"><RolePanel title="My job cards" subtitle={`Showing ${Math.min(jobs.length, 6)} of ${jobs.length} job cards`} action={{ label: 'View all jobs', onClick: () => onNavigate('Job cards') }}><RoleList items={jobs.filter(job => !query || `${job.number} ${job.title} ${job.status}`.toLowerCase().includes(query.toLowerCase())).slice(0, 6).map(job => ({ title: job.number, detail: `${job.title} · ${job.status}`, module: 'Job cards' as OpsModule }))} empty="No job cards found." onNavigate={onNavigate}/></RolePanel><RolePanel title="Commission ledger" subtitle={`Showing ${Math.min(commissions.length, 6)} of ${commissions.length} entries`} action={{ label: 'Open reports', onClick: () => onNavigate('Reports') }}><RoleList items={commissions.slice(0, 6).map(commission => ({ title: commission.sale_number || 'Sale', detail: `${formatCurrency(commission.amount, settings.currency)} · ${commission.status}` }))} empty="No commission entries yet."/></RolePanel></div>
+    <div className="grid-main"><RolePanel title="My dispatches" subtitle={`Showing ${Math.min(dispatches.length, 6)} of ${dispatches.length} dispatches`} action={{ label: 'View dispatches', onClick: () => onNavigate('Dispatch') }}><RoleList items={dispatches.filter(dispatch => !query || `${dispatch.number} ${dispatch.destination_town} ${dispatch.driver_name} ${dispatch.status}`.toLowerCase().includes(query.toLowerCase())).slice(0, 6).map(dispatch => ({ title: dispatch.number, detail: `${dispatch.destination_town} · ${dispatch.driver_name} · ${dispatch.payment_status || dispatch.status}`, module: 'Dispatch' as OpsModule }))} empty="No dispatches found." onNavigate={onNavigate}/></RolePanel><RolePanel title="Commission ledger" subtitle={`Showing ${Math.min(commissions.length, 6)} of ${commissions.length} entries`} action={{ label: 'Open reports', onClick: () => onNavigate('Reports') }}><RoleList items={commissions.slice(0, 6).map(commission => ({ title: commission.sale_number || 'Sale', detail: `${formatCurrency(commission.amount, settings.currency)} · ${commission.status}` }))} empty="No commission entries yet."/></RolePanel></div>
   </RoleFrame>;
 }
 

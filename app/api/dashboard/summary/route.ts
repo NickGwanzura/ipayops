@@ -16,7 +16,7 @@ export async function GET(request: Request) {
         COALESCE((SELECT SUM(s.total) FROM sales s WHERE s.organization_id = $1 AND s.confirmed_at >= date_trunc('month', current_date) AND s.status NOT IN ('Cancelled', 'Returned', 'Partially returned')), 0) AS revenue,
         COALESCE((SELECT COUNT(*) FROM sales s WHERE s.organization_id = $1 AND s.confirmed_at >= date_trunc('month', current_date) AND s.status NOT IN ('Cancelled', 'Returned', 'Partially returned')), 0)::int AS confirmed_sales,
         COALESCE((SELECT COUNT(*) FROM inventory_items i WHERE i.organization_id = $1 AND i.status IN ('Available', 'Reserved')), 0)::int AS units_in_stock,
-        COALESCE((SELECT COUNT(*) FROM job_cards j WHERE j.organization_id = $1 AND j.status IN ('Scheduled', 'In progress')), 0)::int AS open_jobs`, [organizationId]),
+        COALESCE((SELECT COUNT(*) FROM intertown_dispatches d WHERE d.organization_id = $1 AND d.status IN ('Prepared', 'In transit')), 0)::int AS open_dispatches`, [organizationId]),
       query(`SELECT to_char(days.day, 'DD Mon') AS day,
         COALESCE((SELECT SUM(s.total) FROM sales s WHERE s.organization_id = $1 AND s.confirmed_at::date = days.day::date AND s.status NOT IN ('Cancelled', 'Returned', 'Partially returned')), 0) AS sales,
         COALESCE((SELECT COUNT(*) FROM inventory_items i WHERE i.organization_id = $1 AND i.received_at::date = days.day::date), 0)::int AS stock

@@ -1,4 +1,4 @@
-export type OpsModule = 'Procurement' | 'Products' | 'Inventory' | 'Sales & CRM' | 'Job cards' | 'Warranty' | 'Finance & HR' | 'People & HR' | 'Reports' | 'Audit Logs';
+export type OpsModule = 'Procurement' | 'Products' | 'Inventory' | 'Sales & CRM' | 'Dispatch' | 'Warranty' | 'Finance & HR' | 'People & HR' | 'Reports' | 'Audit Logs';
 export type RecordStatus = 'Approved' | 'Pending' | 'In transit' | 'Available' | 'Reserved' | 'Active' | 'Needs review' | 'In progress' | 'Paid';
 
 export const suppliers = [
@@ -59,7 +59,7 @@ export const moduleMeta: Record<OpsModule, { title:string; description:string; i
   'Products': { title:'Products and pricing', description:'Serialized Laptop/POS products, cost prices, selling prices, and margin controls', icon:'products' },
   'Inventory': { title:'Serialized inventory', description:'Trace every device from supplier receipt to delivery and warranty', icon:'boxes' },
   'Sales & CRM': { title:'Sales & CRM', description:'Clients, pipeline, pre-sales, reservations, and confirmed sales', icon:'crm' },
-  'Job cards': { title:'Jobs & installations', description:'Schedule, assign, configure, and sign off device installations', icon:'jobs' },
+  Dispatch: { title:'Inter-town dispatch', description:'Record drivers, destinations, devices, and driver payment status', icon:'truck' },
   'Warranty': { title:'Warranty service desk', description:'Check coverage, manage claims, repairs, and replacements', icon:'warranty' },
   'Finance & HR': { title:'Finance & HR', description:'Expenses, commissions, targets, and consultant lifecycle', icon:'finance' },
   'People & HR': { title:'People & HR', description:'Employees, invitations, onboarding, and lifecycle history', icon:'people' },

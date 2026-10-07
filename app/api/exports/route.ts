@@ -30,9 +30,9 @@ export async function GET(request: NextRequest) {
       FROM sales sa JOIN clients c ON c.id = sa.client_id
       WHERE sa.organization_id = $1 AND ($4::text IS NULL OR EXISTS (SELECT 1 FROM sale_items si JOIN inventory_items ii ON ii.id = si.inventory_item_id WHERE si.sale_id = sa.id AND ii.location = $4)) AND ($5::text IS NULL OR EXISTS (SELECT 1 FROM sale_items si WHERE si.sale_id = sa.id AND si.sku = $5))
       UNION ALL
-      SELECT j.number, c.name, j.status, COUNT(jci.id)::numeric, j.created_at
-      FROM job_cards j JOIN clients c ON c.id = j.client_id LEFT JOIN job_card_items jci ON jci.job_card_id = j.id
-      WHERE j.organization_id = $1 AND ($4::text IS NULL OR EXISTS (SELECT 1 FROM job_card_items jci JOIN inventory_items ii ON ii.id = jci.inventory_item_id WHERE jci.job_card_id = j.id AND ii.location = $4)) AND ($5::text IS NULL OR EXISTS (SELECT 1 FROM job_card_items jci JOIN inventory_items ii ON ii.id = jci.inventory_item_id WHERE jci.job_card_id = j.id AND ii.sku = $5)) GROUP BY j.id, c.name
+      SELECT d.number, c.name || ' · ' || d.destination_town, d.status, d.driver_fee::numeric, d.created_at
+      FROM intertown_dispatches d JOIN sales sa ON sa.id = d.sale_id JOIN clients c ON c.id = sa.client_id
+      WHERE d.organization_id = $1 AND ($4::text IS NULL OR EXISTS (SELECT 1 FROM intertown_dispatch_items di JOIN inventory_items ii ON ii.id = di.inventory_item_id WHERE di.dispatch_id = d.id AND ii.location = $4)) AND ($5::text IS NULL OR EXISTS (SELECT 1 FROM intertown_dispatch_items di JOIN sale_items si ON si.id = di.sale_item_id WHERE di.dispatch_id = d.id AND si.sku = $5))
       UNION ALL
       SELECT wc.number, COALESCE(ii.client_name, 'Unassigned'), wc.status, 0::numeric, wc.created_at
       FROM warranty_claims wc JOIN inventory_items ii ON ii.id = wc.inventory_item_id

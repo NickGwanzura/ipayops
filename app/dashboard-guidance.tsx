@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Boxes, BriefcaseBusiness, Check, CircleDollarSign, ClipboardCheck, FileText, Plus, ShieldCheck, ShoppingCart, Users, X } from 'lucide-react';
+import { ArrowRight, Boxes, BriefcaseBusiness, Check, CircleDollarSign, FileText, Plus, ShieldCheck, ShoppingCart, Truck, Users, X } from 'lucide-react';
 import { normalizeRole, roleLabel } from '@/lib/rbac';
 import type { OpsModule } from '@/lib/ops-data';
 import { useDialogFocus } from './dialog-focus';
@@ -32,7 +32,7 @@ const quickActions: Record<DashboardRole, QuickAction[]> = {
   sales_consultant: [
     { label: 'Create a lead', detail: 'Start a client and opportunity workflow', module: 'Sales & CRM', icon: Plus, tone: 'blue' },
     { label: 'Raise a quotation', detail: 'Use live product prices and serial stock', module: 'Sales & CRM', icon: FileText, tone: 'purple' },
-    { label: 'Open job cards', detail: 'Track installations and client sign-offs', module: 'Job cards', icon: ClipboardCheck, tone: 'green' },
+    { label: 'Inter-town dispatches', detail: 'Track drivers, destinations, and payment', module: 'Dispatch', icon: Truck, tone: 'green' },
     { label: 'View commission', detail: 'See your sales-linked commission ledger', module: 'Reports', icon: CircleDollarSign, tone: 'amber' },
   ],
 };
@@ -46,7 +46,7 @@ const guideSteps: Record<DashboardRole, GuideStep[]> = {
   manager: [
     { title: 'Set up your team', detail: 'Invite consultants, assign onboarding tasks, and review employee lifecycle history in Finance & HR.', module: 'Finance & HR', moduleLabel: 'Open team controls', icon: Users },
     { title: 'Keep stock moving', detail: 'Use Inventory for serialized intake, reservations, transfers, shipping, and release controls.', module: 'Inventory', moduleLabel: 'Open stock control', icon: Boxes },
-    { title: 'Control sales operations', detail: 'Configure commission rules and targets, then use Procurement and Job cards to manage delivery.', module: 'Procurement', moduleLabel: 'Open procurement', icon: ShoppingCart },
+    { title: 'Control sales operations', detail: 'Configure commission rules and targets, then use Procurement and Dispatch to manage delivery.', module: 'Procurement', moduleLabel: 'Open procurement', icon: ShoppingCart },
   ],
   finance: [
     { title: 'Start with the finance KPI strip', detail: 'Outstanding debtors, overdue balances, pending expenses, and commission entries show your current workload.', icon: CircleDollarSign },
@@ -56,7 +56,7 @@ const guideSteps: Record<DashboardRole, GuideStep[]> = {
   sales_consultant: [
     { title: 'Build your pipeline', detail: 'Start in Sales & CRM with clients, leads, opportunities, and quotations.', module: 'Sales & CRM', moduleLabel: 'Open CRM', icon: BriefcaseBusiness },
     { title: 'Convert with serialized stock', detail: 'Confirm a sale by assigning the exact available serial numbers from the quotation workflow.', module: 'Sales & CRM', moduleLabel: 'Open sales workspace', icon: ShoppingCart },
-    { title: 'Deliver and earn', detail: 'Use Job cards for installation and sign-off, then Reports for your commission view.', module: 'Job cards', moduleLabel: 'Open job cards', icon: ClipboardCheck },
+    { title: 'Deliver and earn', detail: 'Record the driver, destination, devices, and payment in Dispatch, then use Reports for your commission view.', module: 'Dispatch', moduleLabel: 'Open dispatch', icon: Truck },
   ],
 };
 
