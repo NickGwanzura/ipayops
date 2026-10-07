@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { ACCESS, requireRole } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/db';
+import { notifyOrganizationRoles } from '@/lib/notifications';
 
 const returnSchema = z.object({ reason: z.string().trim().min(3).max(500), refundAmount: z.number().nonnegative().max(100000000).optional().default(0), refundMethod: z.enum(['Bank transfer', 'Cash', 'Card', 'Mobile money', 'Credit note']).optional(), items: z.array(z.object({ saleItemId: z.string().uuid(), condition: z.enum(['Good', 'Damaged', 'Quarantined']).default('Good') })).min(1) });
 
@@ -52,10 +53,31 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         await client.query(`UPDATE sale_items SET returned = true WHERE id = $1`, [item.id]);
         await client.query(`UPDATE inventory_items SET status = $1, updated_at = now() WHERE id = $2`, [condition === 'Good' ? 'Available' : 'Quarantined', item.inventory_item_id]);
       }
-      const outstanding = await client.query('SELECT COUNT(*)::int AS count FROM sale_items WHERE sale_id = $1 AND returned = false', [params.id]);
+      const outstanding = await client.query('SELECT COUNT(*)::int AS count, COALESCE(SUM(amount), 0) AS amount FROM sale_items WHERE sale_id = $1 AND returned = false', [params.id]);
       await client.query(`UPDATE sales SET status = $1 WHERE id = $2`, [outstanding.rows[0].count === 0 ? 'Returned' : 'Partially returned', params.id]);
+      const remainingValue = Number(outstanding.rows[0].amount);
+      // Keep downstream money in step with the return: a provisional commission follows the kept items, and an unpaid invoice shrinks (or voids) with them.
+      // Unpaid commission shrinks (or voids); paid commission is untouched and the amount to recover is recorded as a clawback.
+      await client.query(`UPDATE commission_entries SET
+        amount = CASE WHEN status IN ('Provisional', 'Approved') THEN ROUND(rate * $2::numeric / 100, 2) ELSE amount END,
+        clawback_amount = CASE WHEN status = 'Paid' THEN GREATEST(0, amount - ROUND(rate * $2::numeric / 100, 2)) ELSE clawback_amount END,
+        status = CASE WHEN $2::numeric = 0 AND status IN ('Provisional', 'Approved') THEN 'Voided' ELSE status END
+        WHERE sale_id = $1 AND status IN ('Provisional', 'Approved', 'Paid')`, [params.id, remainingValue]);
+      // The invoice shrinks to the items kept, whether or not it was already paid (payments are kept so any refund can be validated).
+      // A credit note is issued against the invoice for the returned value.
+      const adjustable = await client.query(`SELECT id FROM invoices WHERE sale_id = $1 AND status IN ('Draft', 'Issued', 'Paid') FOR UPDATE`, [params.id]);
+      if (adjustable.rows[0]) {
+        await client.query('DELETE FROM invoice_items WHERE invoice_id = $1 AND sale_item_id = ANY($2::uuid[])', [adjustable.rows[0].id, requestedItemIds]);
+        await client.query(`UPDATE invoices SET total = $2,
+          status = CASE WHEN $2::numeric = 0 THEN 'Void' WHEN status = 'Draft' AND paid_amount = 0 THEN 'Draft' WHEN paid_amount >= $2::numeric - 0.005 THEN 'Paid' ELSE 'Issued' END,
+          paid_at = CASE WHEN $2::numeric > 0 AND paid_amount >= $2::numeric - 0.005 THEN COALESCE(paid_at, now()) ELSE paid_at END
+          WHERE id = $1`, [adjustable.rows[0].id, remainingValue]);
+        await client.query('UPDATE returns SET credit_note_number = COALESCE(credit_note_number, $2) WHERE id = $1', [returnResult.rows[0].id, `CN-${new Date().getFullYear()}-${randomUUID().slice(0, 6).toUpperCase()}`]);
+      }
       return returnResult.rows[0];
     });
+    const settled = await query(`SELECT clawback_amount FROM commission_entries WHERE sale_id = $1 AND organization_id = $2 AND status = 'Paid' AND clawback_amount > 0 LIMIT 1`, [params.id, session.user.organizationId]);
+    if (settled.rows[0]) await notifyOrganizationRoles({ organizationId: session.user.organizationId, roles: ['ceo', 'manager', 'finance'], excludeUserId: session.user.id, eventType: 'commission.review_required', subject: `Commission clawback due after return ${returned.number}`, eyebrow: 'Returns and finance', title: 'Paid commission must be recovered', summary: 'Items were returned on a sale whose commission was already paid. The amount to recover is recorded against the commission entry.', fields: [{ label: 'Return', value: returned.number }, { label: 'Clawback due', value: String(settled.rows[0].clawback_amount) }], action: { label: 'Open commissions', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Finance%20%26%20HR&view=commissions` } }).catch(notificationError => console.error('Commission review notification failed', notificationError));
     return NextResponse.json({ return: returned }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: 'Return reason and at least one sale item are required.' }, { status: 400 });

@@ -18,7 +18,7 @@ Open `http://localhost:3000` or `http://localhost:3000/operations`. Health: `htt
 ## Docker development stack
 
 ```bash
-docker compose up --build
+docker compose -f docker-compose.dev.yml up --build
 ```
 
 This starts the app and PostgreSQL on a persistent named volume. The container applies PostgreSQL migrations before starting the application.

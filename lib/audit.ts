@@ -1,4 +1,6 @@
+import { isIP } from 'node:net';
 import { query } from '@/lib/db';
+import { requestAddress } from '@/lib/rate-limit';
 
 type AuditEvent = {
   organizationId?: string;
@@ -9,6 +11,12 @@ type AuditEvent = {
   metadata?: Record<string, unknown>;
   request?: Request;
 };
+
+function auditAddress(request?: Request) {
+  if (!request) return null;
+  const address = requestAddress(request);
+  return isIP(address) ? address : null;
+}
 
 export async function writeAuditLog(event: AuditEvent) {
   try {
@@ -22,7 +30,7 @@ export async function writeAuditLog(event: AuditEvent) {
         event.entityType || null,
         event.entityId || null,
         JSON.stringify(event.metadata || {}),
-        event.request?.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || event.request?.headers.get('x-real-ip') || null,
+        auditAddress(event.request),
         event.request?.headers.get('user-agent') || null,
       ],
     );

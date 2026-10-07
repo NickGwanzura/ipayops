@@ -4,6 +4,7 @@ import { createSession, hashPassword, publicUser, setSessionCookie } from '@/lib
 import { writeAuditLog } from '@/lib/audit';
 import { hashInvitationToken } from '@/lib/invitations';
 import { query, withTransaction } from '@/lib/db';
+import { SALES_ONBOARDING_TASKS } from '@/lib/offboarding';
 import { consumeRateLimit, requestAddress, resetRateLimit } from '@/lib/rate-limit';
 import { isPrivilegedMfaRequired } from '@/lib/server-env';
 import { encryptMfaSecret, generateChallengeToken, generateTotpSecret, MFA_CHALLENGE_SECONDS, setMfaChallengeCookie } from '@/lib/mfa';
@@ -43,6 +44,11 @@ export async function POST(request: Request, props: { params: Promise<{ token: s
       const userResult = await client.query(`INSERT INTO users (organization_id, email, full_name, password_hash, role) VALUES ($1, lower($2), $3, $4, $5) RETURNING id, organization_id, email, full_name, role`, [invitation.organization_id, invitation.email, invitation.full_name, passwordHash, invitation.role]);
       await client.query('UPDATE user_invitations SET accepted_at = now(), accepted_user_id = $1, updated_at = now() WHERE id = $2', [userResult.rows[0].id, invitation.id]);
       await client.query(`INSERT INTO employee_lifecycle_events (organization_id, user_id, event_type, status, notes, created_by) VALUES ($1, $2, 'Onboarding', 'Completed', 'Employee accepted an invitation and activated their account.', NULL)`, [invitation.organization_id, userResult.rows[0].id]);
+      if (invitation.role === 'sales_consultant') {
+        for (const task of SALES_ONBOARDING_TASKS) {
+          await client.query(`INSERT INTO onboarding_tasks (organization_id, user_id, title, category, due_at) VALUES ($1, $2, $3, $4, CURRENT_DATE + $5::int) ON CONFLICT (organization_id, user_id, title) DO NOTHING`, [invitation.organization_id, userResult.rows[0].id, task.title, task.category, task.dueInDays]);
+        }
+      }
       const privilegedMfaRequired = (invitation.role === 'ceo' || invitation.role === 'finance') && isPrivilegedMfaRequired();
       if (!privilegedMfaRequired) return { user: userResult.rows[0], challengeToken: null };
       const challenge = generateChallengeToken();

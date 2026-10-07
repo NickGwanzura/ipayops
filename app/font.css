@@ -1,3 +1,20 @@
+/* Geist (SIL OFL 1.1, see /fonts/GEIST-LICENSE.txt): one variable file per family covers weights 100-900. */
+@font-face {
+  font-family: 'Geist Sans';
+  src: url('/fonts/geist-sans-vf.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('/fonts/geist-mono-vf.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
 @font-face {
   font-family: 'JUST Sans';
   src: url('/fonts/JUST Sans ExLight.woff2') format('woff2');
@@ -62,8 +79,12 @@
   font-display: swap;
 }
 
-body {
-  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+body,
+button,
+input,
+select,
+textarea {
+  font-family: 'Geist Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 .font-data,
@@ -71,7 +92,7 @@ body {
 .serial-picker,
 .coverage-copy strong,
 .mono-data {
-  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: 'Geist Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .font-data,

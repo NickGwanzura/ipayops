@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   if ('response' in auth) return auth.response;
   const { session } = auth;
   const result = await query(
-    `SELECT ce.id, ce.sale_id, ce.consultant_id, ce.rate, ce.amount, ce.status, ce.created_at,
+    `SELECT ce.id, ce.sale_id, ce.consultant_id, ce.rate, ce.amount, ce.clawback_amount, ce.status, ce.created_at,
             s.number AS sale_number, s.total AS sale_total, c.name AS client_name, u.full_name AS consultant_name
      FROM commission_entries ce JOIN sales s ON s.id = ce.sale_id JOIN clients c ON c.id = s.client_id
      LEFT JOIN users u ON u.id = ce.consultant_id

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { ACCESS, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
@@ -33,7 +34,9 @@ export async function POST(request: Request) {
     if ('response' in auth) return auth.response;
     const { session } = auth;
     const body = clientSchema.parse(await request.json());
-    const code = body.code || `CLI-${Date.now().toString().slice(-6)}`;
+    const code = body.code || `CLI-${randomUUID().slice(0, 6).toUpperCase()}`;
+    const duplicate = await query(`SELECT id, name FROM clients WHERE organization_id = $1 AND status = 'Active' AND ((NULLIF($2, '') IS NOT NULL AND lower(email) = lower($2)) OR ($3 = 'Organisation' AND lower(name) = lower($4))) LIMIT 1`, [session.user.organizationId, body.email, body.clientType, body.name]);
+    if (duplicate.rows[0]) return NextResponse.json({ error: `A client matching "${duplicate.rows[0].name}" already exists. Use the existing record instead of creating a duplicate.`, existingClientId: duplicate.rows[0].id }, { status: 409 });
     const result = await query(
       `INSERT INTO clients (organization_id, code, name, client_type, contact_name, email, phone, address)
        VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''), $7, $8)

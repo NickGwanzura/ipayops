@@ -50,7 +50,10 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       if (!existing.rows[0]) throw Object.assign(new Error('Purchase order not found.'), { code: 'NOT_FOUND' });
       const received = await client.query(`SELECT COALESCE(SUM(received_quantity), 0)::int AS received_quantity FROM purchase_order_items WHERE purchase_order_id = $1`, [params.id]);
       if (received.rows[0].received_quantity > 0 && (body.items || body.supplierId)) throw Object.assign(new Error('Received orders cannot change supplier or lines.'), { code: 'RECEIVED' });
-      if (existing.rows[0].status === 'Fully received') throw Object.assign(new Error('Fully received orders cannot be edited.'), { code: 'LOCKED' });
+      if (['Fully received', 'Cancelled'].includes(existing.rows[0].status)) throw Object.assign(new Error('Closed orders cannot be edited.'), { code: 'LOCKED' });
+      // Once approved, the supplier, lines, and approval state are frozen so approved spend cannot be silently changed.
+      const approvalOpen = ['Draft', 'Pending approval'].includes(existing.rows[0].status);
+      if (!approvalOpen && (body.items || body.supplierId || (body.status && body.status !== 'Cancelled'))) throw Object.assign(new Error('Approved orders cannot change supplier, lines, or approval state.'), { code: 'APPROVED_LOCKED' });
       if (body.supplierId) { const supplier = await client.query(`SELECT id FROM suppliers WHERE id = $1 AND organization_id = $2 AND status = 'Active'`, [body.supplierId, auth.session.user.organizationId]); if (!supplier.rows[0]) throw Object.assign(new Error('Supplier not found.'), { code: 'SUPPLIER_NOT_FOUND' }); }
       let total: number | null = null;
       if (body.items) {
@@ -71,6 +74,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     if (error instanceof z.ZodError) return NextResponse.json({ error: 'Invalid purchase-order update.' }, { status: 400 });
     const code = (error as { code?: string }).code;
     if (code === 'NOT_FOUND' || code === 'SUPPLIER_NOT_FOUND' || code === 'PRODUCT_NOT_FOUND') return NextResponse.json({ error: 'Purchase order, active supplier, or supplier product not found.' }, { status: 404 });
+    if (code === 'APPROVED_LOCKED') return NextResponse.json({ error: 'Approved purchase orders cannot change supplier, lines, or approval state. Cancel the order and raise a new one instead.' }, { status: 409 });
     if (code === 'RECEIVED' || code === 'LOCKED') return NextResponse.json({ error: 'Received purchase orders cannot change supplier or lines.' }, { status: 409 });
     console.error('Purchase-order update failed', error);
     return NextResponse.json({ error: 'Unable to update purchase order.' }, { status: 500 });

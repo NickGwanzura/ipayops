@@ -12,8 +12,9 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     const note = await withTransaction(async client => {
       const scope = session.user.role === 'sales_consultant' ? ' AND (consultant_id = $3 OR created_by = $3)' : '';
       const values = session.user.role === 'sales_consultant' ? [params.id, session.user.organizationId, session.user.id] : [params.id, session.user.organizationId];
-      const saleResult = await client.query(`SELECT id, client_id FROM sales WHERE id = $1 AND organization_id = $2${scope} FOR UPDATE`, values);
+      const saleResult = await client.query(`SELECT id, client_id, status FROM sales WHERE id = $1 AND organization_id = $2${scope} FOR UPDATE`, values);
       if (!saleResult.rows[0]) throw Object.assign(new Error('Sale not found.'), { code: 'SALE_NOT_FOUND' });
+      if (['Cancelled', 'Returned'].includes(saleResult.rows[0].status)) throw Object.assign(new Error('Sale is closed.'), { code: 'SALE_CLOSED' });
       const existing = await client.query('SELECT id FROM delivery_notes WHERE sale_id = $1', [params.id]); if (existing.rows[0]) throw Object.assign(new Error('Delivery note already exists.'), { code: 'EXISTS' });
       const number = `DN-${new Date().getFullYear()}-${randomUUID().slice(0, 6).toUpperCase()}`;
       const result = await client.query('INSERT INTO delivery_notes (organization_id, number, sale_id, client_id, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING id, number, status, created_at', [session.user.organizationId, number, params.id, saleResult.rows[0].client_id, session.user.id]);
@@ -21,5 +22,5 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       return result.rows[0];
     });
     return NextResponse.json({ deliveryNote: note }, { status: 201 });
-  } catch (error) { const code = (error as { code?: string }).code; if (code === 'SALE_NOT_FOUND') return NextResponse.json({ error: 'Sale not found.' }, { status: 404 }); if (code === 'EXISTS' || code === '23505') return NextResponse.json({ error: 'Delivery note already exists for this sale.' }, { status: 409 }); console.error('Delivery note generation failed', error); return NextResponse.json({ error: 'Unable to generate delivery note.' }, { status: 500 }); }
+  } catch (error) { const code = (error as { code?: string }).code; if (code === 'SALE_NOT_FOUND') return NextResponse.json({ error: 'Sale not found.' }, { status: 404 }); if (code === 'SALE_CLOSED') return NextResponse.json({ error: 'Delivery notes cannot be generated for a cancelled or fully returned sale.' }, { status: 409 }); if (code === 'EXISTS' || code === '23505') return NextResponse.json({ error: 'Delivery note already exists for this sale.' }, { status: 409 }); console.error('Delivery note generation failed', error); return NextResponse.json({ error: 'Unable to generate delivery note.' }, { status: 500 }); }
 }

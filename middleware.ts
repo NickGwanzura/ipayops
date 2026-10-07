@@ -5,6 +5,24 @@ import { getOrCreateRequestId, REQUEST_ID_HEADER } from './lib/observability';
 
 const cookieName = 'ipaytech_session';
 
+// Browsers always send Origin on cross-site state-changing requests; server-to-server callers send none and are unaffected.
+function isSameOrigin(request: NextRequest, origin: string) {
+  let originHost: string;
+  try {
+    originHost = new URL(origin).host;
+  } catch {
+    return false;
+  }
+  const allowed = new Set<string>();
+  for (const value of [request.headers.get('host'), request.headers.get('x-forwarded-host')?.split(',')[0]?.trim()]) if (value) allowed.add(value);
+  try {
+    if (process.env.APP_URL) allowed.add(new URL(process.env.APP_URL).host);
+  } catch {
+    // Ignore a malformed APP_URL; the host headers still apply.
+  }
+  return allowed.has(originHost);
+}
+
 export async function middleware(request: NextRequest) {
   const requestId = getOrCreateRequestId(request);
   const requestHeaders = new Headers(request.headers);
@@ -15,7 +33,17 @@ export async function middleware(request: NextRequest) {
     return response;
   };
 
-  if (request.nextUrl.pathname === '/api' || request.nextUrl.pathname.startsWith('/api/')) return next();
+  if (request.nextUrl.pathname === '/api' || request.nextUrl.pathname.startsWith('/api/')) {
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
+      const origin = request.headers.get('origin');
+      if (origin && !isSameOrigin(request, origin)) {
+        const response = NextResponse.json({ error: 'Cross-origin request rejected.' }, { status: 403 });
+        response.headers.set(REQUEST_ID_HEADER, requestId);
+        return response;
+      }
+    }
+    return next();
+  }
 
   const token = request.cookies.get(cookieName)?.value;
   const secret = process.env.AUTH_SECRET;
@@ -49,6 +77,6 @@ export const config = {
   runtime: 'nodejs',
   matcher: [
     '/api/:path*',
-    '/((?!api|login|verify|invite|forgot-password|reset-password|_next/static|_next/image|favicon.ico|iPaytechLogo.jpg|pos-login-hero.webp).*)',
+    '/((?!api|login|verify|invite|forgot-password|reset-password|_next/static|_next/image|fonts/|favicon.ico|iPaytechLogo.jpg|pos-login-hero.webp).*)',
   ],
 };

@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { ACCESS, requireRole } from '@/lib/auth';
 import { query, withTransaction } from '@/lib/db';
 import { notifyOrganizationRoles, sendNotification } from '@/lib/notifications';
+import { QUOTATION_LINE_ERRORS, resolveQuotationLines } from '@/lib/quotation-lines';
+import { isoDateIn, organizationTimeZone } from '@/lib/timezone';
 
 const quotationSchema = z.object({
   clientId: z.string().uuid(), opportunityId: z.string().uuid().optional(), validUntil: z.string().date().optional(),
@@ -33,6 +35,7 @@ export async function POST(request: Request) {
     if ('response' in auth) return auth.response;
     const { session } = auth;
     const body = quotationSchema.parse(await request.json());
+    if (body.validUntil && body.validUntil < isoDateIn(await organizationTimeZone(session.user.organizationId))) return NextResponse.json({ error: 'The valid-until date must not be in the past.' }, { status: 400 });
     const quotation = await withTransaction(async client => {
       const clientResult = await client.query('SELECT id FROM clients WHERE id = $1 AND organization_id = $2', [body.clientId, session.user.organizationId]);
       if (!clientResult.rows[0]) throw Object.assign(new Error('Client not found.'), { code: 'CLIENT_NOT_FOUND' });
@@ -41,30 +44,27 @@ export async function POST(request: Request) {
         if (!opportunityResult.rows[0]) throw Object.assign(new Error('Opportunity not found.'), { code: 'OPPORTUNITY_NOT_FOUND' });
       }
       const number = `QUO-${new Date().getFullYear()}-${randomUUID().slice(0, 6).toUpperCase()}`;
-      const resolvedItems = [] as Array<{ productId: string | null; productType: string | null; sku: string; description: string; quantity: number; unitPrice: number }>;
-      for (const item of body.items) {
-        const product = item.productId ? (await client.query(`SELECT id, product_type, product_name, sku, selling_price FROM supplier_products WHERE id = $1 AND organization_id = $2 AND status = 'Active'`, [item.productId, session.user.organizationId])).rows[0] : null;
-        if (item.productId && !product) throw Object.assign(new Error('Product not found.'), { code: 'PRODUCT_NOT_FOUND' });
-        const sku = product?.sku || item.sku; const description = product?.product_name || item.description; const unitPrice = product ? Number(product.selling_price) : item.unitPrice;
-        if (!sku || !description || unitPrice === undefined) throw Object.assign(new Error('Product or quotation line details are incomplete.'), { code: 'LINE_INVALID' });
-        resolvedItems.push({ productId: product?.id || null, productType: product?.product_type || null, sku, description, quantity: item.quantity, unitPrice });
-      }
+      const resolvedItems = await resolveQuotationLines(client, session.user.organizationId, session.user.role, body.items);
       const total = resolvedItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
       const header = await client.query(
         `INSERT INTO quotations (organization_id, number, client_id, opportunity_id, total, valid_until, created_by)
          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, number, status, total, valid_until, created_at`,
         [session.user.organizationId, number, body.clientId, body.opportunityId || null, total, body.validUntil || null, session.user.id],
       );
+      // A quotation moves its opportunity into the Quotation stage and seeds an empty opportunity value.
+      if (body.opportunityId) await client.query(`UPDATE opportunities SET value = CASE WHEN value = 0 THEN $2 ELSE value END, stage = CASE WHEN stage IN ('Discovery', 'Qualified') THEN 'Quotation' ELSE stage END, updated_at = now() WHERE id = $1`, [body.opportunityId, total]);
       for (const item of resolvedItems) await client.query('INSERT INTO quotation_items (quotation_id, supplier_product_id, product_type, sku, description, quantity, unit_price) VALUES ($1, $2, $3, $4, $5, $6, $7)', [header.rows[0].id, item.productId, item.productType, item.sku, item.description, item.quantity, item.unitPrice]);
       return header.rows[0];
     });
     await Promise.all([
       sendNotification({ organizationId: session.user.organizationId, eventType: 'quotation.created', recipientEmail: session.user.email, recipientName: session.user.fullName, subject: `Pre-sale quotation ${quotation.number} created`, eyebrow: 'Sales & CRM', title: 'New pre-sale quotation', summary: 'A quotation has been created and is ready for customer follow-up.', fields: [{ label: 'Quotation', value: quotation.number }, { label: 'Total', value: String(quotation.total) }, { label: 'Status', value: quotation.status }], action: { label: 'Open Sales & CRM', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Sales%20%26%20CRM` } }),
       notifyOrganizationRoles({ organizationId: session.user.organizationId, roles: ['ceo', 'manager'], excludeUserId: session.user.id, eventType: 'quotation.created', subject: `Pre-sale quotation ${quotation.number} created`, eyebrow: 'Pre-sales oversight', title: 'New quotation requires follow-up', summary: `${session.user.fullName} created a new customer quotation.`, fields: [{ label: 'Quotation', value: quotation.number }, { label: 'Total', value: String(quotation.total) }], action: { label: 'Open Sales & CRM', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Sales%20%26%20CRM` } }),
-    ]);
+    ]).catch(notificationError => console.error('Quotation notification failed after commit', notificationError));
     return NextResponse.json({ quotation }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: 'Client and at least one valid quotation line are required.' }, { status: 400 });
+    const lineError = QUOTATION_LINE_ERRORS[(error as { code?: string }).code || ''];
+    if (lineError) return NextResponse.json({ error: lineError.message }, { status: lineError.status });
     if ((error as { code?: string }).code === 'LINE_INVALID') return NextResponse.json({ error: 'Every quotation line must select a product or provide SKU, description, and price.' }, { status: 400 });
     if ((error as { code?: string }).code === 'CLIENT_NOT_FOUND' || (error as { code?: string }).code === 'PRODUCT_NOT_FOUND') return NextResponse.json({ error: 'Client or product not found.' }, { status: 404 });
     if ((error as { code?: string }).code === 'OPPORTUNITY_NOT_FOUND') return NextResponse.json({ error: 'Opportunity not found.' }, { status: 404 });

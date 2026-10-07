@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ACCESS, requireRole } from '@/lib/auth';
 import { query } from '@/lib/db';
+import { organizationTimeZone } from '@/lib/timezone';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,17 +12,18 @@ export async function GET(request: Request) {
     const { session } = auth;
 
     const organizationId = session.user.organizationId;
+    const timeZone = await organizationTimeZone(organizationId);
     const [summary, performance, activity, stockByCategory, approvals] = await Promise.all([
       query(`SELECT
-        COALESCE((SELECT SUM(s.total) FROM sales s WHERE s.organization_id = $1 AND s.confirmed_at >= date_trunc('month', current_date) AND s.status NOT IN ('Cancelled', 'Returned', 'Partially returned')), 0) AS revenue,
-        COALESCE((SELECT COUNT(*) FROM sales s WHERE s.organization_id = $1 AND s.confirmed_at >= date_trunc('month', current_date) AND s.status NOT IN ('Cancelled', 'Returned', 'Partially returned')), 0)::int AS confirmed_sales,
+        COALESCE((SELECT SUM(si.amount) FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE s.organization_id = $1 AND si.returned = false AND (s.confirmed_at AT TIME ZONE $2) >= date_trunc('month', now() AT TIME ZONE $2) AND s.status NOT IN ('Cancelled', 'Returned')), 0) AS revenue,
+        COALESCE((SELECT COUNT(*) FROM sales s WHERE s.organization_id = $1 AND (s.confirmed_at AT TIME ZONE $2) >= date_trunc('month', now() AT TIME ZONE $2) AND s.status NOT IN ('Cancelled', 'Returned')), 0)::int AS confirmed_sales,
         COALESCE((SELECT COUNT(*) FROM inventory_items i WHERE i.organization_id = $1 AND i.status IN ('Available', 'Reserved')), 0)::int AS units_in_stock,
-        COALESCE((SELECT COUNT(*) FROM intertown_dispatches d WHERE d.organization_id = $1 AND d.status IN ('Prepared', 'In transit')), 0)::int AS open_dispatches`, [organizationId]),
+        COALESCE((SELECT COUNT(*) FROM intertown_dispatches d WHERE d.organization_id = $1 AND d.status IN ('Prepared', 'In transit')), 0)::int AS open_dispatches`, [organizationId, timeZone]),
       query(`SELECT to_char(days.day, 'DD Mon') AS day,
-        COALESCE((SELECT SUM(s.total) FROM sales s WHERE s.organization_id = $1 AND s.confirmed_at::date = days.day::date AND s.status NOT IN ('Cancelled', 'Returned', 'Partially returned')), 0) AS sales,
-        COALESCE((SELECT COUNT(*) FROM inventory_items i WHERE i.organization_id = $1 AND i.received_at::date = days.day::date), 0)::int AS stock
-        FROM generate_series(current_date - interval '29 days', current_date, interval '1 day') AS days(day)
-        ORDER BY days.day`, [organizationId]),
+        COALESCE((SELECT SUM(si.amount) FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE s.organization_id = $1 AND si.returned = false AND (s.confirmed_at AT TIME ZONE $2)::date = days.day::date AND s.status NOT IN ('Cancelled', 'Returned')), 0) AS sales,
+        COALESCE((SELECT COUNT(*) FROM inventory_items i WHERE i.organization_id = $1 AND (i.received_at AT TIME ZONE $2)::date = days.day::date), 0)::int AS stock
+        FROM generate_series(((now() AT TIME ZONE $2)::date - 29)::timestamp, (now() AT TIME ZONE $2)::date::timestamp, interval '1 day') AS days(day)
+        ORDER BY days.day`, [organizationId, timeZone]),
       query(`SELECT event, detail, status, occurred_at FROM (
         SELECT 'Sale ' || s.number AS event, c.name || ' · ' || COUNT(si.id)::text || ' item(s)' AS detail, s.status, s.confirmed_at AS occurred_at
         FROM sales s JOIN clients c ON c.id = s.client_id LEFT JOIN sale_items si ON si.sale_id = s.id
@@ -38,7 +40,7 @@ export async function GET(request: Request) {
         SELECT 'Transfer ' || st.number, st.source_location || ' → ' || st.destination_location, st.status, st.created_at
         FROM stock_transfers st WHERE st.organization_id = $1
       ) events ORDER BY occurred_at DESC LIMIT 8`, [organizationId]),
-      query(`SELECT COALESCE(NULLIF(split_part(i.sku, '-', 1), ''), 'Other') AS name, COUNT(*)::int AS value
+      query(`SELECT COALESCE(NULLIF(i.product_type, ''), NULLIF(split_part(i.sku, '-', 1), ''), 'Other') AS name, COUNT(*)::int AS value
         FROM inventory_items i WHERE i.organization_id = $1 AND i.status = 'Available'
         GROUP BY 1 ORDER BY value DESC, name LIMIT 8`, [organizationId]),
       query(`SELECT

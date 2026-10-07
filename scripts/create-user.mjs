@@ -1,4 +1,5 @@
 import pg from 'pg';
+import { databaseSsl } from './pg-ssl.mjs';
 import bcrypt from 'bcryptjs';
 
 const { Pool } = pg;
@@ -10,7 +11,7 @@ const allowedRoles = new Set(['ceo', 'manager', 'finance', 'sales_consultant']);
 if (!process.env.DATABASE_URL || !email || !password) throw new Error('DATABASE_URL, ADMIN_EMAIL, and ADMIN_PASSWORD are required.');
 if (password.length < 8) throw new Error('ADMIN_PASSWORD must be at least 8 characters.');
 if (!allowedRoles.has(role)) throw new Error(`ADMIN_ROLE must be one of: ${[...allowedRoles].join(', ')}.`);
-const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined });
+const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: databaseSsl() });
 try {
   const organization = await pool.query(`INSERT INTO organizations (name, slug) VALUES ('iPayTech Ops', 'ipaytech-ops') ON CONFLICT (slug) DO UPDATE SET updated_at = now() RETURNING id`);
   const hash = await bcrypt.hash(password, 12);
@@ -21,6 +22,7 @@ try {
     [organization.rows[0].id, email, fullName, hash, role],
   );
   console.log(`Provisioned ${email}`);
+  console.log(`Organization ID: ${organization.rows[0].id} (use this as BACKUP_ADMIN_ORGANIZATION_ID for the platform organization)`);
 } finally {
   await pool.end();
 }

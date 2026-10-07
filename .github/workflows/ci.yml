@@ -53,6 +53,11 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
+      - name: Build production image
+        run: docker build --build-arg DEPLOY_SHA=${{ github.sha }} -t ipaytech-ops:ci .
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+        continue-on-error: true
       - run: npm run db:migrate
       - run: npm run test:integration
       - name: Create empty restore target database

@@ -5,6 +5,7 @@ import { writeAuditLog } from '@/lib/audit';
 import { createInvitationToken, invitationUrl, INVITATION_TTL_HOURS } from '@/lib/invitations';
 import { query, withTransaction } from '@/lib/db';
 import { sendNotification } from '@/lib/notifications';
+import { roleLabel } from '@/lib/rbac';
 
 const invitationSchema = z.object({
   fullName: z.string().trim().min(2).max(120),
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
       eyebrow: 'Account invitation',
       title: 'Complete your iPayTech Operations account',
       summary: 'You have been invited to join the iPayTech Operations workspace. Set your password using the secure link below.',
-      fields: [{ label: 'Role', value: invitation.role }, { label: 'Link expires', value: `${INVITATION_TTL_HOURS} hours` }],
+      fields: [{ label: 'Role', value: roleLabel(invitation.role) }, { label: 'Link expires', value: `${INVITATION_TTL_HOURS} hours` }],
       action: { label: 'Accept invitation', url: invitationUrl(token.token) },
     });
     await writeAuditLog({ organizationId: auth.session.user.organizationId, actorUserId: auth.session.user.id, action: 'employee.invite_created', entityType: 'user_invitation', entityId: invitation.id, metadata: { email: invitation.email, role: invitation.role, emailStatus: notification.status }, request });

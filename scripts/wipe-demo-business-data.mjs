@@ -1,4 +1,5 @@
 import pg from 'pg';
+import { databaseSsl } from './pg-ssl.mjs';
 
 const { Pool } = pg;
 
@@ -25,7 +26,7 @@ const businessTables = [
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+  ssl: databaseSsl(),
 });
 
 const client = await pool.connect();

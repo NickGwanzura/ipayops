@@ -9,7 +9,7 @@ const NOTIFICATION_EVENTS = [
   'opportunity.created', 'inventory.received', 'shipment.status_changed', 'job.assigned', 'job.completed',
   'warranty.claim_opened', 'warranty.claim_resolved', 'expense.submitted', 'expense.status_changed',
   'employee.onboarding', 'employee.invited', 'employee.offboarded', 'purchase_order.submitted',
-  'purchase_order.approved', 'goods_receipt.posted', 'commission.created', 'commission.run',
+  'purchase_order.approved', 'goods_receipt.posted', 'commission.created', 'commission.run', 'commission.review_required',
   'repair_requisition.submitted', 'expense.asset_linked',
 ] as const;
 

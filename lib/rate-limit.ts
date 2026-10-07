@@ -1,10 +1,16 @@
 import { query, withTransaction } from '@/lib/db';
 
-export function requestAddress(request: Request) {
+/**
+ * Each trusted proxy appends the address it saw to X-Forwarded-For, so entries to the left of the proxy-added
+ * ones are client-controlled and can be forged to dodge rate limits. TRUSTED_PROXY_HOPS (default 1) is how many
+ * proxies sit in front of the app.
+ */
+export function requestAddress(request: Pick<Request, 'headers'>) {
   if (process.env.TRUST_PROXY !== 'true') return 'unknown';
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-    || request.headers.get('x-real-ip')?.trim()
-    || 'unknown';
+  const hops = Math.max(1, Math.trunc(Number(process.env.TRUSTED_PROXY_HOPS || 1)) || 1);
+  const forwarded = (request.headers.get('x-forwarded-for') || '').split(',').map(part => part.trim()).filter(Boolean);
+  if (forwarded.length) return forwarded[Math.max(0, forwarded.length - hops)];
+  return request.headers.get('x-real-ip')?.trim() || 'unknown';
 }
 
 export async function consumeRateLimit(key: string, limit: number, windowMs: number) {

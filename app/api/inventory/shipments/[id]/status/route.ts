@@ -17,11 +17,15 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       `UPDATE shipments SET status = $1,
          shipped_at = CASE WHEN $1 IN ('Dispatched', 'In transit', 'Delivered') AND shipped_at IS NULL THEN now() ELSE shipped_at END,
          delivered_at = CASE WHEN $1 = 'Delivered' THEN COALESCE(delivered_at, now()) ELSE delivered_at END
-       WHERE id = $2 AND organization_id = $3
+       WHERE id = $2 AND organization_id = $3 AND status NOT IN ('Delivered', 'Cancelled')
        RETURNING id, number, status, carrier, tracking_number, shipped_at, delivered_at`,
       [body.status, params.id, session.user.organizationId],
     );
-    if (!result.rows[0]) return NextResponse.json({ error: 'Shipment not found.' }, { status: 404 });
+    if (!result.rows[0]) {
+      const existing = await query('SELECT status FROM shipments WHERE id = $1 AND organization_id = $2', [params.id, session.user.organizationId]);
+      if (!existing.rows[0]) return NextResponse.json({ error: 'Shipment not found.' }, { status: 404 });
+      return NextResponse.json({ error: `A ${String(existing.rows[0].status).toLowerCase()} shipment can no longer change status.` }, { status: 409 });
+    }
     await notifyOrganizationRoles({ organizationId: session.user.organizationId, roles: ['ceo', 'manager', 'finance'], excludeUserId: session.user.id, eventType: 'shipment.status_changed', subject: `Shipment ${result.rows[0].number} is ${result.rows[0].status}`, eyebrow: 'Shipping oversight', title: 'Shipment status updated', summary: `${session.user.fullName} updated a shipment status.`, fields: [{ label: 'Shipment', value: result.rows[0].number }, { label: 'Status', value: result.rows[0].status }, { label: 'Carrier', value: result.rows[0].carrier || 'Not specified' }, { label: 'Tracking', value: result.rows[0].tracking_number || 'Not specified' }], action: { label: 'Open inventory', url: `${process.env.APP_URL || 'https://ipaytechops.com'}/operations?module=Inventory` } });
     return NextResponse.json({ shipment: result.rows[0] });
   } catch (error) {

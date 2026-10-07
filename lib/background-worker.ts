@@ -1,5 +1,6 @@
 import { processBackupQueue } from '@/lib/backup';
 import { processNotificationQueue } from '@/lib/notifications';
+import { runMaintenance } from '@/lib/maintenance';
 
 const DEFAULT_INTERVAL_MS = 15_000;
 const MIN_INTERVAL_MS = 1_000;
@@ -7,6 +8,7 @@ const MIN_INTERVAL_MS = 1_000;
 type WorkerState = {
   started: boolean;
   running: boolean;
+  stopping?: boolean;
   interval?: ReturnType<typeof setInterval>;
 };
 
@@ -24,7 +26,7 @@ function intervalMilliseconds() {
 
 async function cycle() {
   const worker = state();
-  if (worker.running) return;
+  if (worker.running || worker.stopping) return;
   worker.running = true;
   try {
     try {
@@ -37,11 +39,23 @@ async function cycle() {
     } catch (error) {
       console.error('Background backup cycle failed', error);
     }
+    try {
+      await runMaintenance();
+    } catch (error) {
+      console.error('Background maintenance cycle failed', error);
+    }
   } catch (error) {
     console.error('Background worker cycle failed', error);
   } finally {
     worker.running = false;
   }
+}
+
+/** Stop starting new cycles (on SIGTERM) so a redeploy does not begin a backup it cannot finish. */
+export function stopBackgroundWorker() {
+  const worker = state();
+  worker.stopping = true;
+  if (worker.interval) clearInterval(worker.interval);
 }
 
 export function startBackgroundWorker() {

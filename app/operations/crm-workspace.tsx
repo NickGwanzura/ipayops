@@ -1,74 +1,838 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { ArrowRight, BriefcaseBusiness, Check, FileDown, FileText, LayoutGrid, Plus, Receipt, RotateCcw, Truck, Users, WalletCards, X } from 'lucide-react';
+import {
+  ArrowRight,
+  BriefcaseBusiness,
+  Check,
+  FileDown,
+  FileText,
+  LayoutGrid,
+  Plus,
+  Receipt,
+  RotateCcw,
+  Truck,
+  Users,
+  WalletCards,
+  X,
+} from 'lucide-react';
 import { formatCurrency, formatOrganizationDate, useOrganizationSettings } from '../organization-settings';
 import { normalizeRole } from '@/lib/rbac';
 import { useDialogFocus } from '../dialog-focus';
 import { ActionMenu, ActionMenuItem } from './action-menu';
+import { Field, Panel, TableHead, Status, LiveKpi } from '@/components/ui';
+import { confirmAction } from '@/components/ui/confirm';
+import { matchesQuery } from '@/components/ui/search';
 
-type Client = { id: string; code: string; name: string; client_type?: string; contact_name?: string; email?: string; phone?: string; address?: string; status: string };
-type Opportunity = { id: string; name: string; stage: string; value: string; client_id?: string; client_name?: string; expected_close?: string; notes?: string };
-type QuoteItem = { id: string; productId?: string; sku: string; description: string; quantity: number; unitPrice: string };
-type Product = { id: string; product_name: string; product_type: 'Laptop' | 'POS'; sku: string; selling_price: string; currency: string; stock_count: number; available_count: number };
-type Quote = { id: string; number: string; status: string; total: string; client_id?: string; valid_until?: string; client_name: string; items: QuoteItem[] };
+type Client = {
+  id: string;
+  code: string;
+  name: string;
+  client_type?: string;
+  contact_name?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  status: string;
+};
+type Opportunity = {
+  id: string;
+  name: string;
+  stage: string;
+  value: string;
+  client_id?: string;
+  client_name?: string;
+  expected_close?: string;
+  notes?: string;
+};
+type QuoteItem = {
+  id: string;
+  productId?: string;
+  sku: string;
+  description: string;
+  quantity: number;
+  unitPrice: string;
+};
+type Product = {
+  id: string;
+  product_name: string;
+  product_type: 'Laptop' | 'POS';
+  sku: string;
+  selling_price: string;
+  currency: string;
+  stock_count: number;
+  available_count: number;
+};
+type Quote = {
+  id: string;
+  number: string;
+  status: string;
+  total: string;
+  client_id?: string;
+  valid_until?: string;
+  client_name: string;
+  items: QuoteItem[];
+};
 type SaleItem = { id: string; serialNumber: string; sku: string; description: string; returned: boolean };
 type Sale = { id: string; number: string; status: string; total: string; client_name: string; items: SaleItem[] };
-type Inventory = { id: string; serial_number: string; sku: string; description: string; status: string };
-type Lead = { id: string; name: string; source?: string; status: string; client_id?: string; notes?: string; client_name?: string; owner_name?: string };
-type CrmReturn = { id: string; number: string; reason: string; refund_amount: string; refund_status: string; credit_note_number?: string; sale_number: string; client_name: string; created_at: string };
+type Inventory = {
+  id: string;
+  serial_number: string;
+  sku: string;
+  description: string;
+  status: string;
+  location?: string;
+};
+
+/** Available units for the given SKUs (queried per SKU so stock beyond the first inventory page is not missed). */
+async function fetchAvailableUnits(skus: string[]) {
+  const pages = await Promise.all(
+    Array.from(new Set(skus)).map((sku) =>
+      fetch(`/api/inventory?status=Available&pageSize=100&q=${encodeURIComponent(sku)}`, { cache: 'no-store' }).then(
+        (response) => response.json() as Promise<{ inventory?: Inventory[] }>,
+      ),
+    ),
+  );
+  const units = new Map<string, Inventory>();
+  for (const page of pages)
+    for (const unit of page.inventory || []) if (skus.includes(unit.sku)) units.set(unit.id, unit);
+  return Array.from(units.values());
+}
+type Lead = {
+  id: string;
+  name: string;
+  source?: string;
+  status: string;
+  client_id?: string;
+  notes?: string;
+  client_name?: string;
+  owner_name?: string;
+};
+type CrmReturn = {
+  id: string;
+  number: string;
+  reason: string;
+  refund_amount: string;
+  refund_status: string;
+  credit_note_number?: string;
+  sale_number: string;
+  client_name: string;
+  created_at: string;
+};
 type ClientFinanceHistory = {
-  summary: { totalInvoiced: number; totalPaid: number; outstanding: number; invoiceCount: number; paymentCount: number };
-  invoices: Array<{ id: string; number: string; status: string; total: string; paid_amount: string; outstanding: string; issued_at: string; due_at?: string; sale_number?: string }>;
-  payments: Array<{ id: string; invoice_id: string; invoice_number: string; amount: string; method: string; reference?: string; paid_at: string; recorded_by?: string }>;
+  summary: {
+    totalInvoiced: number;
+    totalPaid: number;
+    outstanding: number;
+    invoiceCount: number;
+    paymentCount: number;
+  };
+  invoices: Array<{
+    id: string;
+    number: string;
+    status: string;
+    total: string;
+    paid_amount: string;
+    outstanding: string;
+    issued_at: string;
+    due_at?: string;
+    sale_number?: string;
+  }>;
+  payments: Array<{
+    id: string;
+    invoice_id: string;
+    invoice_number: string;
+    amount: string;
+    method: string;
+    reference?: string;
+    paid_at: string;
+    recorded_by?: string;
+  }>;
   sales: Array<{ id: string; number: string; status: string; total: string; created_at: string }>;
 };
 type CrmPage = 'overview' | 'clients' | 'leads' | 'opportunities' | 'sales' | 'returns';
 const crmPages: CrmPage[] = ['overview', 'clients', 'leads', 'opportunities', 'sales', 'returns'];
-function requestedCrmPage(): CrmPage { if (typeof window === 'undefined') return 'overview'; const requested = new URLSearchParams(window.location.search).get('view') as CrmPage | null; return requested && crmPages.includes(requested) ? requested : 'overview'; }
+function requestedCrmPage(): CrmPage {
+  if (typeof window === 'undefined') return 'overview';
+  const requested = new URLSearchParams(window.location.search).get('view') as CrmPage | null;
+  return requested && crmPages.includes(requested) ? requested : 'overview';
+}
 
-export default function CrmWorkspace({ notify, newRecordSignal = 0, role = 'sales_consultant' }: { notify: (message: string) => void; newRecordSignal?: number; role?: string }) {
-  const [clients, setClients] = useState<Client[]>([]); const [leads, setLeads] = useState<Lead[]>([]); const [opportunities, setOpportunities] = useState<Opportunity[]>([]); const [quotes, setQuotes] = useState<Quote[]>([]); const [sales, setSales] = useState<Sale[]>([]); const [products, setProducts] = useState<Product[]>([]); const [returns, setReturns] = useState<CrmReturn[]>([]);
-  const [dialog, setDialog] = useState<'client' | 'lead' | 'opportunity' | 'quotation' | 'quoteEdit' | 'convert' | 'return' | 'clientEdit' | 'clientHistory' | 'leadEdit' | 'opportunityEdit' | null>(null); const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null); const [selectedSale, setSelectedSale] = useState<Sale | null>(null); const [selectedClient, setSelectedClient] = useState<Client | null>(null); const [selectedLead, setSelectedLead] = useState<Lead | null>(null); const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(null); const [error, setError] = useState('');
+export default function CrmWorkspace({
+  notify,
+  newRecordSignal = 0,
+  role = 'sales_consultant',
+  query = '',
+}: {
+  notify: (message: string) => void;
+  newRecordSignal?: number;
+  role?: string;
+  query?: string;
+}) {
+  const [clients, setClients] = useState<Client[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [returns, setReturns] = useState<CrmReturn[]>([]);
+  const [dialog, setDialog] = useState<
+    | 'client'
+    | 'lead'
+    | 'opportunity'
+    | 'quotation'
+    | 'quoteEdit'
+    | 'convert'
+    | 'reserve'
+    | 'return'
+    | 'clientEdit'
+    | 'clientHistory'
+    | 'leadEdit'
+    | 'opportunityEdit'
+    | null
+  >(null);
+  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
+  const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(null);
+  const [error, setError] = useState('');
   const [crmPage, setCrmPage] = useState<CrmPage>(requestedCrmPage);
   const settings = useOrganizationSettings();
   const canCalculateCommission = ['ceo', 'manager', 'finance'].includes(normalizeRole(role));
-  const load = async () => { setError(''); try { const responses = await Promise.all(['/api/crm/clients', '/api/crm/leads', '/api/crm/opportunities', '/api/crm/quotations', '/api/crm/sales', '/api/products', '/api/crm/returns'].map(url => fetch(url, { cache: 'no-store' }))); if (responses.some(response => !response.ok)) throw new Error('Live CRM data is unavailable.'); const data = await Promise.all(responses.map(response => response.json())); setClients(data[0].clients || []); setLeads(data[1].leads || []); setOpportunities(data[2].opportunities || []); setQuotes(data[3].quotations || []); setSales(data[4].sales || []); setProducts(data[5].products || []); setReturns(data[6].returns || []); } catch (loadError) { setError(loadError instanceof Error ? loadError.message : 'Live CRM data is unavailable.'); } };
-  useEffect(() => { void load(); }, []);
-  useEffect(() => { if (newRecordSignal > 0) setDialog(crmPage === 'clients' ? 'client' : crmPage === 'leads' ? 'lead' : crmPage === 'opportunities' ? 'opportunity' : 'quotation'); }, [newRecordSignal, crmPage]);
-  useEffect(() => { const syncFromHistory = () => setCrmPage(requestedCrmPage()); window.addEventListener('popstate', syncFromHistory); return () => window.removeEventListener('popstate', syncFromHistory); }, []);
-  const openCrmPage = (page: CrmPage) => { setCrmPage(page); const url = new URL(window.location.href); if (page === 'overview') url.searchParams.delete('view'); else url.searchParams.set('view', page); window.history.pushState(null, '', `${url.pathname}${url.search}`); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-  const saved = (message: string) => { setDialog(null); notify(message); void load(); };
-  const updateLead = async (lead: Lead, status: string) => { const response = await fetch(`/api/crm/leads/${lead.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) }); const data = await response.json(); if (!response.ok) { notify(data.error || 'Unable to update lead.'); return; } notify(`${lead.name} moved to ${status}`); void load(); };
-  const convertLead = async (lead: Lead) => { const response = await fetch(`/api/crm/leads/${lead.id}/convert`, { method: 'POST' }); const data = await response.json(); if (!response.ok) { notify(data.error || 'Unable to convert lead.'); return; } notify(`${lead.name} converted to an opportunity`); void load(); };
-  const updateOpportunity = async (opportunity: Opportunity, stage: string) => { const response = await fetch(`/api/crm/opportunities/${opportunity.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stage }) }); const data = await response.json(); if (!response.ok) { notify(data.error || 'Unable to update opportunity.'); return; } notify(`${opportunity.name} moved to ${stage}`); void load(); };
-  const archiveRecord = async (kind: 'clients' | 'leads' | 'opportunities', record: { id: string; name: string }) => { if (!window.confirm(`Archive ${record.name}? It will remain in history but stop appearing as active.`)) return; const response = await fetch(`/api/crm/${kind}/${record.id}`, { method: 'DELETE' }); const data = await response.json(); if (!response.ok) { notify(data.error || `Unable to archive ${record.name}.`); return; } notify(`${record.name} archived`); void load(); };
-  const archiveQuote = async (quote: Quote) => { if (!window.confirm(`Cancel ${quote.number}?`)) return; const response = await fetch(`/api/crm/quotations/${quote.id}`, { method: 'DELETE' }); const data = await response.json(); if (!response.ok) { notify(data.error || 'Unable to cancel quotation.'); return; } notify(`${quote.number} cancelled`); void load(); };
-  const createDocument = async (saleId: string, kind: 'invoice' | 'delivery-note') => { const response = await fetch(`/api/crm/sales/${saleId}/${kind}`, { method: 'POST' }); const data = await response.json(); if (!response.ok) { notify(data.error || `Unable to generate ${kind}.`); return; } const document = data.invoice || data.deliveryNote; notify(`${kind === 'invoice' ? 'Invoice' : 'Delivery note'} ${document.number} generated`); window.open(`/api/crm/${kind === 'invoice' ? 'invoices' : 'delivery-notes'}/${document.id}/pdf`, '_blank', 'noopener,noreferrer'); };
-  const createCommission = async (saleId: string) => { const response = await fetch(`/api/crm/sales/${saleId}/commission`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rate: 5 }) }); const data = await response.json(); if (!response.ok) { notify(data.error || 'Unable to calculate commission.'); return; } notify(`Provisional commission ${formatCurrency(data.commission.amount, settings.currency)} calculated`); };
-  return <div className={`crm-pages crm-page-${crmPage}`}>
-    <CrmSectionNav active={crmPage} onOpen={openCrmPage}/>
-    <div className="ops-kpis"><LiveKpi label="Live clients" value={clients.length} note="CRM accounts in PostgreSQL" icon={<Users size={16}/>} tone="blue"/><LiveKpi label="Leads" value={leads.length} note="Source and owner tracked" icon={<Users size={16}/>} tone="purple"/><LiveKpi label="Quotations" value={quotes.length} note="Quote-to-sale workflow" icon={<FileText size={16}/>} tone="amber"/><LiveKpi label="Confirmed sales" value={sales.length} note="Serialized conversion records" icon={<Check size={16}/>} tone="green"/></div>
-    {crmPage === 'overview' && <CrmOverview clients={clients.length} leads={leads.length} opportunities={opportunities.length} quotes={quotes.length} sales={sales.length} returns={returns.length} onOpen={openCrmPage}/>}
-    <div className="workflow-actions crm-actions"><button className="ops-btn ghost" onClick={() => setDialog('client')}><Plus size={15}/> Add client</button><button className="ops-btn ghost" onClick={() => setDialog('lead')}><Plus size={15}/> New lead</button><button className="ops-btn ghost" onClick={() => setDialog('opportunity')} disabled={!clients.length}><Plus size={15}/> New opportunity</button><button className="ops-btn blue" onClick={() => setDialog('quotation')} disabled={!clients.length}><Plus size={15}/> New quotation</button><button className="link-btn" onClick={() => void load()}>Refresh</button></div>
-    {crmPage !== 'overview' && <div className="workflow-actions crm-page-actions"><button className="link-btn" onClick={() => openCrmPage('overview')}>Back to CRM overview</button>{crmPage === 'clients' && <button className="ops-btn blue" onClick={() => setDialog('client')}><Plus size={15}/> Add client</button>}{crmPage === 'leads' && <button className="ops-btn blue" onClick={() => setDialog('lead')}><Plus size={15}/> New lead</button>}{crmPage === 'opportunities' && <button className="ops-btn blue" disabled={!clients.length} onClick={() => setDialog('opportunity')}><Plus size={15}/> New opportunity</button>}{crmPage === 'sales' && <button className="ops-btn blue" disabled={!clients.length} onClick={() => setDialog('quotation')}><Plus size={15}/> New quotation</button>}</div>}
-    {error && <p className="workflow-error" role="alert">{error}</p>}
-    <div className="ops-grid-two crm-directory-grid"><Panel className="crm-clients-panel" title="Live client accounts" subtitle="Open a client card for contacts, finance history, receipts, and statements"><div className="client-card-grid">{clients.map(client => <article className="client-card" key={client.id}><div className="client-card-top"><span className="client-card-icon"><Users size={17}/></span><Status value={client.status}/></div><strong>{client.name}</strong><span className="client-card-code">{client.code} · {client.client_type || 'Organisation'}</span><span className="client-card-contact">{client.contact_name || 'No contact'} · {client.phone || client.email || 'No contact details'}</span><div className="client-card-actions"><button className="row-action" onClick={() => { setSelectedClient(client); setDialog('clientHistory'); }}><Receipt size={13}/> Finance history</button><ActionMenu label={`More actions for ${client.name}`}><ActionMenuItem onClick={() => { setSelectedClient(client); setDialog('clientEdit'); }}>Edit</ActionMenuItem>{client.status === 'Active' && <ActionMenuItem onClick={() => void archiveRecord('clients', client)}>Archive</ActionMenuItem>}</ActionMenu></div></article>)}{!clients.length && <div className="empty-state"><Users size={22}/><strong>No live clients</strong><span>Add a client to start CRM workflows.</span></div>}</div></Panel><Panel className="crm-leads-panel" title="Lead management" subtitle="Capture source, ownership, and qualification state"><div className="data-table labelled-cards"><TableHead labels={['Lead','Client','Source','Stage / action']}/>{leads.map(lead => <div className="data-row" key={lead.id}><div data-label="Lead"><strong>{lead.name}</strong><small>{lead.owner_name || 'Current owner'}</small></div><span data-label="Client">{lead.client_name || 'Unassigned'}</span><span data-label="Source">{lead.source || '—'}</span><div className="transfer-card-actions" data-label="Stage / action"><select value={lead.status} onChange={event => void updateLead(lead, event.target.value)}><option>New</option><option>Qualified</option><option>Converted</option><option>Lost</option></select>{lead.status !== 'Converted' && <button className="row-action" onClick={() => void convertLead(lead)}><BriefcaseBusiness size={14}/> Convert</button>}<ActionMenu label={`More actions for ${lead.name}`}><ActionMenuItem onClick={() => { setSelectedLead(lead); setDialog('leadEdit'); }}>Edit</ActionMenuItem>{!['Converted', 'Lost'].includes(lead.status) && <ActionMenuItem onClick={() => void archiveRecord('leads', lead)}>Archive</ActionMenuItem>}</ActionMenu></div></div>)}{!leads.length && <div className="empty-state"><Users size={22}/><strong>No live leads</strong><span>Create a lead to begin qualification.</span></div>}</div></Panel></div>
-    <Panel className="crm-opportunities-panel" title="Opportunity pipeline" subtitle="Progress stages inline; conversion keeps lead ownership"><div className="data-table labelled-cards"><TableHead labels={['Opportunity','Client','Stage','Value','Actions']}/>{opportunities.map(opportunity => <div className="data-row" key={opportunity.id}><strong data-label="Opportunity">{opportunity.name}</strong><span data-label="Client">{opportunity.client_name || 'Unassigned'}</span><select data-label="Stage" value={opportunity.stage} onChange={event => void updateOpportunity(opportunity, event.target.value)}><option>Discovery</option><option>Qualified</option><option>Quotation</option><option>Negotiation</option><option>Won</option><option>Lost</option></select><span data-label="Value">{formatCurrency(opportunity.value || 0, settings.currency)}</span><div className="transfer-card-actions" data-label="Actions"><ActionMenu label={`More actions for ${opportunity.name}`}><ActionMenuItem onClick={() => { setSelectedOpportunity(opportunity); setDialog('opportunityEdit'); }}>Edit</ActionMenuItem>{!['Won', 'Lost'].includes(opportunity.stage) && <ActionMenuItem onClick={() => void archiveRecord('opportunities', opportunity)}>Archive</ActionMenuItem>}</ActionMenu></div></div>)}{!opportunities.length && <div className="empty-state"><BriefcaseBusiness size={22}/><strong>No opportunities</strong><span>Create one from a live client.</span></div>}</div></Panel>
-    <Panel className="crm-sales-panel" title="Quotations and confirmed sales" subtitle="Edit live quotations, convert exact serials, generate documents, and process returns"><div className="data-table"><TableHead labels={['Record','Client','Total','Status','Actions']}/>{quotes.map(quote => <div className="data-row" key={quote.id}><div><strong>{quote.number}</strong><small>{quote.items.length} line(s) · {quote.valid_until ? `Valid to ${formatOrganizationDate(quote.valid_until, settings)}` : 'No expiry'}</small></div><span>{quote.client_name}</span><span>{formatCurrency(quote.total, settings.currency)}</span><Status value={quote.status}/><div className="transfer-card-actions"><button className="row-action" onClick={() => { setSelectedQuote(quote); setDialog('quoteEdit'); }}>Edit</button><button className="row-action" disabled={quote.status === 'Converted'} onClick={() => { setSelectedQuote(quote); setDialog('convert'); }}><Check size={14}/> Convert</button>{!['Converted', 'Cancelled'].includes(quote.status) && <button className="row-action" onClick={() => void archiveQuote(quote)}>Cancel</button>}</div></div>)}{sales.map(sale => <div className="data-row" key={sale.id}><div><strong>{sale.number}</strong><small>{sale.items.length} serial(s)</small></div><span>{sale.client_name}</span><span>{formatCurrency(sale.total, settings.currency)}</span><Status value={sale.status}/><div className="transfer-card-actions"><button className="row-action" onClick={() => void createDocument(sale.id, 'invoice')}><FileText size={14}/> Invoice</button><button className="row-action" onClick={() => void createDocument(sale.id, 'delivery-note')}><FileText size={14}/> Delivery note</button>{canCalculateCommission && <button className="row-action" onClick={() => void createCommission(sale.id)}><Check size={14}/> Commission</button>}<button className="row-action" onClick={() => { setSelectedSale(sale); setDialog('return'); }}><RotateCcw size={14}/> Return</button></div></div>)}{!quotes.length && !sales.length && <div className="empty-state"><FileText size={22}/><strong>No quotations or sales</strong><span>Create a quotation to begin the conversion workflow.</span></div>}</div></Panel>
-    <Panel className="crm-returns-panel" title="Returns history" subtitle="Serialized returns recorded against confirmed sales; refunds are settled by Finance"><div className="data-table labelled-cards"><TableHead labels={['Return','Client / sale','Amount','Refund status','Credit note']}/>{returns.map(record => <div className="data-row" key={record.id}><div data-label="Return"><strong>{record.number}</strong><small>{record.reason}</small></div><span data-label="Client / sale">{record.client_name} · {record.sale_number}</span><span data-label="Amount">{formatCurrency(record.refund_amount, settings.currency)}</span><span data-label="Refund status"><Status value={record.refund_status}/></span><span data-label="Credit note">{record.credit_note_number || 'Pending finance review'}</span></div>)}{!returns.length && <div className="empty-state"><RotateCcw size={22}/><strong>No returns recorded</strong><span>Completed sale returns will appear here.</span></div>}</div></Panel>
-    {dialog === 'client' && <ClientDialog close={() => setDialog(null)} saved={() => saved('Client created')}/>}
-    {dialog === 'lead' && <LeadDialog clients={clients} close={() => setDialog(null)} saved={() => saved('Lead created')}/>}
-    {dialog === 'opportunity' && <OpportunityDialog clients={clients} close={() => setDialog(null)} saved={() => saved('Opportunity created')}/>}
-    {dialog === 'quotation' && <QuotationDialog clients={clients} products={products} close={() => setDialog(null)} saved={() => saved('Quotation created')}/>}
-    {dialog === 'quoteEdit' && selectedQuote && <QuotationEditDialog quote={selectedQuote} clients={clients} products={products} close={() => setDialog(null)} saved={() => saved('Quotation updated')}/>}
-    {dialog === 'clientEdit' && selectedClient && <ClientEditDialog client={selectedClient} close={() => setDialog(null)} saved={() => saved('Client updated')}/>}
-    {dialog === 'clientHistory' && selectedClient && <ClientHistoryDialog client={selectedClient} close={() => setDialog(null)}/>}
-    {dialog === 'leadEdit' && selectedLead && <LeadEditDialog lead={selectedLead} clients={clients} close={() => setDialog(null)} saved={() => saved('Lead updated')}/>}
-    {dialog === 'opportunityEdit' && selectedOpportunity && <OpportunityEditDialog opportunity={selectedOpportunity} clients={clients} close={() => setDialog(null)} saved={() => saved('Opportunity updated')}/>}
-    {dialog === 'convert' && selectedQuote && <ConvertDialog quote={selectedQuote} close={() => setDialog(null)} saved={() => saved('Sale confirmed and warranty coverage created')}/>}
-    {dialog === 'return' && selectedSale && <ReturnDialog sale={selectedSale} close={() => setDialog(null)} saved={() => saved('Return completed')}/>}
-  </div>;
+  const load = async () => {
+    setError('');
+    try {
+      const responses = await Promise.all(
+        [
+          '/api/crm/clients',
+          '/api/crm/leads',
+          '/api/crm/opportunities',
+          '/api/crm/quotations',
+          '/api/crm/sales',
+          '/api/products',
+          '/api/crm/returns',
+        ].map((url) => fetch(url, { cache: 'no-store' })),
+      );
+      if (responses.some((response) => !response.ok)) throw new Error('Live CRM data is unavailable.');
+      const data = await Promise.all(responses.map((response) => response.json()));
+      setClients(data[0].clients || []);
+      setLeads(data[1].leads || []);
+      setOpportunities(data[2].opportunities || []);
+      setQuotes(data[3].quotations || []);
+      setSales(data[4].sales || []);
+      setProducts(data[5].products || []);
+      setReturns(data[6].returns || []);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Live CRM data is unavailable.');
+    }
+  };
+  useEffect(() => {
+    void load();
+  }, []);
+  useEffect(() => {
+    if (newRecordSignal > 0)
+      setDialog(
+        crmPage === 'clients'
+          ? 'client'
+          : crmPage === 'leads'
+            ? 'lead'
+            : crmPage === 'opportunities'
+              ? 'opportunity'
+              : 'quotation',
+      );
+  }, [newRecordSignal, crmPage]);
+  useEffect(() => {
+    const syncFromHistory = () => setCrmPage(requestedCrmPage());
+    window.addEventListener('popstate', syncFromHistory);
+    return () => window.removeEventListener('popstate', syncFromHistory);
+  }, []);
+  const openCrmPage = (page: CrmPage) => {
+    setCrmPage(page);
+    const url = new URL(window.location.href);
+    if (page === 'overview') url.searchParams.delete('view');
+    else url.searchParams.set('view', page);
+    window.history.pushState(null, '', `${url.pathname}${url.search}`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  const saved = (message: string) => {
+    setDialog(null);
+    notify(message);
+    void load();
+  };
+  const updateLead = async (lead: Lead, status: string) => {
+    const response = await fetch(`/api/crm/leads/${lead.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      notify(data.error || 'Unable to update lead.');
+      return;
+    }
+    notify(`${lead.name} moved to ${status}`);
+    void load();
+  };
+  const convertLead = async (lead: Lead) => {
+    const response = await fetch(`/api/crm/leads/${lead.id}/convert`, { method: 'POST' });
+    const data = await response.json();
+    if (!response.ok) {
+      notify(data.error || 'Unable to convert lead.');
+      return;
+    }
+    notify(`${lead.name} converted to an opportunity`);
+    void load();
+  };
+  const updateOpportunity = async (opportunity: Opportunity, stage: string) => {
+    const response = await fetch(`/api/crm/opportunities/${opportunity.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stage }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      notify(data.error || 'Unable to update opportunity.');
+      return;
+    }
+    notify(`${opportunity.name} moved to ${stage}`);
+    void load();
+  };
+  const archiveRecord = async (kind: 'clients' | 'leads' | 'opportunities', record: { id: string; name: string }) => {
+    if (!(await confirmAction(`Archive ${record.name}? It will remain in history but stop appearing as active.`)))
+      return;
+    const response = await fetch(`/api/crm/${kind}/${record.id}`, { method: 'DELETE' });
+    const data = await response.json();
+    if (!response.ok) {
+      notify(data.error || `Unable to archive ${record.name}.`);
+      return;
+    }
+    notify(`${record.name} archived`);
+    void load();
+  };
+  const archiveQuote = async (quote: Quote) => {
+    if (!(await confirmAction(`Cancel ${quote.number}?`))) return;
+    const response = await fetch(`/api/crm/quotations/${quote.id}`, { method: 'DELETE' });
+    const data = await response.json();
+    if (!response.ok) {
+      notify(data.error || 'Unable to cancel quotation.');
+      return;
+    }
+    notify(`${quote.number} cancelled`);
+    void load();
+  };
+  const createDocument = async (saleId: string, kind: 'invoice' | 'delivery-note') => {
+    const response = await fetch(`/api/crm/sales/${saleId}/${kind}`, { method: 'POST' });
+    const data = await response.json();
+    if (!response.ok) {
+      notify(data.error || `Unable to generate ${kind}.`);
+      return;
+    }
+    const document = data.invoice || data.deliveryNote;
+    notify(`${kind === 'invoice' ? 'Invoice' : 'Delivery note'} ${document.number} generated`);
+    window.open(
+      `/api/crm/${kind === 'invoice' ? 'invoices' : 'delivery-notes'}/${document.id}/pdf`,
+      '_blank',
+      'noopener,noreferrer',
+    );
+  };
+  const createCommission = async (saleId: string) => {
+    const response = await fetch(`/api/crm/sales/${saleId}/commission`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rate: 5 }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      notify(data.error || 'Unable to calculate commission.');
+      return;
+    }
+    notify(`Provisional commission ${formatCurrency(data.commission.amount, settings.currency)} calculated`);
+  };
+  return (
+    <div className={`crm-pages crm-page-${crmPage}`}>
+      <CrmSectionNav active={crmPage} onOpen={openCrmPage} />
+      <div className="ops-kpis">
+        <LiveKpi
+          label="Live clients"
+          onClick={() => openCrmPage('clients')}
+          help="Active client accounts. Open a client for finance history, receipts and statements."
+          value={clients.length}
+          note="CRM accounts in PostgreSQL"
+          icon={<Users size={16} />}
+          tone="blue"
+        />
+        <LiveKpi
+          label="Leads"
+          onClick={() => openCrmPage('leads')}
+          help="Prospects not yet qualified. Convert a lead to create an opportunity."
+          value={leads.length}
+          note="Source and owner tracked"
+          icon={<Users size={16} />}
+          tone="purple"
+        />
+        <LiveKpi
+          label="Quotations"
+          onClick={() => openCrmPage('sales')}
+          help="Pre-sale quotes. Reserve stock to hold units, then convert after choosing exact serials to create the sale, invoice and warranty."
+          value={quotes.length}
+          note="Quote-to-sale workflow"
+          icon={<FileText size={16} />}
+          tone="amber"
+        />
+        <LiveKpi
+          label="Confirmed sales"
+          onClick={() => openCrmPage('sales')}
+          help="Quotes converted into sales with serialized units allocated. Returns reduce the invoice and commission."
+          value={sales.length}
+          note="Serialized conversion records"
+          icon={<Check size={16} />}
+          tone="green"
+        />
+      </div>
+      {crmPage === 'overview' && (
+        <CrmOverview
+          clients={clients.length}
+          leads={leads.length}
+          opportunities={opportunities.length}
+          quotes={quotes.length}
+          sales={sales.length}
+          returns={returns.length}
+          onOpen={openCrmPage}
+        />
+      )}
+      <div className="workflow-actions crm-actions">
+        <button className="ops-btn ghost" onClick={() => setDialog('client')}>
+          <Plus size={15} /> Add client
+        </button>
+        <button className="ops-btn ghost" onClick={() => setDialog('lead')}>
+          <Plus size={15} /> New lead
+        </button>
+        <button className="ops-btn ghost" onClick={() => setDialog('opportunity')} disabled={!clients.length}>
+          <Plus size={15} /> New opportunity
+        </button>
+        <button className="ops-btn blue" onClick={() => setDialog('quotation')} disabled={!clients.length}>
+          <Plus size={15} /> New quotation
+        </button>
+        <button className="link-btn" onClick={() => void load()}>
+          Refresh
+        </button>
+      </div>
+      {crmPage !== 'overview' && (
+        <div className="workflow-actions crm-page-actions">
+          <button className="link-btn" onClick={() => openCrmPage('overview')}>
+            Back to CRM overview
+          </button>
+          {crmPage === 'clients' && (
+            <button className="ops-btn blue" onClick={() => setDialog('client')}>
+              <Plus size={15} /> Add client
+            </button>
+          )}
+          {crmPage === 'leads' && (
+            <button className="ops-btn blue" onClick={() => setDialog('lead')}>
+              <Plus size={15} /> New lead
+            </button>
+          )}
+          {crmPage === 'opportunities' && (
+            <button className="ops-btn blue" disabled={!clients.length} onClick={() => setDialog('opportunity')}>
+              <Plus size={15} /> New opportunity
+            </button>
+          )}
+          {crmPage === 'sales' && (
+            <button className="ops-btn blue" disabled={!clients.length} onClick={() => setDialog('quotation')}>
+              <Plus size={15} /> New quotation
+            </button>
+          )}
+        </div>
+      )}
+      {error && (
+        <p className="workflow-error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="ops-grid-two crm-directory-grid">
+        <Panel
+          className="crm-clients-panel"
+          title="Live client accounts"
+          subtitle="Open a client card for contacts, finance history, receipts, and statements"
+        >
+          <div className="client-card-grid">
+            {clients
+              .filter((client) =>
+                matchesQuery(query, client.name, client.code, client.email, client.phone, client.contact_name),
+              )
+              .map((client) => (
+                <article className="client-card" key={client.id}>
+                  <div className="client-card-top">
+                    <span className="client-card-icon">
+                      <Users size={17} />
+                    </span>
+                    <Status value={client.status} />
+                  </div>
+                  <strong>{client.name}</strong>
+                  <span className="client-card-code">
+                    {client.code} · {client.client_type || 'Organisation'}
+                  </span>
+                  <span className="client-card-contact">
+                    {client.contact_name || 'No contact'} · {client.phone || client.email || 'No contact details'}
+                  </span>
+                  <div className="client-card-actions">
+                    <button
+                      className="row-action"
+                      onClick={() => {
+                        setSelectedClient(client);
+                        setDialog('clientHistory');
+                      }}
+                    >
+                      <Receipt size={13} /> Finance history
+                    </button>
+                    <ActionMenu label={`More actions for ${client.name}`}>
+                      <ActionMenuItem
+                        onClick={() => {
+                          setSelectedClient(client);
+                          setDialog('clientEdit');
+                        }}
+                      >
+                        Edit
+                      </ActionMenuItem>
+                      {client.status === 'Active' && (
+                        <ActionMenuItem onClick={() => void archiveRecord('clients', client)}>Archive</ActionMenuItem>
+                      )}
+                    </ActionMenu>
+                  </div>
+                </article>
+              ))}
+            {!clients.length && (
+              <div className="empty-state">
+                <Users size={22} />
+                <strong>No live clients</strong>
+                <span>Add a client to start CRM workflows.</span>
+              </div>
+            )}
+          </div>
+        </Panel>
+        <Panel
+          className="crm-leads-panel"
+          title="Lead management"
+          subtitle="Capture source, ownership, and qualification state"
+        >
+          <div className="data-table labelled-cards">
+            <TableHead labels={['Lead', 'Client', 'Source', 'Stage / action']} />
+            {leads
+              .filter((lead) =>
+                matchesQuery(query, lead.name, lead.source, lead.status, lead.client_name, lead.owner_name),
+              )
+              .map((lead) => (
+                <div className="data-row" key={lead.id}>
+                  <div data-label="Lead">
+                    <strong>{lead.name}</strong>
+                    <small>{lead.owner_name || 'Current owner'}</small>
+                  </div>
+                  <span data-label="Client">{lead.client_name || 'Unassigned'}</span>
+                  <span data-label="Source">{lead.source || '—'}</span>
+                  <div className="transfer-card-actions" data-label="Stage / action">
+                    <select value={lead.status} onChange={(event) => void updateLead(lead, event.target.value)}>
+                      <option>New</option>
+                      <option>Qualified</option>
+                      <option>Converted</option>
+                      <option>Lost</option>
+                    </select>
+                    {lead.status !== 'Converted' && (
+                      <button className="row-action" onClick={() => void convertLead(lead)}>
+                        <BriefcaseBusiness size={14} /> Convert
+                      </button>
+                    )}
+                    <ActionMenu label={`More actions for ${lead.name}`}>
+                      <ActionMenuItem
+                        onClick={() => {
+                          setSelectedLead(lead);
+                          setDialog('leadEdit');
+                        }}
+                      >
+                        Edit
+                      </ActionMenuItem>
+                      {!['Converted', 'Lost'].includes(lead.status) && (
+                        <ActionMenuItem onClick={() => void archiveRecord('leads', lead)}>Archive</ActionMenuItem>
+                      )}
+                    </ActionMenu>
+                  </div>
+                </div>
+              ))}
+            {!leads.length && (
+              <div className="empty-state">
+                <Users size={22} />
+                <strong>No live leads</strong>
+                <span>Create a lead to begin qualification.</span>
+              </div>
+            )}
+          </div>
+        </Panel>
+      </div>
+      <Panel
+        className="crm-opportunities-panel"
+        title="Opportunity pipeline"
+        subtitle="Progress stages inline; conversion keeps lead ownership"
+      >
+        <div className="data-table labelled-cards">
+          <TableHead labels={['Opportunity', 'Client', 'Stage', 'Value', 'Actions']} />
+          {opportunities
+            .filter((opportunity) => matchesQuery(query, opportunity.name, opportunity.stage, opportunity.client_name))
+            .map((opportunity) => (
+              <div className="data-row" key={opportunity.id}>
+                <strong data-label="Opportunity">{opportunity.name}</strong>
+                <span data-label="Client">{opportunity.client_name || 'Unassigned'}</span>
+                <select
+                  data-label="Stage"
+                  value={opportunity.stage}
+                  onChange={(event) => void updateOpportunity(opportunity, event.target.value)}
+                >
+                  <option>Discovery</option>
+                  <option>Qualified</option>
+                  <option>Quotation</option>
+                  <option>Negotiation</option>
+                  <option>Won</option>
+                  <option>Lost</option>
+                </select>
+                <span data-label="Value">{formatCurrency(opportunity.value || 0, settings.currency)}</span>
+                <div className="transfer-card-actions" data-label="Actions">
+                  <ActionMenu label={`More actions for ${opportunity.name}`}>
+                    <ActionMenuItem
+                      onClick={() => {
+                        setSelectedOpportunity(opportunity);
+                        setDialog('opportunityEdit');
+                      }}
+                    >
+                      Edit
+                    </ActionMenuItem>
+                    {!['Won', 'Lost'].includes(opportunity.stage) && (
+                      <ActionMenuItem onClick={() => void archiveRecord('opportunities', opportunity)}>
+                        Archive
+                      </ActionMenuItem>
+                    )}
+                  </ActionMenu>
+                </div>
+              </div>
+            ))}
+          {!opportunities.length && (
+            <div className="empty-state">
+              <BriefcaseBusiness size={22} />
+              <strong>No opportunities</strong>
+              <span>Create one from a live client.</span>
+            </div>
+          )}
+        </div>
+      </Panel>
+      <Panel
+        className="crm-sales-panel"
+        title="Quotations and confirmed sales"
+        subtitle="Edit live quotations, convert exact serials, generate documents, and process returns"
+      >
+        <div className="data-table">
+          <TableHead labels={['Record', 'Client', 'Total', 'Status', 'Actions']} />
+          {quotes
+            .filter((quote) => matchesQuery(query, quote.number, quote.client_name, quote.status))
+            .map((quote) => (
+              <div className="data-row" key={quote.id}>
+                <div>
+                  <strong>{quote.number}</strong>
+                  <small>
+                    {quote.items.length} line(s) ·{' '}
+                    {quote.valid_until
+                      ? `Valid to ${formatOrganizationDate(quote.valid_until, settings)}`
+                      : 'No expiry'}
+                  </small>
+                </div>
+                <span>{quote.client_name}</span>
+                <span>{formatCurrency(quote.total, settings.currency)}</span>
+                <Status value={quote.status} />
+                <div className="transfer-card-actions">
+                  <button
+                    className="row-action"
+                    onClick={() => {
+                      setSelectedQuote(quote);
+                      setDialog('quoteEdit');
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="row-action"
+                    disabled={quote.status === 'Converted'}
+                    onClick={() => {
+                      setSelectedQuote(quote);
+                      setDialog('convert');
+                    }}
+                  >
+                    <Check size={14} /> Convert
+                  </button>
+                  {['Draft', 'Sent', 'Accepted'].includes(quote.status) && (
+                    <button
+                      className="row-action"
+                      onClick={() => {
+                        setSelectedQuote(quote);
+                        setDialog('reserve');
+                      }}
+                    >
+                      Reserve
+                    </button>
+                  )}
+                  {!['Converted', 'Cancelled'].includes(quote.status) && (
+                    <button className="row-action" onClick={() => void archiveQuote(quote)}>
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          {sales
+            .filter((sale) =>
+              matchesQuery(
+                query,
+                sale.number,
+                sale.client_name,
+                sale.status,
+                ...sale.items.map((item) => item.serialNumber),
+              ),
+            )
+            .map((sale) => (
+              <div className="data-row" key={sale.id}>
+                <div>
+                  <strong>{sale.number}</strong>
+                  <small>{sale.items.length} serial(s)</small>
+                </div>
+                <span>{sale.client_name}</span>
+                <span>{formatCurrency(sale.total, settings.currency)}</span>
+                <Status value={sale.status} />
+                <div className="transfer-card-actions">
+                  <button className="row-action" onClick={() => void createDocument(sale.id, 'invoice')}>
+                    <FileText size={14} /> Invoice
+                  </button>
+                  <button className="row-action" onClick={() => void createDocument(sale.id, 'delivery-note')}>
+                    <FileText size={14} /> Delivery note
+                  </button>
+                  {canCalculateCommission && (
+                    <button className="row-action" onClick={() => void createCommission(sale.id)}>
+                      <Check size={14} /> Commission
+                    </button>
+                  )}
+                  <button
+                    className="row-action"
+                    onClick={() => {
+                      setSelectedSale(sale);
+                      setDialog('return');
+                    }}
+                  >
+                    <RotateCcw size={14} /> Return
+                  </button>
+                </div>
+              </div>
+            ))}
+          {!quotes.length && !sales.length && (
+            <div className="empty-state">
+              <FileText size={22} />
+              <strong>No quotations or sales</strong>
+              <span>Create a quotation to begin the conversion workflow.</span>
+            </div>
+          )}
+        </div>
+      </Panel>
+      <Panel
+        className="crm-returns-panel"
+        title="Returns history"
+        subtitle="Serialized returns recorded against confirmed sales; refunds are settled by Finance"
+      >
+        <div className="data-table labelled-cards">
+          <TableHead labels={['Return', 'Client / sale', 'Amount', 'Refund status', 'Credit note']} />
+          {returns
+            .filter((record) =>
+              matchesQuery(query, record.number, record.sale_number, record.client_name, record.credit_note_number),
+            )
+            .map((record) => (
+              <div className="data-row" key={record.id}>
+                <div data-label="Return">
+                  <strong>{record.number}</strong>
+                  <small>{record.reason}</small>
+                </div>
+                <span data-label="Client / sale">
+                  {record.client_name} · {record.sale_number}
+                </span>
+                <span data-label="Amount">{formatCurrency(record.refund_amount, settings.currency)}</span>
+                <span data-label="Refund status">
+                  <Status value={record.refund_status} />
+                </span>
+                <span data-label="Credit note">{record.credit_note_number || 'Pending finance review'}</span>
+              </div>
+            ))}
+          {!returns.length && (
+            <div className="empty-state">
+              <RotateCcw size={22} />
+              <strong>No returns recorded</strong>
+              <span>Completed sale returns will appear here.</span>
+            </div>
+          )}
+        </div>
+      </Panel>
+      {dialog === 'client' && <ClientDialog close={() => setDialog(null)} saved={() => saved('Client created')} />}
+      {dialog === 'lead' && (
+        <LeadDialog clients={clients} close={() => setDialog(null)} saved={() => saved('Lead created')} />
+      )}
+      {dialog === 'opportunity' && (
+        <OpportunityDialog clients={clients} close={() => setDialog(null)} saved={() => saved('Opportunity created')} />
+      )}
+      {dialog === 'quotation' && (
+        <QuotationDialog
+          clients={clients}
+          products={products}
+          close={() => setDialog(null)}
+          saved={() => saved('Quotation created')}
+        />
+      )}
+      {dialog === 'quoteEdit' && selectedQuote && (
+        <QuotationEditDialog
+          quote={selectedQuote}
+          clients={clients}
+          products={products}
+          close={() => setDialog(null)}
+          saved={() => saved('Quotation updated')}
+        />
+      )}
+      {dialog === 'clientEdit' && selectedClient && (
+        <ClientEditDialog client={selectedClient} close={() => setDialog(null)} saved={() => saved('Client updated')} />
+      )}
+      {dialog === 'clientHistory' && selectedClient && (
+        <ClientHistoryDialog client={selectedClient} close={() => setDialog(null)} />
+      )}
+      {dialog === 'leadEdit' && selectedLead && (
+        <LeadEditDialog
+          lead={selectedLead}
+          clients={clients}
+          close={() => setDialog(null)}
+          saved={() => saved('Lead updated')}
+        />
+      )}
+      {dialog === 'opportunityEdit' && selectedOpportunity && (
+        <OpportunityEditDialog
+          opportunity={selectedOpportunity}
+          clients={clients}
+          close={() => setDialog(null)}
+          saved={() => saved('Opportunity updated')}
+        />
+      )}
+      {dialog === 'reserve' && selectedQuote && (
+        <ReserveDialog quote={selectedQuote} close={() => setDialog(null)} saved={(message) => saved(message)} />
+      )}
+      {dialog === 'convert' && selectedQuote && (
+        <ConvertDialog
+          quote={selectedQuote}
+          close={() => setDialog(null)}
+          saved={() => saved('Sale confirmed and warranty coverage created')}
+        />
+      )}
+      {dialog === 'return' && selectedSale && (
+        <ReturnDialog sale={selectedSale} close={() => setDialog(null)} saved={() => saved('Return completed')} />
+      )}
+    </div>
+  );
 }
 
 function CrmSectionNav({ active, onOpen }: { active: CrmPage; onOpen: (page: CrmPage) => void }) {
@@ -80,60 +844,1151 @@ function CrmSectionNav({ active, onOpen }: { active: CrmPage; onOpen: (page: Crm
     { page: 'sales', label: 'Sales & documents', icon: FileText },
     { page: 'returns', label: 'Returns', icon: RotateCcw },
   ];
-  return <nav className="crm-page-nav" aria-label="Sales and CRM pages">{items.map(item => { const Icon = item.icon; return <button key={item.page} type="button" className={active === item.page ? 'active' : ''} aria-current={active === item.page ? 'page' : undefined} onClick={() => onOpen(item.page)}><Icon size={16}/><span>{item.label}</span></button>; })}</nav>;
+  return (
+    <nav className="crm-page-nav" aria-label="Sales and CRM pages">
+      {items.map((item) => {
+        const Icon = item.icon;
+        return (
+          <button
+            key={item.page}
+            type="button"
+            className={active === item.page ? 'active' : ''}
+            aria-current={active === item.page ? 'page' : undefined}
+            onClick={() => onOpen(item.page)}
+          >
+            <Icon size={16} />
+            <span>{item.label}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
 }
 
-function CrmOverview({ clients, leads, opportunities, quotes, sales, returns, onOpen }: { clients: number; leads: number; opportunities: number; quotes: number; sales: number; returns: number; onOpen: (page: CrmPage) => void }) {
-  const items: Array<{ page: CrmPage; title: string; detail: string; count: number; icon: typeof Users; tone: string }> = [
-    { page: 'clients', title: 'Clients', detail: 'Accounts, contacts, finance history and statements.', count: clients, icon: Users, tone: 'blue' },
-    { page: 'leads', title: 'Leads', detail: 'Capture, qualify and convert new opportunities.', count: leads, icon: Users, tone: 'purple' },
-    { page: 'opportunities', title: 'Opportunities', detail: 'Track pipeline stages and expected value.', count: opportunities, icon: BriefcaseBusiness, tone: 'amber' },
-    { page: 'sales', title: 'Sales & documents', detail: 'Manage quotations, sales, invoices and delivery notes.', count: quotes + sales, icon: FileText, tone: 'green' },
-    { page: 'returns', title: 'Returns', detail: 'Review serialized returns and refund history.', count: returns, icon: RotateCcw, tone: 'red' },
+function CrmOverview({
+  clients,
+  leads,
+  opportunities,
+  quotes,
+  sales,
+  returns,
+  onOpen,
+}: {
+  clients: number;
+  leads: number;
+  opportunities: number;
+  quotes: number;
+  sales: number;
+  returns: number;
+  onOpen: (page: CrmPage) => void;
+}) {
+  const items: Array<{
+    page: CrmPage;
+    title: string;
+    detail: string;
+    count: number;
+    icon: typeof Users;
+    tone: string;
+  }> = [
+    {
+      page: 'clients',
+      title: 'Clients',
+      detail: 'Accounts, contacts, finance history and statements.',
+      count: clients,
+      icon: Users,
+      tone: 'blue',
+    },
+    {
+      page: 'leads',
+      title: 'Leads',
+      detail: 'Capture, qualify and convert new opportunities.',
+      count: leads,
+      icon: Users,
+      tone: 'purple',
+    },
+    {
+      page: 'opportunities',
+      title: 'Opportunities',
+      detail: 'Track pipeline stages and expected value.',
+      count: opportunities,
+      icon: BriefcaseBusiness,
+      tone: 'amber',
+    },
+    {
+      page: 'sales',
+      title: 'Sales & documents',
+      detail: 'Manage quotations, sales, invoices and delivery notes.',
+      count: quotes + sales,
+      icon: FileText,
+      tone: 'green',
+    },
+    {
+      page: 'returns',
+      title: 'Returns',
+      detail: 'Review serialized returns and refund history.',
+      count: returns,
+      icon: RotateCcw,
+      tone: 'red',
+    },
   ];
-  return <section className="crm-overview" aria-labelledby="crm-work-queues"><div><span className="ops-kicker">Workspace directory</span><h2 id="crm-work-queues">Choose a sales workflow</h2><p>Move from pipeline to documents without carrying every table on one screen.</p></div><div className="crm-overview-grid">{items.map(item => { const Icon = item.icon; return <button type="button" className="crm-overview-card" key={item.page} onClick={() => onOpen(item.page)}><span className={`crm-overview-icon ${item.tone}`}><Icon size={18}/></span><span className="crm-overview-copy"><strong>{item.title}</strong><span>{item.detail}</span></span><span className="crm-overview-count"><strong>{item.count}</strong><span>records</span></span><ArrowRight className="crm-overview-arrow" size={17}/></button>; })}</div></section>;
+  return (
+    <section className="crm-overview" aria-labelledby="crm-work-queues">
+      <div>
+        <span className="ops-kicker">Workspace directory</span>
+        <h2 id="crm-work-queues">Choose a sales workflow</h2>
+        <p>Move from pipeline to documents without carrying every table on one screen.</p>
+      </div>
+      <div className="crm-overview-grid">
+        {items.map((item) => {
+          const Icon = item.icon;
+          return (
+            <button type="button" className="crm-overview-card" key={item.page} onClick={() => onOpen(item.page)}>
+              <span className={`crm-overview-icon ${item.tone}`}>
+                <Icon size={18} />
+              </span>
+              <span className="crm-overview-copy">
+                <strong>{item.title}</strong>
+                <span>{item.detail}</span>
+              </span>
+              <span className="crm-overview-count">
+                <strong>{item.count}</strong>
+                <span>records</span>
+              </span>
+              <ArrowRight className="crm-overview-arrow" size={17} />
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
 
-function Dialog({ title, children, close }: { title: string; children: React.ReactNode; close: () => void }) { const dialogRef = useDialogFocus<HTMLDivElement>(close); return <div className="workflow-dialog-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) close(); }}><div ref={dialogRef} className="workflow-dialog" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}><div className="workflow-dialog-head"><h3>{title}</h3><button onClick={close} aria-label="Close"><X size={16}/></button></div>{children}</div></div>; }
-function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="workflow-field"><span>{label}</span>{children}</label>; }
-function Panel({ title, subtitle, children, className = '' }: { title: string; subtitle: string; children: React.ReactNode; className?: string }) { return <section className={`ops-panel ${className}`.trim()}><div className="ops-panel-head"><div><h2>{title}</h2><p>{subtitle}</p></div></div>{children}</section>; }
-function TableHead({ labels }: { labels: string[] }) { return <div className="table-head ops-table-head">{labels.map(label => <span key={label}>{label}</span>)}</div>; }
-function Status({ value }: { value: string }) { const key = value.toLowerCase().replaceAll(' ', '-'); return <span className={`status ${key}`}>{value}</span>; }
-function LiveKpi({ label, value, note, icon, tone }: { label: string; value: number; note: string; icon: React.ReactNode; tone: string }) { return <div className="ops-kpi"><span className={`kpi-icon ${tone}`}>{icon}</span><strong>{value}</strong><span>{label}</span><small>{note}</small></div>; }
+function Dialog({ title, children, close }: { title: string; children: React.ReactNode; close: () => void }) {
+  const dialogRef = useDialogFocus<HTMLDivElement>(close);
+  return (
+    <div
+      className="workflow-dialog-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) close();
+      }}
+    >
+      <div ref={dialogRef} className="workflow-dialog" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}>
+        <div className="workflow-dialog-head">
+          <h3>{title}</h3>
+          <button onClick={close} aria-label="Close">
+            <X size={16} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
 
-function ClientDialog({ close, saved }: { close: () => void; saved: () => void }) { const [form, setForm] = useState({ name: '', contactName: '', phone: '', email: '', clientType: 'Organisation' }); const [error, setError] = useState(''); const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch('/api/crm/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to create client.'); return; } saved(); }; return <Dialog title="Add client" close={close}><form className="workflow-form" onSubmit={submit}><Field label="Name"><input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}/></Field><Field label="Contact name"><input value={form.contactName} onChange={e => setForm({ ...form, contactName: e.target.value })}/></Field><div className="workflow-form-grid"><Field label="Phone"><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })}/></Field><Field label="Email"><input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}/></Field></div>{error && <p className="workflow-error">{error}</p>}<Actions close={close}/></form></Dialog>; }
-function LeadDialog({ clients, close, saved }: { clients: Client[]; close: () => void; saved: () => void }) { const [form, setForm] = useState({ name: '', clientId: '', source: 'Website', notes: '' }); const [error, setError] = useState(''); const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch('/api/crm/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, clientId: form.clientId || undefined }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to create lead.'); return; } saved(); }; return <Dialog title="New lead" close={close}><form className="workflow-form" onSubmit={submit}><Field label="Lead name"><input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}/></Field><Field label="Existing client (optional)"><select value={form.clientId} onChange={e => setForm({ ...form, clientId: e.target.value })}><option value="">Unassigned</option>{clients.map(client => <option key={client.id} value={client.id}>{client.name}</option>)}</select></Field><Field label="Source"><input value={form.source} onChange={e => setForm({ ...form, source: e.target.value })}/></Field><Field label="Notes"><textarea rows={3} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}/></Field>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Create lead"/></form></Dialog>; }
-function OpportunityDialog({ clients, close, saved }: { clients: Client[]; close: () => void; saved: () => void }) { const [form, setForm] = useState({ name: '', clientId: clients[0]?.id || '', value: '0' }); const [error, setError] = useState(''); const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch('/api/crm/opportunities', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, value: Number(form.value) }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to create opportunity.'); return; } saved(); }; return <Dialog title="New opportunity" close={close}><form className="workflow-form" onSubmit={submit}><Field label="Opportunity name"><input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}/></Field><Field label="Client"><select value={form.clientId} onChange={e => setForm({ ...form, clientId: e.target.value })}>{clients.map(client => <option key={client.id} value={client.id}>{client.name}</option>)}</select></Field><Field label="Value"><input type="number" min="0" step="0.01" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })}/></Field>{error && <p className="workflow-error">{error}</p>}<Actions close={close}/></form></Dialog>; }
-function QuotationDialog({ clients, products, close, saved }: { clients: Client[]; products: Product[]; close: () => void; saved: () => void }) { const [form, setForm] = useState({ clientId: clients[0]?.id || '', productId: products[0]?.id || '', quantity: '1' }); const [error, setError] = useState(''); const product = products.find(item => item.id === form.productId); const submit = async (event: FormEvent) => { event.preventDefault(); if (!product) { setError('Select an active product before creating the quotation.'); return; } const response = await fetch('/api/crm/quotations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: form.clientId, items: [{ productId: form.productId, quantity: Number(form.quantity) }] }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to create quotation.'); return; } saved(); }; return <Dialog title="New quotation" close={close}><form className="workflow-form" onSubmit={submit}><Field label="Client"><select value={form.clientId} onChange={e => setForm({ ...form, clientId: e.target.value })}>{clients.map(client => <option key={client.id} value={client.id}>{client.name}</option>)}</select></Field><Field label="Product"><select required value={form.productId} onChange={e => setForm({ ...form, productId: e.target.value })}><option value="">Select product</option>{products.map(item => <option key={item.id} value={item.id}>{item.product_name} · {item.sku} · {item.product_type}</option>)}</select></Field><div className="workflow-form-grid"><Field label="Quantity"><input required type="number" min="1" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })}/></Field><Field label="Selling price"><input readOnly value={product ? product.selling_price : '—'} /></Field></div>{product && <p className="workflow-help">Price is controlled by Products. Available serialized stock: {product.available_count}.</p>}{!products.length && <p className="workflow-error">Create an active Laptop or POS product before raising a quotation.</p>}{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Create quotation"/></form></Dialog>; }
+function ClientDialog({ close, saved }: { close: () => void; saved: () => void }) {
+  const [form, setForm] = useState({ name: '', contactName: '', phone: '', email: '', clientType: 'Organisation' });
+  const [error, setError] = useState('');
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const response = await fetch('/api/crm/clients', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to create client.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title="Add client" close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Name">
+          <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        </Field>
+        <Field label="Contact name">
+          <input value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} />
+        </Field>
+        <div className="workflow-form-grid">
+          <Field label="Phone">
+            <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          </Field>
+          <Field label="Email">
+            <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          </Field>
+        </div>
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} />
+      </form>
+    </Dialog>
+  );
+}
+function LeadDialog({ clients, close, saved }: { clients: Client[]; close: () => void; saved: () => void }) {
+  const [form, setForm] = useState({ name: '', clientId: '', source: 'Website', notes: '' });
+  const [error, setError] = useState('');
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const response = await fetch('/api/crm/leads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...form, clientId: form.clientId || undefined }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to create lead.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title="New lead" close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Lead name">
+          <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        </Field>
+        <Field label="Existing client (optional)">
+          <select value={form.clientId} onChange={(e) => setForm({ ...form, clientId: e.target.value })}>
+            <option value="">Unassigned</option>
+            {clients.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Source">
+          <input value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} />
+        </Field>
+        <Field label="Notes">
+          <textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+        </Field>
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Create lead" />
+      </form>
+    </Dialog>
+  );
+}
+function OpportunityDialog({ clients, close, saved }: { clients: Client[]; close: () => void; saved: () => void }) {
+  const [form, setForm] = useState({ name: '', clientId: clients[0]?.id || '', value: '0' });
+  const [error, setError] = useState('');
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const response = await fetch('/api/crm/opportunities', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...form, value: Number(form.value) }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to create opportunity.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title="New opportunity" close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Opportunity name">
+          <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        </Field>
+        <Field label="Client">
+          <select value={form.clientId} onChange={(e) => setForm({ ...form, clientId: e.target.value })}>
+            {clients.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Value">
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.value}
+            onChange={(e) => setForm({ ...form, value: e.target.value })}
+          />
+        </Field>
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} />
+      </form>
+    </Dialog>
+  );
+}
+function QuotationDialog({
+  clients,
+  products,
+  close,
+  saved,
+}: {
+  clients: Client[];
+  products: Product[];
+  close: () => void;
+  saved: () => void;
+}) {
+  const [form, setForm] = useState({ clientId: clients[0]?.id || '', productId: products[0]?.id || '', quantity: '1' });
+  const [error, setError] = useState('');
+  const product = products.find((item) => item.id === form.productId);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!product) {
+      setError('Select an active product before creating the quotation.');
+      return;
+    }
+    const response = await fetch('/api/crm/quotations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientId: form.clientId,
+        items: [{ productId: form.productId, quantity: Number(form.quantity) }],
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to create quotation.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title="New quotation" close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Client">
+          <select value={form.clientId} onChange={(e) => setForm({ ...form, clientId: e.target.value })}>
+            {clients.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Product">
+          <select required value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })}>
+            <option value="">Select product</option>
+            {products.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.product_name} · {item.sku} · {item.product_type}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <div className="workflow-form-grid">
+          <Field label="Quantity">
+            <input
+              required
+              type="number"
+              min="1"
+              value={form.quantity}
+              onChange={(e) => setForm({ ...form, quantity: e.target.value })}
+            />
+          </Field>
+          <Field label="Selling price">
+            <input readOnly value={product ? product.selling_price : '—'} />
+          </Field>
+        </div>
+        {product && (
+          <p className="workflow-help">
+            Price is controlled by Products. Available serialized stock: {product.available_count}.
+          </p>
+        )}
+        {!products.length && (
+          <p className="workflow-error">Create an active Laptop or POS product before raising a quotation.</p>
+        )}
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Create quotation" />
+      </form>
+    </Dialog>
+  );
+}
 
 function ClientEditDialog({ client, close, saved }: { client: Client; close: () => void; saved: () => void }) {
-  const [form, setForm] = useState({ name: client.name, clientType: client.client_type || 'Organisation', contactName: client.contact_name || '', email: client.email || '', phone: client.phone || '', address: client.address || '' }); const [error, setError] = useState('');
-  const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch(`/api/crm/clients/${client.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to update client.'); return; } saved(); };
-  return <Dialog title={`Edit ${client.name}`} close={close}><form className="workflow-form" onSubmit={submit}><Field label="Name"><input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}/></Field><div className="workflow-form-grid"><Field label="Type"><select value={form.clientType} onChange={e => setForm({ ...form, clientType: e.target.value })}><option>Organisation</option><option>Person</option></select></Field><Field label="Contact name"><input value={form.contactName} onChange={e => setForm({ ...form, contactName: e.target.value })}/></Field></div><div className="workflow-form-grid"><Field label="Email"><input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}/></Field><Field label="Phone"><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })}/></Field></div><Field label="Address"><textarea rows={2} value={form.address} onChange={e => setForm({ ...form, address: e.target.value })}/></Field>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Save client"/></form></Dialog>;
+  const [form, setForm] = useState({
+    name: client.name,
+    clientType: client.client_type || 'Organisation',
+    contactName: client.contact_name || '',
+    email: client.email || '',
+    phone: client.phone || '',
+    address: client.address || '',
+  });
+  const [error, setError] = useState('');
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const response = await fetch(`/api/crm/clients/${client.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to update client.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title={`Edit ${client.name}`} close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Name">
+          <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        </Field>
+        <div className="workflow-form-grid">
+          <Field label="Type">
+            <select value={form.clientType} onChange={(e) => setForm({ ...form, clientType: e.target.value })}>
+              <option>Organisation</option>
+              <option>Person</option>
+            </select>
+          </Field>
+          <Field label="Contact name">
+            <input value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} />
+          </Field>
+        </div>
+        <div className="workflow-form-grid">
+          <Field label="Email">
+            <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          </Field>
+          <Field label="Phone">
+            <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          </Field>
+        </div>
+        <Field label="Address">
+          <textarea rows={2} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+        </Field>
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Save client" />
+      </form>
+    </Dialog>
+  );
 }
 
-function LeadEditDialog({ lead, clients, close, saved }: { lead: Lead; clients: Client[]; close: () => void; saved: () => void }) {
-  const [form, setForm] = useState({ name: lead.name, clientId: lead.client_id || '', source: lead.source || '', status: lead.status, notes: lead.notes || '' }); const [error, setError] = useState('');
-  const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch(`/api/crm/leads/${lead.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, clientId: form.clientId || null }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to update lead.'); return; } saved(); };
-  return <Dialog title={`Edit ${lead.name}`} close={close}><form className="workflow-form" onSubmit={submit}><Field label="Lead name"><input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}/></Field><Field label="Client"><select value={form.clientId} onChange={e => setForm({ ...form, clientId: e.target.value })}><option value="">Unassigned</option>{clients.map(client => <option key={client.id} value={client.id}>{client.name}</option>)}</select></Field><div className="workflow-form-grid"><Field label="Source"><input value={form.source} onChange={e => setForm({ ...form, source: e.target.value })}/></Field><Field label="Status"><select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}><option>New</option><option>Qualified</option><option>Converted</option><option>Lost</option></select></Field></div><Field label="Notes"><textarea rows={3} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}/></Field>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Save lead"/></form></Dialog>;
+function LeadEditDialog({
+  lead,
+  clients,
+  close,
+  saved,
+}: {
+  lead: Lead;
+  clients: Client[];
+  close: () => void;
+  saved: () => void;
+}) {
+  const [form, setForm] = useState({
+    name: lead.name,
+    clientId: lead.client_id || '',
+    source: lead.source || '',
+    status: lead.status,
+    notes: lead.notes || '',
+  });
+  const [error, setError] = useState('');
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const response = await fetch(`/api/crm/leads/${lead.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...form, clientId: form.clientId || null }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to update lead.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title={`Edit ${lead.name}`} close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Lead name">
+          <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        </Field>
+        <Field label="Client">
+          <select value={form.clientId} onChange={(e) => setForm({ ...form, clientId: e.target.value })}>
+            <option value="">Unassigned</option>
+            {clients.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <div className="workflow-form-grid">
+          <Field label="Source">
+            <input value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} />
+          </Field>
+          <Field label="Status">
+            <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+              <option>New</option>
+              <option>Qualified</option>
+              <option>Converted</option>
+              <option>Lost</option>
+            </select>
+          </Field>
+        </div>
+        <Field label="Notes">
+          <textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+        </Field>
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Save lead" />
+      </form>
+    </Dialog>
+  );
 }
 
-function OpportunityEditDialog({ opportunity, clients, close, saved }: { opportunity: Opportunity; clients: Client[]; close: () => void; saved: () => void }) {
-  const [form, setForm] = useState({ name: opportunity.name, clientId: opportunity.client_id || '', stage: opportunity.stage, value: String(opportunity.value || 0), expectedClose: opportunity.expected_close ? String(opportunity.expected_close).slice(0, 10) : '', notes: opportunity.notes || '' }); const [error, setError] = useState('');
-  const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch(`/api/crm/opportunities/${opportunity.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, clientId: form.clientId || null, value: Number(form.value), expectedClose: form.expectedClose || null }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to update opportunity.'); return; } saved(); };
-  return <Dialog title={`Edit ${opportunity.name}`} close={close}><form className="workflow-form" onSubmit={submit}><Field label="Opportunity name"><input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}/></Field><Field label="Client"><select value={form.clientId} onChange={e => setForm({ ...form, clientId: e.target.value })}><option value="">Unassigned</option>{clients.map(client => <option key={client.id} value={client.id}>{client.name}</option>)}</select></Field><div className="workflow-form-grid"><Field label="Stage"><select value={form.stage} onChange={e => setForm({ ...form, stage: e.target.value })}><option>Discovery</option><option>Qualified</option><option>Quotation</option><option>Negotiation</option><option>Won</option><option>Lost</option></select></Field><Field label="Value"><input type="number" min="0" step="0.01" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })}/></Field></div><Field label="Expected close"><input type="date" value={form.expectedClose} onChange={e => setForm({ ...form, expectedClose: e.target.value })}/></Field><Field label="Notes"><textarea rows={3} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}/></Field>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Save opportunity"/></form></Dialog>;
+function OpportunityEditDialog({
+  opportunity,
+  clients,
+  close,
+  saved,
+}: {
+  opportunity: Opportunity;
+  clients: Client[];
+  close: () => void;
+  saved: () => void;
+}) {
+  const [form, setForm] = useState({
+    name: opportunity.name,
+    clientId: opportunity.client_id || '',
+    stage: opportunity.stage,
+    value: String(opportunity.value || 0),
+    expectedClose: opportunity.expected_close ? String(opportunity.expected_close).slice(0, 10) : '',
+    notes: opportunity.notes || '',
+  });
+  const [error, setError] = useState('');
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const response = await fetch(`/api/crm/opportunities/${opportunity.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...form,
+        clientId: form.clientId || null,
+        value: Number(form.value),
+        expectedClose: form.expectedClose || null,
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to update opportunity.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title={`Edit ${opportunity.name}`} close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Opportunity name">
+          <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        </Field>
+        <Field label="Client">
+          <select value={form.clientId} onChange={(e) => setForm({ ...form, clientId: e.target.value })}>
+            <option value="">Unassigned</option>
+            {clients.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <div className="workflow-form-grid">
+          <Field label="Stage">
+            <select value={form.stage} onChange={(e) => setForm({ ...form, stage: e.target.value })}>
+              <option>Discovery</option>
+              <option>Qualified</option>
+              <option>Quotation</option>
+              <option>Negotiation</option>
+              <option>Won</option>
+              <option>Lost</option>
+            </select>
+          </Field>
+          <Field label="Value">
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.value}
+              onChange={(e) => setForm({ ...form, value: e.target.value })}
+            />
+          </Field>
+        </div>
+        <Field label="Expected close">
+          <input
+            type="date"
+            value={form.expectedClose}
+            onChange={(e) => setForm({ ...form, expectedClose: e.target.value })}
+          />
+        </Field>
+        <Field label="Notes">
+          <textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+        </Field>
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Save opportunity" />
+      </form>
+    </Dialog>
+  );
 }
 
-function QuotationEditDialog({ quote, clients, products, close, saved }: { quote: Quote; clients: Client[]; products: Product[]; close: () => void; saved: () => void }) { const [form, setForm] = useState({ clientId: quote.client_id || '', validUntil: quote.valid_until ? String(quote.valid_until).slice(0, 10) : '', status: quote.status }); const [items, setItems] = useState(quote.items.map(item => ({ productId: item.productId || '', quantity: String(item.quantity) }))); const [error, setError] = useState(''); const submit = async (event: FormEvent) => { event.preventDefault(); const response = await fetch(`/api/crm/quotations/${quote.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: form.clientId, validUntil: form.validUntil || null, status: form.status, items: items.map(item => ({ productId: item.productId || undefined, quantity: Number(item.quantity) })) }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to update quotation.'); return; } saved(); }; return <Dialog title={`Edit ${quote.number}`} close={close}><form className="workflow-form" onSubmit={submit}><Field label="Client"><select value={form.clientId} onChange={e => setForm({ ...form, clientId: e.target.value })}>{clients.map(client => <option key={client.id} value={client.id}>{client.name}</option>)}</select></Field><div className="workflow-form-grid"><Field label="Status"><select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}><option>Draft</option><option>Sent</option><option>Accepted</option><option>Expired</option><option>Cancelled</option></select></Field><Field label="Valid until"><input type="date" value={form.validUntil} onChange={e => setForm({ ...form, validUntil: e.target.value })}/></Field></div><div className="serial-picker"><strong>Quotation lines · product prices</strong>{items.map((item, index) => { const product = products.find(candidate => candidate.id === item.productId); return <div className="workflow-form" key={`${quote.items[index]?.id || index}`}><Field label="Product"><select required value={item.productId} onChange={e => setItems(current => current.map((line, lineIndex) => lineIndex === index ? { ...line, productId: e.target.value } : line))}><option value="">Select product</option>{products.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.product_name} · {candidate.sku}</option>)}</select></Field><div className="workflow-form-grid"><Field label="Quantity"><input required min="1" type="number" value={item.quantity} onChange={e => setItems(current => current.map((line, lineIndex) => lineIndex === index ? { ...line, quantity: e.target.value } : line))}/></Field><Field label="Selling price"><input readOnly value={product ? product.selling_price : '—'} /></Field></div></div>; })}</div>{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Save quotation"/></form></Dialog>; }
+function QuotationEditDialog({
+  quote,
+  clients,
+  products,
+  close,
+  saved,
+}: {
+  quote: Quote;
+  clients: Client[];
+  products: Product[];
+  close: () => void;
+  saved: () => void;
+}) {
+  const [form, setForm] = useState({
+    clientId: quote.client_id || '',
+    validUntil: quote.valid_until ? String(quote.valid_until).slice(0, 10) : '',
+    status: quote.status,
+  });
+  const [items, setItems] = useState(
+    quote.items.map((item) => ({ productId: item.productId || '', quantity: String(item.quantity) })),
+  );
+  const [error, setError] = useState('');
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const response = await fetch(`/api/crm/quotations/${quote.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientId: form.clientId,
+        validUntil: form.validUntil || null,
+        status: form.status,
+        items: items.map((item) => ({ productId: item.productId || undefined, quantity: Number(item.quantity) })),
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to update quotation.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title={`Edit ${quote.number}`} close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Client">
+          <select value={form.clientId} onChange={(e) => setForm({ ...form, clientId: e.target.value })}>
+            {clients.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <div className="workflow-form-grid">
+          <Field label="Status">
+            <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+              <option>Draft</option>
+              <option>Sent</option>
+              <option>Accepted</option>
+              <option>Expired</option>
+              <option>Cancelled</option>
+            </select>
+          </Field>
+          <Field label="Valid until">
+            <input
+              type="date"
+              value={form.validUntil}
+              onChange={(e) => setForm({ ...form, validUntil: e.target.value })}
+            />
+          </Field>
+        </div>
+        <div className="serial-picker">
+          <strong>Quotation lines · product prices</strong>
+          {items.map((item, index) => {
+            const product = products.find((candidate) => candidate.id === item.productId);
+            return (
+              <div className="workflow-form" key={`${quote.items[index]?.id || index}`}>
+                <Field label="Product">
+                  <select
+                    required
+                    value={item.productId}
+                    onChange={(e) =>
+                      setItems((current) =>
+                        current.map((line, lineIndex) =>
+                          lineIndex === index ? { ...line, productId: e.target.value } : line,
+                        ),
+                      )
+                    }
+                  >
+                    <option value="">Select product</option>
+                    {products.map((candidate) => (
+                      <option key={candidate.id} value={candidate.id}>
+                        {candidate.product_name} · {candidate.sku}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <div className="workflow-form-grid">
+                  <Field label="Quantity">
+                    <input
+                      required
+                      min="1"
+                      type="number"
+                      value={item.quantity}
+                      onChange={(e) =>
+                        setItems((current) =>
+                          current.map((line, lineIndex) =>
+                            lineIndex === index ? { ...line, quantity: e.target.value } : line,
+                          ),
+                        )
+                      }
+                    />
+                  </Field>
+                  <Field label="Selling price">
+                    <input readOnly value={product ? product.selling_price : '—'} />
+                  </Field>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Save quotation" />
+      </form>
+    </Dialog>
+  );
+}
 
-function ConvertDialog({ quote, close, saved }: { quote: Quote; close: () => void; saved: () => void }) { const [inventory, setInventory] = useState<Inventory[]>([]); const [selected, setSelected] = useState<Record<string, string[]>>({}); const [error, setError] = useState(''); useEffect(() => { void fetch('/api/inventory?status=Available', { cache: 'no-store' }).then(response => response.json()).then(data => setInventory(data.inventory || [])); }, []); const submit = async (event: FormEvent) => { event.preventDefault(); const items = quote.items.map(item => ({ quotationItemId: item.id, inventoryItemIds: selected[item.id] || [] })); const response = await fetch(`/api/crm/quotations/${quote.id}/convert`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Assign the exact available serials before conversion.'); return; } saved(); }; return <Dialog title={`Convert ${quote.number}`} close={close}><form className="workflow-form" onSubmit={submit}><p className="workflow-help">Assign exactly the quoted quantity from available serialized inventory.</p>{quote.items.map(item => <div className="serial-picker" key={item.id}><strong>{item.sku} · {item.description} · {item.quantity} required</strong>{inventory.filter(device => device.sku === item.sku).slice(0, 20).map(device => <label key={device.id}><input type="checkbox" checked={(selected[item.id] || []).includes(device.id)} onChange={e => setSelected(current => ({ ...current, [item.id]: e.target.checked ? [...(current[item.id] || []), device.id] : (current[item.id] || []).filter(id => id !== device.id) }))}/>{device.serial_number}</label>)}{!inventory.some(device => device.sku === item.sku) && <span className="workflow-help">No available serials match this SKU.</span>}</div>)}{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Confirm sale"/></form></Dialog>; }
-function ReturnDialog({ sale, close, saved }: { sale: Sale; close: () => void; saved: () => void }) { const [reason, setReason] = useState(''); const [condition, setCondition] = useState<'Good' | 'Damaged' | 'Quarantined'>('Good'); const [refundAmount, setRefundAmount] = useState('0'); const [refundMethod, setRefundMethod] = useState('Credit note'); const [selected, setSelected] = useState<Record<string, boolean>>({}); const [history, setHistory] = useState<Array<{ id: string; number: string; reason: string; status: string; refund_amount: string; refund_status: string; refund_method?: string; credit_note_number?: string; created_at: string }>>([]); const [error, setError] = useState(''); const settings = useOrganizationSettings(); useEffect(() => { void fetch(`/api/crm/sales/${sale.id}/returns`, { cache: 'no-store' }).then(response => response.json()).then(data => setHistory(data.returns || [])); }, [sale.id]); const submit = async (event: FormEvent) => { event.preventDefault(); const items = sale.items.filter(item => selected[item.id]).map(item => ({ saleItemId: item.id, condition })); const response = await fetch(`/api/crm/sales/${sale.id}/returns`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason, refundAmount: Number(refundAmount), refundMethod: Number(refundAmount) > 0 ? refundMethod : undefined, items }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Select at least one sale item.'); return; } saved(); }; return <Dialog title={`Return ${sale.number}`} close={close}><form className="workflow-form" onSubmit={submit}><Field label="Reason"><textarea required rows={3} value={reason} onChange={e => setReason(e.target.value)}/></Field><div className="workflow-form-grid"><Field label="Returned condition"><select value={condition} onChange={e => setCondition(e.target.value as 'Good' | 'Damaged' | 'Quarantined')}><option>Good</option><option>Damaged</option><option>Quarantined</option></select></Field><Field label={`Refund amount (${settings.currency})`}><input min="0" step="0.01" type="number" value={refundAmount} onChange={e => setRefundAmount(e.target.value)}/></Field></div><Field label="Refund method"><select value={refundMethod} onChange={e => setRefundMethod(e.target.value)} disabled={Number(refundAmount) <= 0}><option>Credit note</option><option>Bank transfer</option><option>Cash</option><option>Card</option><option>Mobile money</option></select></Field><div className="serial-picker">{sale.items.filter(item => !item.returned).map(item => <label key={item.id}><input type="checkbox" checked={!!selected[item.id]} onChange={e => setSelected({ ...selected, [item.id]: e.target.checked })}/>{item.serialNumber} · {item.description}</label>)}</div>{history.length > 0 && <div className="serial-picker"><strong>Return history</strong>{history.map(item => <div className="workflow-help" key={item.id}>{item.number} · {item.reason} · {item.status} · {formatCurrency(item.refund_amount, settings.currency)} {item.refund_status}{item.credit_note_number ? ` · ${item.credit_note_number}` : ''}</div>)}</div>}{error && <p className="workflow-error">{error}</p>}<Actions close={close} label="Complete return"/></form></Dialog>; }
+function ConvertDialog({ quote, close, saved }: { quote: Quote; close: () => void; saved: () => void }) {
+  const [inventory, setInventory] = useState<Inventory[]>([]);
+  const [selected, setSelected] = useState<Record<string, string[]>>({});
+  const [error, setError] = useState('');
+  useEffect(() => {
+    // Units held for this quotation are offered first and pre-selected, then other available stock for the same SKUs.
+    void Promise.all([
+      fetchAvailableUnits(quote.items.map((item) => item.sku)),
+      fetch(`/api/crm/quotations/${quote.id}/reserve`, { cache: 'no-store' }).then(
+        (response) => response.json() as Promise<{ reserved?: Inventory[] }>,
+      ),
+    ]).then(([available, held]) => {
+      const reserved = held.reserved || [];
+      const units = new Map<string, Inventory>();
+      for (const unit of [...reserved, ...available]) units.set(unit.id, unit);
+      setInventory(Array.from(units.values()));
+      const chosen: Record<string, string[]> = {};
+      for (const item of quote.items) {
+        chosen[item.id] = reserved
+          .filter((unit) => unit.sku === item.sku)
+          .slice(0, item.quantity)
+          .map((unit) => unit.id);
+      }
+      setSelected(chosen);
+    });
+  }, [quote]);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const items = quote.items.map((item) => ({ quotationItemId: item.id, inventoryItemIds: selected[item.id] || [] }));
+    const response = await fetch(`/api/crm/quotations/${quote.id}/convert`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Assign the exact available serials before conversion.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title={`Convert ${quote.number}`} close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <p className="workflow-help">Assign exactly the quoted quantity from available serialized inventory.</p>
+        {quote.items.map((item) => (
+          <div className="serial-picker" key={item.id}>
+            <strong>
+              {item.sku} · {item.description} · {item.quantity} required
+            </strong>
+            {inventory
+              .filter((device) => device.sku === item.sku)
+              .slice(0, 20)
+              .map((device) => (
+                <label key={device.id}>
+                  <input
+                    type="checkbox"
+                    checked={(selected[item.id] || []).includes(device.id)}
+                    onChange={(e) =>
+                      setSelected((current) => ({
+                        ...current,
+                        [item.id]: e.target.checked
+                          ? [...(current[item.id] || []), device.id]
+                          : (current[item.id] || []).filter((id) => id !== device.id),
+                      }))
+                    }
+                  />
+                  {device.serial_number}
+                </label>
+              ))}
+            {!inventory.some((device) => device.sku === item.sku) && (
+              <span className="workflow-help">No available serials match this SKU.</span>
+            )}
+          </div>
+        ))}
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Confirm sale" />
+      </form>
+    </Dialog>
+  );
+}
+function ReserveDialog({ quote, close, saved }: { quote: Quote; close: () => void; saved: (message: string) => void }) {
+  const [available, setAvailable] = useState<Inventory[]>([]);
+  const [held, setHeld] = useState<Inventory[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    void Promise.all([
+      fetchAvailableUnits(quote.items.map((item) => item.sku)),
+      fetch(`/api/crm/quotations/${quote.id}/reserve`, { cache: 'no-store' }).then(
+        (response) => response.json() as Promise<{ reserved?: Inventory[] }>,
+      ),
+    ])
+      .then(([units, current]) => {
+        setAvailable(units);
+        setHeld(current.reserved || []);
+      })
+      .catch(() => setError('Unable to load stock for this quotation.'))
+      .finally(() => setLoading(false));
+  }, [quote]);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!selected.length) {
+      setError('Choose at least one unit to reserve.');
+      return;
+    }
+    const response = await fetch(`/api/crm/quotations/${quote.id}/reserve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inventoryItemIds: selected }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to reserve these units.');
+      return;
+    }
+    saved(
+      `${data.reserved} unit${data.reserved === 1 ? '' : 's'} reserved for ${quote.number} (${data.holdDays} days)`,
+    );
+  };
+  const release = async () => {
+    const response = await fetch(`/api/crm/quotations/${quote.id}/reserve`, { method: 'DELETE' });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to release the reservation.');
+      return;
+    }
+    saved(`Reservation released for ${quote.number}`);
+  };
+  return (
+    <Dialog title={`Reserve stock for ${quote.number}`} close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <p className="workflow-help">
+          Held units cannot be sold on another quotation. Reservations expire after 7 days or when the quotation closes.
+        </p>
+        {loading && <p className="workflow-help">Loading stock…</p>}
+        {held.length > 0 && (
+          <div className="serial-picker">
+            <strong>Currently reserved ({held.length})</strong>
+            <span className="workflow-help">{held.map((unit) => unit.serial_number).join(', ')}</span>
+            <button type="button" className="ops-btn ghost" onClick={() => void release()}>
+              Release all
+            </button>
+          </div>
+        )}
+        {quote.items.map((item) => {
+          const units = available.filter((unit) => unit.sku === item.sku);
+          const heldCount = held.filter((unit) => unit.sku === item.sku).length;
+          const chosenCount = units.filter((unit) => selected.includes(unit.id)).length;
+          return (
+            <div className="serial-picker" key={item.id}>
+              <strong>
+                {item.sku} · {item.description} · {item.quantity} needed · {heldCount} held
+              </strong>
+              {units.slice(0, 40).map((unit) => (
+                <label key={unit.id}>
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(unit.id)}
+                    disabled={!selected.includes(unit.id) && heldCount + chosenCount >= item.quantity}
+                    onChange={(event) =>
+                      setSelected((current) =>
+                        event.target.checked ? [...current, unit.id] : current.filter((id) => id !== unit.id),
+                      )
+                    }
+                  />
+                  {unit.serial_number}
+                  {unit.location ? ` · ${unit.location}` : ''}
+                </label>
+              ))}
+              {!loading && units.length === 0 && (
+                <span className="workflow-help">No available serials match this SKU.</span>
+              )}
+            </div>
+          );
+        })}
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Reserve selected" />
+      </form>
+    </Dialog>
+  );
+}
+function ReturnDialog({ sale, close, saved }: { sale: Sale; close: () => void; saved: () => void }) {
+  const [reason, setReason] = useState('');
+  const [condition, setCondition] = useState<'Good' | 'Damaged' | 'Quarantined'>('Good');
+  const [refundAmount, setRefundAmount] = useState('0');
+  const [refundMethod, setRefundMethod] = useState('Credit note');
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [history, setHistory] = useState<
+    Array<{
+      id: string;
+      number: string;
+      reason: string;
+      status: string;
+      refund_amount: string;
+      refund_status: string;
+      refund_method?: string;
+      credit_note_number?: string;
+      created_at: string;
+    }>
+  >([]);
+  const [error, setError] = useState('');
+  const settings = useOrganizationSettings();
+  useEffect(() => {
+    void fetch(`/api/crm/sales/${sale.id}/returns`, { cache: 'no-store' })
+      .then((response) => response.json())
+      .then((data) => setHistory(data.returns || []));
+  }, [sale.id]);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const items = sale.items.filter((item) => selected[item.id]).map((item) => ({ saleItemId: item.id, condition }));
+    const response = await fetch(`/api/crm/sales/${sale.id}/returns`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reason,
+        refundAmount: Number(refundAmount),
+        refundMethod: Number(refundAmount) > 0 ? refundMethod : undefined,
+        items,
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Select at least one sale item.');
+      return;
+    }
+    saved();
+  };
+  return (
+    <Dialog title={`Return ${sale.number}`} close={close}>
+      <form className="workflow-form" onSubmit={submit}>
+        <Field label="Reason">
+          <textarea required rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
+        </Field>
+        <div className="workflow-form-grid">
+          <Field label="Returned condition">
+            <select
+              value={condition}
+              onChange={(e) => setCondition(e.target.value as 'Good' | 'Damaged' | 'Quarantined')}
+            >
+              <option>Good</option>
+              <option>Damaged</option>
+              <option>Quarantined</option>
+            </select>
+          </Field>
+          <Field label={`Refund amount (${settings.currency})`}>
+            <input
+              min="0"
+              step="0.01"
+              type="number"
+              value={refundAmount}
+              onChange={(e) => setRefundAmount(e.target.value)}
+            />
+          </Field>
+        </div>
+        <Field label="Refund method">
+          <select
+            value={refundMethod}
+            onChange={(e) => setRefundMethod(e.target.value)}
+            disabled={Number(refundAmount) <= 0}
+          >
+            <option>Credit note</option>
+            <option>Bank transfer</option>
+            <option>Cash</option>
+            <option>Card</option>
+            <option>Mobile money</option>
+          </select>
+        </Field>
+        <div className="serial-picker">
+          {sale.items
+            .filter((item) => !item.returned)
+            .map((item) => (
+              <label key={item.id}>
+                <input
+                  type="checkbox"
+                  checked={!!selected[item.id]}
+                  onChange={(e) => setSelected({ ...selected, [item.id]: e.target.checked })}
+                />
+                {item.serialNumber} · {item.description}
+              </label>
+            ))}
+        </div>
+        {history.length > 0 && (
+          <div className="serial-picker">
+            <strong>Return history</strong>
+            {history.map((item) => (
+              <div className="workflow-help" key={item.id}>
+                {item.number} · {item.reason} · {item.status} · {formatCurrency(item.refund_amount, settings.currency)}{' '}
+                {item.refund_status}
+                {item.credit_note_number ? ` · ${item.credit_note_number}` : ''}
+              </div>
+            ))}
+          </div>
+        )}
+        {error && <p className="workflow-error">{error}</p>}
+        <Actions close={close} label="Complete return" />
+      </form>
+    </Dialog>
+  );
+}
 function ClientHistoryDialog({ client, close }: { client: Client; close: () => void }) {
   const [history, setHistory] = useState<ClientFinanceHistory | null>(null);
   const [error, setError] = useState('');
   const settings = useOrganizationSettings();
-  useEffect(() => { void fetch(`/api/crm/clients/${client.id}/history`, { cache: 'no-store' }).then(async response => { const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Unable to load client finance history.'); setHistory(data); }).catch(loadError => setError(loadError instanceof Error ? loadError.message : 'Unable to load client finance history.')); }, [client.id]);
-  return <Dialog title={`${client.name} · finance history`} close={close}><div className="client-history"><div className="client-history-header"><div><strong>{client.code}</strong><span>{client.contact_name || 'No contact'} · {client.email || client.phone || 'No contact details'}</span></div><a className="ops-btn blue" href={`/api/crm/clients/${client.id}/statement/pdf`} target="_blank" rel="noreferrer"><FileDown size={14}/> Statement PDF</a></div>{error && <p className="workflow-error" role="alert">{error}</p>}{!history && !error && <div className="empty-state">Loading finance history…</div>}{history && <><div className="client-finance-summary"><div><strong>{formatCurrency(history.summary.totalInvoiced, settings.currency)}</strong><span>Total invoiced</span></div><div><strong>{formatCurrency(history.summary.totalPaid, settings.currency)}</strong><span>Total paid</span></div><div><strong>{formatCurrency(history.summary.outstanding, settings.currency)}</strong><span>Outstanding</span></div></div><div className="client-history-section"><div className="client-history-section-head"><strong>Payment receipts</strong><span>{history.summary.paymentCount} receipt(s)</span></div>{history.payments.length ? history.payments.map(payment => <div className="client-history-row" key={payment.id}><div><strong>{payment.invoice_number}</strong><span>{payment.method} · {payment.reference || 'No reference'} · {payment.recorded_by || 'System'}</span></div><b>{formatCurrency(payment.amount, settings.currency)}</b><span>{formatOrganizationDate(payment.paid_at, settings)}</span><a className="row-action" href={`/api/crm/clients/${client.id}/receipts/${payment.id}/pdf`} target="_blank" rel="noreferrer" aria-label={`Download receipt ${payment.invoice_number}`}><FileDown size={13}/> PDF</a></div>) : <div className="empty-state">No payments or receipts recorded.</div>}</div><div className="client-history-section"><div className="client-history-section-head"><strong>Statements and invoices</strong><span>{history.summary.invoiceCount} invoice(s)</span></div>{history.invoices.length ? history.invoices.map(invoice => <div className="client-history-row" key={invoice.id}><div><strong>{invoice.number}</strong><span>{invoice.status} · Sale {invoice.sale_number || '—'}</span></div><b>{formatCurrency(invoice.total, settings.currency)}</b><span>{formatOrganizationDate(invoice.issued_at, settings)}</span><a className="row-action" href={`/api/crm/invoices/${invoice.id}/pdf`} target="_blank" rel="noreferrer" aria-label={`Download invoice ${invoice.number}`}><FileDown size={13}/> PDF</a></div>) : <div className="empty-state">No invoices recorded.</div>}</div></>}</div></Dialog>;
+  useEffect(() => {
+    void fetch(`/api/crm/clients/${client.id}/history`, { cache: 'no-store' })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Unable to load client finance history.');
+        setHistory(data);
+      })
+      .catch((loadError) =>
+        setError(loadError instanceof Error ? loadError.message : 'Unable to load client finance history.'),
+      );
+  }, [client.id]);
+  return (
+    <Dialog title={`${client.name} · finance history`} close={close}>
+      <div className="client-history">
+        <div className="client-history-header">
+          <div>
+            <strong>{client.code}</strong>
+            <span>
+              {client.contact_name || 'No contact'} · {client.email || client.phone || 'No contact details'}
+            </span>
+          </div>
+          <a
+            className="ops-btn blue"
+            href={`/api/crm/clients/${client.id}/statement/pdf`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <FileDown size={14} /> Statement PDF
+          </a>
+        </div>
+        {error && (
+          <p className="workflow-error" role="alert">
+            {error}
+          </p>
+        )}
+        {!history && !error && <div className="empty-state">Loading finance history…</div>}
+        {history && (
+          <>
+            <div className="client-finance-summary">
+              <div>
+                <strong>{formatCurrency(history.summary.totalInvoiced, settings.currency)}</strong>
+                <span>Total invoiced</span>
+              </div>
+              <div>
+                <strong>{formatCurrency(history.summary.totalPaid, settings.currency)}</strong>
+                <span>Total paid</span>
+              </div>
+              <div>
+                <strong>{formatCurrency(history.summary.outstanding, settings.currency)}</strong>
+                <span>Outstanding</span>
+              </div>
+            </div>
+            <div className="client-history-section">
+              <div className="client-history-section-head">
+                <strong>Payment receipts</strong>
+                <span>{history.summary.paymentCount} receipt(s)</span>
+              </div>
+              {history.payments.length ? (
+                history.payments.map((payment) => (
+                  <div className="client-history-row" key={payment.id}>
+                    <div>
+                      <strong>{payment.invoice_number}</strong>
+                      <span>
+                        {payment.method} · {payment.reference || 'No reference'} · {payment.recorded_by || 'System'}
+                      </span>
+                    </div>
+                    <b>{formatCurrency(payment.amount, settings.currency)}</b>
+                    <span>{formatOrganizationDate(payment.paid_at, settings)}</span>
+                    <a
+                      className="row-action"
+                      href={`/api/crm/clients/${client.id}/receipts/${payment.id}/pdf`}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`Download receipt ${payment.invoice_number}`}
+                    >
+                      <FileDown size={13} /> PDF
+                    </a>
+                  </div>
+                ))
+              ) : (
+                <div className="empty-state">No payments or receipts recorded.</div>
+              )}
+            </div>
+            <div className="client-history-section">
+              <div className="client-history-section-head">
+                <strong>Statements and invoices</strong>
+                <span>{history.summary.invoiceCount} invoice(s)</span>
+              </div>
+              {history.invoices.length ? (
+                history.invoices.map((invoice) => (
+                  <div className="client-history-row" key={invoice.id}>
+                    <div>
+                      <strong>{invoice.number}</strong>
+                      <span>
+                        {invoice.status} · Sale {invoice.sale_number || '—'}
+                      </span>
+                    </div>
+                    <b>{formatCurrency(invoice.total, settings.currency)}</b>
+                    <span>{formatOrganizationDate(invoice.issued_at, settings)}</span>
+                    <a
+                      className="row-action"
+                      href={`/api/crm/invoices/${invoice.id}/pdf`}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`Download invoice ${invoice.number}`}
+                    >
+                      <FileDown size={13} /> PDF
+                    </a>
+                  </div>
+                ))
+              ) : (
+                <div className="empty-state">No invoices recorded.</div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </Dialog>
+  );
 }
 
-function Actions({ close, label = 'Save' }: { close: () => void; label?: string }) { return <div className="workflow-dialog-actions"><button type="button" className="ops-btn ghost" onClick={close}>Cancel</button><button className="ops-btn blue">{label}</button></div>; }
+function Actions({ close, label = 'Save' }: { close: () => void; label?: string }) {
+  return (
+    <div className="workflow-dialog-actions">
+      <button type="button" className="ops-btn ghost" onClick={close}>
+        Cancel
+      </button>
+      <button className="ops-btn blue">{label}</button>
+    </div>
+  );
+}

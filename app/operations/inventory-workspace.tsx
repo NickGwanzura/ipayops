@@ -1,97 +1,825 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Boxes, Check, CircleDollarSign, ClipboardCheck, Laptop, PackageCheck, Plus, Search, Truck, X } from 'lucide-react';
+import { Panel, TableHead, Status, LiveKpi } from '@/components/ui';
+import {
+  Boxes,
+  Check,
+  CircleDollarSign,
+  ClipboardCheck,
+  Laptop,
+  PackageCheck,
+  Plus,
+  Search,
+  Truck,
+  X,
+} from 'lucide-react';
 
-type InventoryItem = { id: string; serial_number: string; sku: string; description: string; location: string; status: string; client_name?: string };
-type Summary = { total: number; available: number; reserved: number; in_transit: number; sold: number; installed: number; warranty: number };
-type Transfer = { id: string; number: string; source_location: string; destination_location: string; status: string; items: Array<{ id: string; serialNumber: string; sku: string }> };
+type InventoryItem = {
+  id: string;
+  serial_number: string;
+  sku: string;
+  description: string;
+  location: string;
+  status: string;
+  client_name?: string;
+};
+type Summary = {
+  total: number;
+  available: number;
+  reserved: number;
+  in_transit: number;
+  sold: number;
+  installed: number;
+  warranty: number;
+};
+type Transfer = {
+  id: string;
+  number: string;
+  source_location: string;
+  destination_location: string;
+  status: string;
+  items: Array<{ id: string; serialNumber: string; sku: string }>;
+};
 type Shipment = { id: string; number: string; status: string; carrier?: string; tracking_number?: string };
-type Reservation = { id: string; inventory_item_id: string; serial_number: string; reference_type: string; reference_id: string; status: string };
+type Reservation = {
+  id: string;
+  inventory_item_id: string;
+  serial_number: string;
+  reference_type: string;
+  reference_id: string;
+  status: string;
+};
 
-export default function InventoryWorkspace({ query, notify, newRecordSignal = 0 }: { query: string; notify: (message: string) => void; newRecordSignal?: number }) {
-  const [summary, setSummary] = useState<Summary>({ total: 0, available: 0, reserved: 0, in_transit: 0, sold: 0, installed: 0, warranty: 0 });
+export default function InventoryWorkspace({
+  query,
+  notify,
+  newRecordSignal = 0,
+}: {
+  query: string;
+  notify: (message: string) => void;
+  newRecordSignal?: number;
+}) {
+  const [summary, setSummary] = useState<Summary>({
+    total: 0,
+    available: 0,
+    reserved: 0,
+    in_transit: 0,
+    sold: 0,
+    installed: 0,
+    warranty: 0,
+  });
   const [items, setItems] = useState<InventoryItem[]>([]);
-  const [transfers, setTransfers] = useState<Transfer[]>([]); const [shipments, setShipments] = useState<Shipment[]>([]); const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [transfers, setTransfers] = useState<Transfer[]>([]);
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
   const [serial, setSerial] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const [source, setSource] = useState('');
   const [destination, setDestination] = useState('');
-  const [carrier, setCarrier] = useState(''); const [tracking, setTracking] = useState(''); const [reservationRef, setReservationRef] = useState('');
+  const [carrier, setCarrier] = useState('');
+  const [tracking, setTracking] = useState('');
+  const [reservationRef, setReservationRef] = useState('');
   const [error, setError] = useState('');
   const [intakeOpen, setIntakeOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<'stock' | 'movement'>('stock');
+  const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 50, total: 0, hasMore: false });
 
   const load = async () => {
     setError('');
     try {
-      const [summaryResponse, inventoryResponse, transfersResponse, shipmentsResponse, reservationsResponse] = await Promise.all([
-        fetch('/api/inventory/summary', { cache: 'no-store' }),
-        fetch(`/api/inventory?${new URLSearchParams({ ...(query ? { q: query } : {}), page: String(page), pageSize: String(pagination.pageSize) })}`, { cache: 'no-store' }),
-        fetch('/api/inventory/transfers', { cache: 'no-store' }),
-        fetch('/api/inventory/shipments', { cache: 'no-store' }),
-        fetch('/api/inventory/reservations', { cache: 'no-store' }),
-      ]);
-      if ([summaryResponse, inventoryResponse, transfersResponse, shipmentsResponse, reservationsResponse].some(response => !response.ok)) throw new Error('Live inventory data is unavailable.');
-      const summaryData = await summaryResponse.json(); const inventoryData = await inventoryResponse.json(); const transferData = await transfersResponse.json(); const shipmentData = await shipmentsResponse.json(); const reservationData = await reservationsResponse.json();
-      setSummary(summaryData.summary || {}); setItems(inventoryData.inventory || []); setTransfers(transferData.transfers || []); setShipments(shipmentData.shipments || []); setReservations(reservationData.reservations || []); setPagination(inventoryData.pagination || pagination);
+      const [summaryResponse, inventoryResponse, transfersResponse, shipmentsResponse, reservationsResponse] =
+        await Promise.all([
+          fetch('/api/inventory/summary', { cache: 'no-store' }),
+          fetch(
+            `/api/inventory?${new URLSearchParams({ ...(query ? { q: query } : {}), ...(statusFilter ? { status: statusFilter } : {}), page: String(page), pageSize: String(pagination.pageSize) })}`,
+            { cache: 'no-store' },
+          ),
+          fetch('/api/inventory/transfers', { cache: 'no-store' }),
+          fetch('/api/inventory/shipments', { cache: 'no-store' }),
+          fetch('/api/inventory/reservations', { cache: 'no-store' }),
+        ]);
+      if (
+        [summaryResponse, inventoryResponse, transfersResponse, shipmentsResponse, reservationsResponse].some(
+          (response) => !response.ok,
+        )
+      )
+        throw new Error('Live inventory data is unavailable.');
+      const summaryData = await summaryResponse.json();
+      const inventoryData = await inventoryResponse.json();
+      const transferData = await transfersResponse.json();
+      const shipmentData = await shipmentsResponse.json();
+      const reservationData = await reservationsResponse.json();
+      setSummary(summaryData.summary || {});
+      setItems(inventoryData.inventory || []);
+      setTransfers(transferData.transfers || []);
+      setShipments(shipmentData.shipments || []);
+      setReservations(reservationData.reservations || []);
+      setPagination(inventoryData.pagination || pagination);
       if (!source && inventoryData.inventory?.[0]) setSource(inventoryData.inventory[0].location);
-    } catch (loadError) { setError(loadError instanceof Error ? loadError.message : 'Live inventory data is unavailable.'); }
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Live inventory data is unavailable.');
+    }
   };
 
-  useEffect(() => { setPage(1); }, [query]);
-  useEffect(() => { void load(); }, [query, page]);
-  useEffect(() => { if (newRecordSignal > 0) setIntakeOpen(true); }, [newRecordSignal]);
-  const availableItems = useMemo(() => items.filter(item => item.status === 'Available'), [items]);
-  const locations = useMemo(() => Array.from(new Set(items.map(item => item.location).filter(Boolean))), [items]);
-  const found = items.find(item => item.serial_number.toLowerCase() === serial.trim().toLowerCase());
+  useEffect(() => {
+    setPage(1);
+  }, [query, statusFilter]);
+  useEffect(() => {
+    void load();
+  }, [query, page, statusFilter]);
+  /** KPI drilldown: show only units in this status (click again to clear). */
+  const showStatus = (status: string) => {
+    setActiveSection('stock');
+    setStatusFilter((current) => (current === status ? '' : status));
+  };
+  useEffect(() => {
+    if (newRecordSignal > 0) setIntakeOpen(true);
+  }, [newRecordSignal]);
+  const availableItems = useMemo(() => items.filter((item) => item.status === 'Available'), [items]);
+  const locations = useMemo(() => Array.from(new Set(items.map((item) => item.location).filter(Boolean))), [items]);
+  const found = items.find((item) => item.serial_number.toLowerCase() === serial.trim().toLowerCase());
 
   const createTransfer = async () => {
-    if (!selected.length || !source || !destination) { setError('Choose available items, a source, and a different destination.'); return; }
-    const response = await fetch('/api/inventory/transfers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceLocation: source, destinationLocation: destination, inventoryItemIds: selected }) });
-    const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to create transfer.'); return; }
-    setSelected([]); notify(`${data.transfer.number} dispatched`); await load();
+    if (!selected.length || !source || !destination) {
+      setError('Choose available items, a source, and a different destination.');
+      return;
+    }
+    const response = await fetch('/api/inventory/transfers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sourceLocation: source, destinationLocation: destination, inventoryItemIds: selected }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to create transfer.');
+      return;
+    }
+    setSelected([]);
+    notify(`${data.transfer.number} dispatched`);
+    await load();
   };
   const receiveTransfer = async (transfer: Transfer) => {
-    const response = await fetch(`/api/inventory/transfers/${transfer.id}/receive`, { method: 'POST' }); const data = await response.json();
-    if (!response.ok) { setError(data.error || 'Unable to receive transfer.'); return; } notify(`${transfer.number} received`); await load();
+    const response = await fetch(`/api/inventory/transfers/${transfer.id}/receive`, { method: 'POST' });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to receive transfer.');
+      return;
+    }
+    notify(`${transfer.number} received`);
+    await load();
+  };
+  const cancelTransfer = async (transfer: Transfer) => {
+    const response = await fetch(`/api/inventory/transfers/${transfer.id}/cancel`, { method: 'POST' });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to cancel transfer.');
+      return;
+    }
+    notify(`${transfer.number} cancelled; stock returned to ${transfer.source_location}`);
+    await load();
   };
   const createShipment = async (transfer: Transfer) => {
-    const response = await fetch('/api/inventory/shipments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ transferId: transfer.id, carrier, trackingNumber: tracking, status: 'Dispatched' }) }); const data = await response.json();
-    if (!response.ok) { setError(data.error || 'Unable to create shipment.'); return; } setCarrier(''); setTracking(''); notify(`${data.shipment.number} created`);
+    const response = await fetch('/api/inventory/shipments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transferId: transfer.id, carrier, trackingNumber: tracking, status: 'Dispatched' }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to create shipment.');
+      return;
+    }
+    setCarrier('');
+    setTracking('');
+    notify(`${data.shipment.number} created`);
   };
-  const updateShipment = async (shipment: Shipment, status: string) => { const response = await fetch(`/api/inventory/shipments/${shipment.id}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to update shipment.'); return; } notify(`${shipment.number} is now ${data.shipment.status}`); await load(); };
-  const reserve = async (item: InventoryItem) => { if (!reservationRef.trim()) { setError('Enter a sales or quotation reference before reserving.'); return; } const response = await fetch('/api/inventory/reservations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inventoryItemId: item.id, referenceType: 'Sales', referenceId: reservationRef.trim() }) }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to reserve inventory.'); return; } notify(`${item.serial_number} reserved`); await load(); };
-  const releaseReservation = async (reservation: Reservation) => { const response = await fetch(`/api/inventory/reservations/${reservation.id}/release`, { method: 'POST' }); const data = await response.json(); if (!response.ok) { setError(data.error || 'Unable to release reservation.'); return; } notify(`${reservation.serial_number} released`); await load(); };
+  const updateShipment = async (shipment: Shipment, status: string) => {
+    const response = await fetch(`/api/inventory/shipments/${shipment.id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to update shipment.');
+      return;
+    }
+    notify(`${shipment.number} is now ${data.shipment.status}`);
+    await load();
+  };
+  const reserve = async (item: InventoryItem) => {
+    if (!reservationRef.trim()) {
+      setError('Enter a sales or quotation reference before reserving.');
+      return;
+    }
+    const response = await fetch('/api/inventory/reservations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inventoryItemId: item.id, referenceType: 'Sales', referenceId: reservationRef.trim() }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to reserve inventory.');
+      return;
+    }
+    notify(`${item.serial_number} reserved`);
+    await load();
+  };
+  const releaseReservation = async (reservation: Reservation) => {
+    const response = await fetch(`/api/inventory/reservations/${reservation.id}/release`, { method: 'POST' });
+    const data = await response.json();
+    if (!response.ok) {
+      setError(data.error || 'Unable to release reservation.');
+      return;
+    }
+    notify(`${reservation.serial_number} released`);
+    await load();
+  };
 
-  return <>
-    <div className="ops-kpis">
-      <LiveKpi label="Available devices" value={summary.available} note={`${summary.total} total serialized units`} icon={<Boxes size={16}/>} tone="blue"/>
-      <LiveKpi label="Reserved" value={summary.reserved} note={`${summary.in_transit} in transit`} icon={<ClipboardCheck size={16}/>} tone="amber"/>
-      <LiveKpi label="Installed / sold" value={summary.installed + summary.sold} note={`${summary.warranty} in warranty service`} icon={<Truck size={16}/>} tone="purple"/>
-      <LiveKpi label="Serialized stock" value={summary.total} note="Live PostgreSQL count" icon={<CircleDollarSign size={16}/>} tone="green"/>
-    </div>
-    <div className="ops-tabs" role="tablist" aria-label="Inventory sections"><button type="button" role="tab" aria-selected={activeSection === 'stock'} className={activeSection === 'stock' ? 'active' : ''} onClick={() => setActiveSection('stock')}>Stock overview</button><button type="button" role="tab" aria-selected={activeSection === 'movement'} className={activeSection === 'movement' ? 'active' : ''} onClick={() => setActiveSection('movement')}>Transfers & reservations</button></div>
-    {activeSection === 'stock' && <>
-    <div className="trace-search"><div><span className="ops-kicker">Serial traceability</span><h2>Find a live device</h2><p>Searches current inventory state, location, and client assignment.</p></div><div className="serial-field"><Search size={15}/><input value={serial} onChange={e => setSerial(e.target.value)} placeholder="Enter serial, e.g. POS-884021"/><button onClick={() => notify(found ? `${found.serial_number} found` : 'No device found')}>Check</button></div></div>
-    {serial && <div className="trace-result">{found ? <div className="trace-device"><span className="device-icon"><Boxes size={18}/></span><div><strong>{found.serial_number}</strong><span>{found.sku} · {found.description}</span></div><Status value={found.status}/></div> : <div className="empty-state"><Search size={22}/><strong>No matching device</strong><span>Check the serial formatting and try again.</span></div>}</div>}
-    <Panel title="Live device register" subtitle="Every row is read from serialized inventory" actions={<div className="inventory-panel-actions"><button className="ops-btn blue" onClick={() => setIntakeOpen(true)}><Plus size={14}/> Add stock</button><button className="link-btn" onClick={() => void load()}><Check size={14}/> Refresh</button></div>}><div className="data-table labelled-cards"><TableHead labels={['Serial / product','Location','Status','Client','Action']}/>{items.map(item => <div className="data-row" key={item.id}><div data-label="Serial / product"><strong>{item.serial_number}</strong><small>{item.sku} · {item.description}</small></div><span data-label="Location">{item.location}</span><Status value={item.status}/><span data-label="Client">{item.client_name || '—'}</span><button className="row-action" data-label="Action" onClick={() => { setSerial(item.serial_number); notify(`${item.serial_number} trace opened`); }}>Trace</button></div>)}{!items.length && <div className="empty-state"><Boxes size={22}/><strong>No inventory records</strong><span>Receive serialized stock to populate this register.</span></div>}</div><div className="ops-pagination" aria-label="Inventory pagination"><span>Showing {items.length ? ((page - 1) * pagination.pageSize) + 1 : 0}–{Math.min(page * pagination.pageSize, pagination.total)} of {pagination.total}</span><div><button type="button" className="link-btn" disabled={page <= 1} onClick={() => setPage(current => Math.max(1, current - 1))}>Previous</button><button type="button" className="link-btn" disabled={!pagination.hasMore} onClick={() => setPage(current => current + 1)}>Next</button></div></div></Panel>
-    </>}
-    {activeSection === 'movement' && <Panel title="Transfers, shipping, and reservations" subtitle="Dispatch available serials, reserve exact units, receive transfers, and track shipments"><div className="transfer-form"><label><span>Source</span><select value={source} onChange={e => setSource(e.target.value)}><option value="">Select source</option>{locations.map(location => <option key={location}>{location}</option>)}</select></label><label><span>Destination</span><input value={destination} onChange={e => setDestination(e.target.value)} placeholder="Bulawayo Branch"/></label><label><span>Reservation reference</span><input value={reservationRef} onChange={e => setReservationRef(e.target.value)} placeholder="QUO-2026-000001"/></label><button className="ops-btn blue" onClick={() => void createTransfer()}>Dispatch selected</button></div><div className="data-table labelled-cards"><TableHead labels={['Select','Serial','SKU','Location','Status','Action']}/>{availableItems.map(item => <div className="data-row transfer-row" key={item.id}><input type="checkbox" aria-label={`Select ${item.serial_number}`} checked={selected.includes(item.id)} onChange={e => setSelected(current => e.target.checked ? [...current, item.id] : current.filter(id => id !== item.id))}/><strong data-label="Serial">{item.serial_number}</strong><span data-label="SKU">{item.sku}</span><span data-label="Location">{item.location}</span><Status value={item.status}/><button className="row-action" data-label="Action" onClick={() => void reserve(item)}><ClipboardCheck size={14}/> Reserve</button></div>)}</div>{transfers.length > 0 && <div className="transfer-list"><strong className="workflow-help">Transfers</strong>{transfers.map(transfer => <div className="transfer-card" key={transfer.id}><div><strong>{transfer.number}</strong><span>{transfer.source_location} → {transfer.destination_location} · {transfer.items.length} serials</span></div><Status value={transfer.status}/><div className="transfer-card-actions">{transfer.status === 'In transit' && <button className="row-action" onClick={() => void receiveTransfer(transfer)}><PackageCheck size={14}/> Receive</button>}{transfer.status === 'In transit' && <><input aria-label="Carrier" value={carrier} onChange={e => setCarrier(e.target.value)} placeholder="Carrier"/><input aria-label="Tracking number" value={tracking} onChange={e => setTracking(e.target.value)} placeholder="Tracking no."/><button className="row-action" onClick={() => void createShipment(transfer)}><Truck size={14}/> Ship</button></>}</div></div>)}</div>}{shipments.length > 0 && <div className="transfer-list"><strong className="workflow-help">Shipment status</strong>{shipments.map(shipment => <div className="transfer-card" key={shipment.id}><div><strong>{shipment.number}</strong><span>{shipment.carrier || 'No carrier'} · {shipment.tracking_number || 'No tracking number'}</span></div><select aria-label={`Status for ${shipment.number}`} value={shipment.status} onChange={e => void updateShipment(shipment, e.target.value)}><option>Draft</option><option>Dispatched</option><option>In transit</option><option>Delivered</option><option>Cancelled</option></select></div>)}</div>}{reservations.length > 0 && <div className="transfer-list"><strong className="workflow-help">Active reservations</strong>{reservations.map(reservation => <div className="transfer-card" key={reservation.id}><div><strong>{reservation.serial_number}</strong><span>{reservation.reference_type} · {reservation.reference_id}</span></div><button className="row-action" onClick={() => void releaseReservation(reservation)}>Release</button></div>)}</div>}{error && <p className="workflow-error" role="alert">{error}</p>}</Panel>}
-    {intakeOpen && <StockIntakeDialog close={() => setIntakeOpen(false)} saved={async count => { setIntakeOpen(false); notify(`${count} serialized unit${count === 1 ? '' : 's'} received`); await load(); }} />}
-  </>;
+  return (
+    <>
+      <div className="ops-kpis">
+        <LiveKpi
+          label="Available devices"
+          onClick={() => showStatus('Available')}
+          active={statusFilter === 'Available'}
+          help="Units ready to sell or transfer. Reserved, sold, in-transit and warranty units are not counted."
+          value={summary.available}
+          note={`${summary.total} total serialized units`}
+          icon={<Boxes size={16} />}
+          tone="blue"
+        />
+        <LiveKpi
+          label="Reserved"
+          onClick={() => showStatus('Reserved')}
+          active={statusFilter === 'Reserved'}
+          help="Held for a quotation or manual reservation. They cannot be sold elsewhere until released or converted; reservations expire automatically."
+          value={summary.reserved}
+          note={`${summary.in_transit} in transit`}
+          icon={<ClipboardCheck size={16} />}
+          tone="amber"
+        />
+        <LiveKpi
+          label="Installed / sold"
+          onClick={() => showStatus('Sold')}
+          active={statusFilter === 'Sold'}
+          help="Units delivered to clients. Selling a unit starts its warranty."
+          value={summary.installed + summary.sold}
+          note={`${summary.warranty} in warranty service`}
+          icon={<Truck size={16} />}
+          tone="purple"
+        />
+        <LiveKpi
+          label="Serialized stock"
+          onClick={() => setStatusFilter('')}
+          active={statusFilter === ''}
+          help="Every serial number received, in any status. Click to clear the status filter."
+          value={summary.total}
+          note="Live PostgreSQL count"
+          icon={<CircleDollarSign size={16} />}
+          tone="green"
+        />
+      </div>
+      <div className="ops-tabs" role="tablist" aria-label="Inventory sections">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeSection === 'stock'}
+          className={activeSection === 'stock' ? 'active' : ''}
+          onClick={() => setActiveSection('stock')}
+        >
+          Stock overview
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeSection === 'movement'}
+          className={activeSection === 'movement' ? 'active' : ''}
+          onClick={() => setActiveSection('movement')}
+        >
+          Transfers & reservations
+        </button>
+      </div>
+      {activeSection === 'stock' && (
+        <>
+          <div className="trace-search">
+            <div>
+              <span className="ops-kicker">Serial traceability</span>
+              <h2>Find a live device</h2>
+              <p>Searches current inventory state, location, and client assignment.</p>
+            </div>
+            <div className="serial-field">
+              <Search size={15} />
+              <input
+                value={serial}
+                onChange={(e) => setSerial(e.target.value)}
+                placeholder="Enter serial, e.g. POS-884021"
+              />
+              <button onClick={() => notify(found ? `${found.serial_number} found` : 'No device found')}>Check</button>
+            </div>
+          </div>
+          {serial && (
+            <div className="trace-result">
+              {found ? (
+                <div className="trace-device">
+                  <span className="device-icon">
+                    <Boxes size={18} />
+                  </span>
+                  <div>
+                    <strong>{found.serial_number}</strong>
+                    <span>
+                      {found.sku} · {found.description}
+                    </span>
+                  </div>
+                  <Status value={found.status} />
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <Search size={22} />
+                  <strong>No matching device</strong>
+                  <span>Check the serial formatting and try again.</span>
+                </div>
+              )}
+            </div>
+          )}
+          <Panel
+            title="Live device register"
+            help="Life of a unit: Available → Reserved (held for a quote) → Sold (delivered, warranty starts) → Installed. In transit means moving between locations; Quarantined means returned damaged."
+            subtitle="Every row is read from serialized inventory"
+            actions={
+              <div className="inventory-panel-actions">
+                <button className="ops-btn blue" onClick={() => setIntakeOpen(true)}>
+                  <Plus size={14} /> Add stock
+                </button>
+                <button className="link-btn" onClick={() => void load()}>
+                  <Check size={14} /> Refresh
+                </button>
+              </div>
+            }
+          >
+            {statusFilter && (
+              <div className="filter-chip-row">
+                <span>Showing</span>
+                <button
+                  className="filter-chip"
+                  onClick={() => setStatusFilter('')}
+                  aria-label={`Clear ${statusFilter} filter`}
+                >
+                  {statusFilter} <X size={12} />
+                </button>
+              </div>
+            )}
+            <div className="data-table labelled-cards">
+              <TableHead labels={['Serial / product', 'Location', 'Status', 'Client', 'Action']} />
+              {items.map((item) => (
+                <div className="data-row" key={item.id}>
+                  <div data-label="Serial / product">
+                    <strong>{item.serial_number}</strong>
+                    <small>
+                      {item.sku} · {item.description}
+                    </small>
+                  </div>
+                  <span data-label="Location">{item.location}</span>
+                  <Status value={item.status} />
+                  <span data-label="Client">{item.client_name || '—'}</span>
+                  <button
+                    className="row-action"
+                    data-label="Action"
+                    onClick={() => {
+                      setSerial(item.serial_number);
+                      notify(`${item.serial_number} trace opened`);
+                    }}
+                  >
+                    Trace
+                  </button>
+                </div>
+              ))}
+              {!items.length && (
+                <div className="empty-state">
+                  <Boxes size={22} />
+                  <strong>No inventory records</strong>
+                  <span>Receive serialized stock to populate this register.</span>
+                </div>
+              )}
+            </div>
+            <div className="ops-pagination" aria-label="Inventory pagination">
+              <span>
+                Showing {items.length ? (page - 1) * pagination.pageSize + 1 : 0}–
+                {Math.min(page * pagination.pageSize, pagination.total)} of {pagination.total}
+              </span>
+              <div>
+                <button
+                  type="button"
+                  className="link-btn"
+                  disabled={page <= 1}
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  className="link-btn"
+                  disabled={!pagination.hasMore}
+                  onClick={() => setPage((current) => current + 1)}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </Panel>
+        </>
+      )}
+      {activeSection === 'movement' && (
+        <Panel
+          title="Transfers, shipping, and reservations"
+          subtitle="Dispatch available serials, reserve exact units, receive transfers, and track shipments"
+        >
+          <div className="transfer-form">
+            <label>
+              <span>Source</span>
+              <select value={source} onChange={(e) => setSource(e.target.value)}>
+                <option value="">Select source</option>
+                {locations.map((location) => (
+                  <option key={location}>{location}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Destination</span>
+              <input
+                value={destination}
+                onChange={(e) => setDestination(e.target.value)}
+                placeholder="Bulawayo Branch"
+              />
+            </label>
+            <label>
+              <span>Reservation reference</span>
+              <input
+                value={reservationRef}
+                onChange={(e) => setReservationRef(e.target.value)}
+                placeholder="QUO-2026-000001"
+              />
+            </label>
+            <button className="ops-btn blue" onClick={() => void createTransfer()}>
+              Dispatch selected
+            </button>
+          </div>
+          <div className="data-table labelled-cards">
+            <TableHead labels={['Select', 'Serial', 'SKU', 'Location', 'Status', 'Action']} />
+            {availableItems.map((item) => (
+              <div className="data-row transfer-row" key={item.id}>
+                <input
+                  type="checkbox"
+                  aria-label={`Select ${item.serial_number}`}
+                  checked={selected.includes(item.id)}
+                  onChange={(e) =>
+                    setSelected((current) =>
+                      e.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id),
+                    )
+                  }
+                />
+                <strong data-label="Serial">{item.serial_number}</strong>
+                <span data-label="SKU">{item.sku}</span>
+                <span data-label="Location">{item.location}</span>
+                <Status value={item.status} />
+                <button className="row-action" data-label="Action" onClick={() => void reserve(item)}>
+                  <ClipboardCheck size={14} /> Reserve
+                </button>
+              </div>
+            ))}
+          </div>
+          {transfers.length > 0 && (
+            <div className="transfer-list">
+              <strong className="workflow-help">Transfers</strong>
+              {transfers.map((transfer) => (
+                <div className="transfer-card" key={transfer.id}>
+                  <div>
+                    <strong>{transfer.number}</strong>
+                    <span>
+                      {transfer.source_location} → {transfer.destination_location} · {transfer.items.length} serials
+                    </span>
+                  </div>
+                  <Status value={transfer.status} />
+                  <div className="transfer-card-actions">
+                    {transfer.status === 'In transit' && (
+                      <button className="row-action" onClick={() => void receiveTransfer(transfer)}>
+                        <PackageCheck size={14} /> Receive
+                      </button>
+                    )}
+                    {transfer.status === 'In transit' && (
+                      <button className="row-action" onClick={() => void cancelTransfer(transfer)}>
+                        <X size={14} /> Cancel
+                      </button>
+                    )}
+                    {transfer.status === 'In transit' && (
+                      <>
+                        <input
+                          aria-label="Carrier"
+                          value={carrier}
+                          onChange={(e) => setCarrier(e.target.value)}
+                          placeholder="Carrier"
+                        />
+                        <input
+                          aria-label="Tracking number"
+                          value={tracking}
+                          onChange={(e) => setTracking(e.target.value)}
+                          placeholder="Tracking no."
+                        />
+                        <button className="row-action" onClick={() => void createShipment(transfer)}>
+                          <Truck size={14} /> Ship
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {shipments.length > 0 && (
+            <div className="transfer-list">
+              <strong className="workflow-help">Shipment status</strong>
+              {shipments.map((shipment) => (
+                <div className="transfer-card" key={shipment.id}>
+                  <div>
+                    <strong>{shipment.number}</strong>
+                    <span>
+                      {shipment.carrier || 'No carrier'} · {shipment.tracking_number || 'No tracking number'}
+                    </span>
+                  </div>
+                  <select
+                    aria-label={`Status for ${shipment.number}`}
+                    value={shipment.status}
+                    onChange={(e) => void updateShipment(shipment, e.target.value)}
+                  >
+                    <option>Draft</option>
+                    <option>Dispatched</option>
+                    <option>In transit</option>
+                    <option>Delivered</option>
+                    <option>Cancelled</option>
+                  </select>
+                </div>
+              ))}
+            </div>
+          )}
+          {reservations.length > 0 && (
+            <div className="transfer-list">
+              <strong className="workflow-help">Active reservations</strong>
+              {reservations.map((reservation) => (
+                <div className="transfer-card" key={reservation.id}>
+                  <div>
+                    <strong>{reservation.serial_number}</strong>
+                    <span>
+                      {reservation.reference_type} · {reservation.reference_id}
+                    </span>
+                  </div>
+                  <button className="row-action" onClick={() => void releaseReservation(reservation)}>
+                    Release
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {error && (
+            <p className="workflow-error" role="alert">
+              {error}
+            </p>
+          )}
+        </Panel>
+      )}
+      {intakeOpen && (
+        <StockIntakeDialog
+          close={() => setIntakeOpen(false)}
+          saved={async (count) => {
+            setIntakeOpen(false);
+            notify(`${count} serialized unit${count === 1 ? '' : 's'} received`);
+            await load();
+          }}
+        />
+      )}
+    </>
+  );
 }
 
-function LiveKpi({ label, value, note, icon, tone }: { label: string; value: number; note: string; icon: React.ReactNode; tone: string }) { return <div className="ops-kpi"><span className={`kpi-icon ${tone}`}>{icon}</span><strong>{value.toLocaleString()}</strong><span>{label}</span><small>{note}</small></div>; }
-function Panel({ title, subtitle, actions, children }: { title: string; subtitle: string; actions?: React.ReactNode; children: React.ReactNode }) { return <section className="ops-panel"><div className="ops-panel-head"><div><h2>{title}</h2><p>{subtitle}</p></div>{actions}</div>{children}</section>; }
-function TableHead({ labels }: { labels: string[] }) { return <div className="table-head ops-table-head">{labels.map(label => <span key={label}>{label}</span>)}</div>; }
-function Status({ value }: { value: string }) { const key = value.toLowerCase().replaceAll(' ', '-'); return <span className={`status ${key}`}>{value}</span>; }
-
 function StockIntakeDialog({ close, saved }: { close: () => void; saved: (count: number) => Promise<void> }) {
-  const [step, setStep] = useState(1); const [category, setCategory] = useState<'Laptop' | 'POS'>('Laptop'); const [productName, setProductName] = useState(''); const [sku, setSku] = useState(''); const [location, setLocation] = useState(''); const [serialText, setSerialText] = useState(''); const [notes, setNotes] = useState(''); const [error, setError] = useState(''); const [saving, setSaving] = useState(false);
-  const serialNumbers = Array.from(new Set(serialText.split(/[\n,]+/).map(value => value.trim()).filter(Boolean)));
-  const submit = async () => { setError(''); if (!productName.trim() || !sku.trim() || !location.trim() || !serialNumbers.length) { setError('Complete the product, location, and at least one unique serial number.'); return; } setSaving(true); try { const response = await fetch('/api/inventory/intake', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ category, productName, sku, location, serialNumbers, notes }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Unable to receive stock.'); await saved(data.received || serialNumbers.length); } catch (submitError) { setError(submitError instanceof Error ? submitError.message : 'Unable to receive stock.'); } finally { setSaving(false); } };
-  return <div className="workflow-dialog-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) close(); }}><div className="workflow-dialog stock-intake-dialog" role="dialog" aria-modal="true" aria-label="Add serialized stock" tabIndex={-1}><div className="workflow-dialog-head"><div><h3>Add serialized stock</h3><p>Three steps · classify, serialize, receive</p></div><button onClick={close} aria-label="Close"><X size={16}/></button></div><div className="stock-stepper"><span className={step >= 1 ? 'active' : ''}>1 <small>Type</small></span><i/><span className={step >= 2 ? 'active' : ''}>2 <small>Serials</small></span><i/><span className={step >= 3 ? 'active' : ''}>3 <small>Review</small></span></div>{step === 1 && <div className="workflow-form"><p className="workflow-help">New stock must be serialized and is currently limited to laptops and POS devices.</p><div className="stock-type-grid"><button className={category === 'Laptop' ? 'stock-type selected' : 'stock-type'} onClick={() => setCategory('Laptop')}><Laptop size={24}/><strong>Laptop</strong><span>Portable computers</span></button><button className={category === 'POS' ? 'stock-type selected' : 'stock-type'} onClick={() => setCategory('POS')}><Boxes size={24}/><strong>POS</strong><span>Point-of-sale devices</span></button></div><label className="workflow-field"><span>Product name</span><input required value={productName} onChange={event => setProductName(event.target.value)} placeholder={category === 'Laptop' ? 'iPayBook Air 14' : 'iPay POS Pro 5'}/></label><label className="workflow-field"><span>SKU</span><input required value={sku} onChange={event => setSku(event.target.value)} placeholder={category === 'Laptop' ? 'LAP-BOOK-AIR-14' : 'POS-PRO-5'}/></label><div className="workflow-dialog-actions"><button type="button" className="ops-btn ghost" onClick={close}>Cancel</button><button type="button" className="ops-btn blue" onClick={() => setStep(2)}>Next: add serials</button></div></div>}{step === 2 && <div className="workflow-form"><label className="workflow-field"><span>Stock location</span><input required value={location} onChange={event => setLocation(event.target.value)} placeholder="Harare HQ"/></label><label className="workflow-field"><span>Serial numbers</span><textarea required rows={7} value={serialText} onChange={event => setSerialText(event.target.value)} placeholder="One serial per line or comma-separated"/><small className="workflow-help">{serialNumbers.length} unique serial number(s) detected.</small></label><label className="workflow-field"><span>Notes (optional)</span><textarea rows={3} value={notes} onChange={event => setNotes(event.target.value)} placeholder="Supplier or receipt reference"/></label><div className="workflow-dialog-actions"><button type="button" className="ops-btn ghost" onClick={() => setStep(1)}>Back</button><button type="button" className="ops-btn blue" onClick={() => setStep(3)} disabled={!location.trim() || !serialNumbers.length}>Next: review</button></div></div>}{step === 3 && <div className="workflow-form"><div className="stock-review"><div><span>Category</span><strong>{category}</strong></div><div><span>Product</span><strong>{productName || '—'} · {sku || '—'}</strong></div><div><span>Location</span><strong>{location || '—'}</strong></div><div><span>Serials</span><strong>{serialNumbers.length} unit(s)</strong></div></div><div className="serial-preview">{serialNumbers.map(serial => <span key={serial}>{serial}</span>)}</div>{error && <p className="workflow-error" role="alert">{error}</p>}<div className="workflow-dialog-actions"><button type="button" className="ops-btn ghost" onClick={() => setStep(2)}>Back</button><button type="button" className="ops-btn blue" onClick={() => void submit()} disabled={saving}>{saving ? 'Receiving…' : 'Receive stock'}</button></div></div>}</div></div>;
+  const [step, setStep] = useState(1);
+  const [category, setCategory] = useState<'Laptop' | 'POS'>('Laptop');
+  const [productName, setProductName] = useState('');
+  const [sku, setSku] = useState('');
+  const [location, setLocation] = useState('');
+  const [serialText, setSerialText] = useState('');
+  const [notes, setNotes] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const serialNumbers = Array.from(
+    new Set(
+      serialText
+        .split(/[\n,]+/)
+        .map((value) => value.trim())
+        .filter(Boolean),
+    ),
+  );
+  const submit = async () => {
+    setError('');
+    if (!productName.trim() || !sku.trim() || !location.trim() || !serialNumbers.length) {
+      setError('Complete the product, location, and at least one unique serial number.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const response = await fetch('/api/inventory/intake', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category, productName, sku, location, serialNumbers, notes }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Unable to receive stock.');
+      await saved(data.received || serialNumbers.length);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : 'Unable to receive stock.');
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <div
+      className="workflow-dialog-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) close();
+      }}
+    >
+      <div
+        className="workflow-dialog stock-intake-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Add serialized stock"
+        tabIndex={-1}
+      >
+        <div className="workflow-dialog-head">
+          <div>
+            <h3>Add serialized stock</h3>
+            <p>Three steps · classify, serialize, receive</p>
+          </div>
+          <button onClick={close} aria-label="Close">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="stock-stepper">
+          <span className={step >= 1 ? 'active' : ''}>
+            1 <small>Type</small>
+          </span>
+          <i />
+          <span className={step >= 2 ? 'active' : ''}>
+            2 <small>Serials</small>
+          </span>
+          <i />
+          <span className={step >= 3 ? 'active' : ''}>
+            3 <small>Review</small>
+          </span>
+        </div>
+        {step === 1 && (
+          <div className="workflow-form">
+            <p className="workflow-help">
+              New stock must be serialized and is currently limited to laptops and POS devices.
+            </p>
+            <div className="stock-type-grid">
+              <button
+                className={category === 'Laptop' ? 'stock-type selected' : 'stock-type'}
+                onClick={() => setCategory('Laptop')}
+              >
+                <Laptop size={24} />
+                <strong>Laptop</strong>
+                <span>Portable computers</span>
+              </button>
+              <button
+                className={category === 'POS' ? 'stock-type selected' : 'stock-type'}
+                onClick={() => setCategory('POS')}
+              >
+                <Boxes size={24} />
+                <strong>POS</strong>
+                <span>Point-of-sale devices</span>
+              </button>
+            </div>
+            <label className="workflow-field">
+              <span>Product name</span>
+              <input
+                required
+                value={productName}
+                onChange={(event) => setProductName(event.target.value)}
+                placeholder={category === 'Laptop' ? 'iPayBook Air 14' : 'iPay POS Pro 5'}
+              />
+            </label>
+            <label className="workflow-field">
+              <span>SKU</span>
+              <input
+                required
+                value={sku}
+                onChange={(event) => setSku(event.target.value)}
+                placeholder={category === 'Laptop' ? 'LAP-BOOK-AIR-14' : 'POS-PRO-5'}
+              />
+            </label>
+            <div className="workflow-dialog-actions">
+              <button type="button" className="ops-btn ghost" onClick={close}>
+                Cancel
+              </button>
+              <button type="button" className="ops-btn blue" onClick={() => setStep(2)}>
+                Next: add serials
+              </button>
+            </div>
+          </div>
+        )}
+        {step === 2 && (
+          <div className="workflow-form">
+            <label className="workflow-field">
+              <span>Stock location</span>
+              <input
+                required
+                value={location}
+                onChange={(event) => setLocation(event.target.value)}
+                placeholder="Harare HQ"
+              />
+            </label>
+            <label className="workflow-field">
+              <span>Serial numbers</span>
+              <textarea
+                required
+                rows={7}
+                value={serialText}
+                onChange={(event) => setSerialText(event.target.value)}
+                placeholder="One serial per line or comma-separated"
+              />
+              <small className="workflow-help">{serialNumbers.length} unique serial number(s) detected.</small>
+            </label>
+            <label className="workflow-field">
+              <span>Notes (optional)</span>
+              <textarea
+                rows={3}
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Supplier or receipt reference"
+              />
+            </label>
+            <div className="workflow-dialog-actions">
+              <button type="button" className="ops-btn ghost" onClick={() => setStep(1)}>
+                Back
+              </button>
+              <button
+                type="button"
+                className="ops-btn blue"
+                onClick={() => setStep(3)}
+                disabled={!location.trim() || !serialNumbers.length}
+              >
+                Next: review
+              </button>
+            </div>
+          </div>
+        )}
+        {step === 3 && (
+          <div className="workflow-form">
+            <div className="stock-review">
+              <div>
+                <span>Category</span>
+                <strong>{category}</strong>
+              </div>
+              <div>
+                <span>Product</span>
+                <strong>
+                  {productName || '—'} · {sku || '—'}
+                </strong>
+              </div>
+              <div>
+                <span>Location</span>
+                <strong>{location || '—'}</strong>
+              </div>
+              <div>
+                <span>Serials</span>
+                <strong>{serialNumbers.length} unit(s)</strong>
+              </div>
+            </div>
+            <div className="serial-preview">
+              {serialNumbers.map((serial) => (
+                <span key={serial}>{serial}</span>
+              ))}
+            </div>
+            {error && (
+              <p className="workflow-error" role="alert">
+                {error}
+              </p>
+            )}
+            <div className="workflow-dialog-actions">
+              <button type="button" className="ops-btn ghost" onClick={() => setStep(2)}>
+                Back
+              </button>
+              <button type="button" className="ops-btn blue" onClick={() => void submit()} disabled={saving}>
+                {saving ? 'Receiving…' : 'Receive stock'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }

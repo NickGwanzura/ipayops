@@ -1,5 +1,6 @@
 import { Pool, type QueryResultRow } from 'pg';
 import { getDbRequestContext, type DbRequestContext } from '@/lib/db-request-context';
+import { databaseSsl } from '@/lib/db-ssl';
 
 const globalForDb = globalThis as typeof globalThis & { __ipaytechPool?: Pool };
 
@@ -9,7 +10,7 @@ function getPool() {
     globalForDb.__ipaytechPool = new Pool({
       connectionString: process.env.DATABASE_URL,
       max: Number(process.env.DATABASE_POOL_MAX || 10),
-      ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+      ssl: databaseSsl(),
     });
   }
   return globalForDb.__ipaytechPool;

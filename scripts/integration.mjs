@@ -10,7 +10,7 @@ import pg from 'pg';
 
 const { Pool } = pg;
 
-if (!/^20\./.test(process.versions.node)) throw new Error(`Integration harness requires Node 20; found ${process.versions.node}.`);
+if (Number(process.versions.node.split(".")[0]) < 20) throw new Error(`Integration harness requires Node 20 or newer; found ${process.versions.node}.`);
 if (process.env.INTEGRATION_TEST_DATABASE !== 'true') throw new Error('Refusing to run integration tests without INTEGRATION_TEST_DATABASE=true.');
 if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required.');
 
@@ -135,7 +135,7 @@ async function startServer() {
   for (let attempt = 0; attempt < 60; attempt += 1) {
     if (server.exitCode !== null) throw new Error(`Standalone server exited with code ${server.exitCode}.`);
     try {
-      const response = await fetch(`${baseUrl}/api/health`);
+      const response = await fetch(`${baseUrl}/api/health?probe=live`);
       if (response.status === 200) {
         pass('standalone server health');
         must('API health propagates a request correlation ID', requestIdPattern.test(response.headers.get('x-request-id') || ''));
@@ -237,7 +237,7 @@ async function seed() {
     [orgAId, 'Luna UAT Org A', `luna-uat-org-a-${runToken}`],
     [orgBId, 'Luna UAT Org B', `luna-uat-org-b-${runToken}`],
   ];
-  await pool.query('DELETE FROM organizations WHERE id = ANY($1::uuid[])', [[orgAId, orgBId]]);
+  await deleteIntegrationOrganizations([orgAId, orgBId]);
   for (const [id, name, slug] of values) await pool.query('INSERT INTO organizations (id, name, slug) VALUES ($1, $2, $3)', [id, name, slug]);
   for (const user of Object.values(users)) {
     await pool.query('INSERT INTO users (id, organization_id, email, full_name, password_hash, role) VALUES ($1, $2, $3, $4, $5, $6)', [user.id, user.organizationId, user.email, user.fullName, hash, user.role]);
@@ -251,7 +251,10 @@ async function seed() {
        ($3, $2, 'LUNA-UAT-WARRANTY-001', 'UAT-WARRANTY', 'Warranty serialized unit', 'UAT', 'Available', NULL, 25, 75)`,
     [foreignItemId, orgAId, warrantyItemId],
   );
-  await pool.query('INSERT INTO inventory_items (organization_id, serial_number, sku, description, location, status, cost_price, selling_price) VALUES ($1, $2, $3, $4, $5, \'Available\', $6, $7), ($1, $8, $9, $10, $5, \'Available\', $11, $12)', [orgAId, 'LUNA-UAT-QUOTE-001', 'UAT-LINE-1', 'UAT serialized line one', 40, 100, 'LUNA-UAT-QUOTE-002', 'UAT-LINE-2', 'UAT serialized line two', 60, 100]);
+  await pool.query('INSERT INTO inventory_items (organization_id, serial_number, sku, description, location, status, cost_price, selling_price) VALUES ($1, $2, $3, $4, $5, \'Available\', $6, $7), ($1, $8, $9, $10, $5, \'Available\', $11, $12)', [orgAId, 'LUNA-UAT-QUOTE-001', 'UAT-LINE-1', 'UAT serialized line one', 'UAT', 40, 100, 'LUNA-UAT-QUOTE-002', 'UAT-LINE-2', 'UAT serialized line two', 60, 100]);
+  // Quotation lines must use catalogue SKUs, so seed the catalogue entries behind the quote units above.
+  const seedSupplier = await pool.query('INSERT INTO suppliers (organization_id, code, name) VALUES ($1, $2, $3) RETURNING id', [orgAId, `UAT-SEEDSUP-${runToken}`, 'Luna UAT Seed Supplier']);
+  await pool.query("INSERT INTO supplier_products (organization_id, supplier_id, product_type, product_name, sku, warranty_months, unit_cost, cost_price, selling_price) VALUES ($1, $2, 'Laptop', 'UAT serialized line one', 'UAT-LINE-1', 12, 40, 40, 100), ($1, $2, 'Laptop', 'UAT serialized line two', 'UAT-LINE-2', 12, 40, 40, 100)", [orgAId, seedSupplier.rows[0].id]);
   const quoteInventory = await pool.query('SELECT id, serial_number, sku FROM inventory_items WHERE organization_id = $1 AND serial_number LIKE \'LUNA-UAT-QUOTE-%\' ORDER BY serial_number', [orgAId]);
   must('integration seed creates two serialized quotation units', quoteInventory.rows.length === 2);
   return { users, clientASeedId, clientBId, foreignItemId, warrantyItemId, quoteItems, quoteInventory: quoteInventory.rows };
@@ -415,6 +418,106 @@ async function runAssertions(data) {
   const warrantyState = await pool.query(`SELECT wc.status, COUNT(rr.id)::int AS requisitions FROM warranty_claims wc LEFT JOIN repair_requisitions rr ON rr.claim_id = wc.id WHERE wc.id = $1 GROUP BY wc.status`, [claim.body.claim.id]);
   must('Warranty requisition commits requisition and Repair status atomically', requisition.status === 201 && warrantyState.rows[0]?.status === 'Repair' && warrantyState.rows[0]?.requisitions === 1);
 
+  // ---- Workflow regression tests: stock intake, purchase orders, reservations, commissions, HR ----
+  const intakeUnknown = await request(manager.jar, 'POST', '/api/inventory/intake', { category: 'Laptop', productName: 'Unlisted', sku: 'UAT-NOT-IN-CATALOGUE', location: 'UAT', serialNumbers: [`UAT-INTAKE-X-${runToken}`] });
+  must('Stock intake rejects a SKU that is not in the product catalogue', intakeUnknown.status === 422);
+  const intakeKnown = await request(manager.jar, 'POST', '/api/inventory/intake', { category: 'Laptop', productName: 'UAT serialized line one', sku: 'UAT-LINE-1', location: 'UAT', serialNumbers: [`UAT-INTAKE-1-${runToken}`] });
+  const intakeRow = await pool.query('SELECT cost_price, selling_price, supplier_product_id FROM inventory_items WHERE serial_number = $1', [`UAT-INTAKE-1-${runToken}`]);
+  must('Stock intake carries the catalogue cost and selling price', intakeKnown.status === 201 && Number(intakeRow.rows[0]?.cost_price) === 40 && Number(intakeRow.rows[0]?.selling_price) === 100 && Boolean(intakeRow.rows[0]?.supplier_product_id));
+
+  const poSupplierId = supplier.body.supplier?.id;
+  const poProduct = await request(manager.jar, 'POST', '/api/products', { supplierId: poSupplierId, productType: 'POS', productName: 'UAT PO device', sku: `UAT-PO-${runToken}`, warrantyMonths: 24, costPrice: 50, sellingPrice: 120 });
+  must('Manager can add a catalogue product', poProduct.status === 201);
+  const purchaseOrder = await request(manager.jar, 'POST', '/api/purchase-orders', { supplierId: poSupplierId, destination: 'UAT', items: [{ productId: poProduct.body.product?.id, quantity: 1, unitCost: 50 }] });
+  must('Purchase order can be created', purchaseOrder.status === 201);
+  const purchaseOrderId = purchaseOrder.body.purchaseOrder?.id;
+  const poApprove = await request(ceoSecond.jar, 'POST', `/api/purchase-orders/${purchaseOrderId}/approve`);
+  must('A different user can approve the purchase order', poApprove.status === 200);
+  const poEdit = await request(manager.jar, 'PATCH', `/api/purchase-orders/${purchaseOrderId}`, { items: [{ productId: poProduct.body.product?.id, quantity: 5, unitCost: 1 }] });
+  must('Approved purchase order lines cannot be edited', poEdit.status === 409);
+  const poReopen = await request(manager.jar, 'PATCH', `/api/purchase-orders/${purchaseOrderId}`, { status: 'Draft' });
+  must('Approved purchase order cannot be moved back to draft', poReopen.status === 409);
+  await request(manager.jar, 'PATCH', `/api/products/${poProduct.body.product?.id}`, { costPrice: 999 });
+  const poDetail = await request(manager.jar, 'GET', `/api/purchase-orders/${purchaseOrderId}`);
+  const poReceive = await request(manager.jar, 'POST', `/api/purchase-orders/${purchaseOrderId}/receive`, { items: [{ purchaseOrderItemId: poDetail.body.purchaseOrder?.items?.[0]?.id, quantity: 1, serialNumbers: [`UAT-PO-SN-${runToken}`], location: 'UAT' }] });
+  const poStock = await pool.query('SELECT cost_price FROM inventory_items WHERE serial_number = $1', [`UAT-PO-SN-${runToken}`]);
+  must('Received stock is costed at the purchase-order price, not the later catalogue cost', poReceive.status === 201 && Number(poStock.rows[0]?.cost_price) === 50);
+
+  const holdUnit = await pool.query(`INSERT INTO inventory_items (organization_id, serial_number, sku, description, location, status, cost_price, selling_price) VALUES ($1, $2, 'UAT-LINE-1', 'UAT hold unit', 'UAT', 'Available', 40, 100) RETURNING id`, [orgAId, `UAT-HOLD-${runToken}`]);
+  const managerQuote = await request(manager.jar, 'POST', '/api/crm/quotations', { clientId: createdClientId, items: [{ sku: 'UAT-LINE-1', quantity: 1 }] });
+  must('Free-typed catalogue SKU is priced from the catalogue', managerQuote.status === 201 && Number(managerQuote.body.quotation?.total) === 100);
+  const belowCost = await request(sales.jar, 'POST', '/api/crm/quotations', { clientId: createdClientId, items: [{ sku: 'UAT-LINE-1', quantity: 1, unitPrice: 10 }] });
+  must('A consultant cannot quote below cost', belowCost.status === 422);
+  const salesQuote = await request(sales.jar, 'POST', '/api/crm/quotations', { clientId: createdClientId, items: [{ sku: 'UAT-LINE-1', quantity: 1 }] });
+  must('Consultant can create a second quotation', salesQuote.status === 201);
+  const hold = await request(manager.jar, 'POST', '/api/inventory/reservations', { inventoryItemId: holdUnit.rows[0].id, referenceType: 'quotation', referenceId: managerQuote.body.quotation?.number });
+  must('Manager can reserve stock against a quotation by number', hold.status === 201);
+  const salesQuoteLine = await pool.query('SELECT id FROM quotation_items WHERE quotation_id = $1', [salesQuote.body.quotation?.id]);
+  const blockedConvert = await request(sales.jar, 'POST', `/api/crm/quotations/${salesQuote.body.quotation?.id}/convert`, { items: [{ quotationItemId: salesQuoteLine.rows[0]?.id, inventoryItemIds: [holdUnit.rows[0].id] }] });
+  must('Stock held for another quotation cannot be sold by a consultant', blockedConvert.status === 409);
+  await request(manager.jar, 'POST', `/api/inventory/reservations/${hold.body.reservation?.id}/release`);
+  const freedConvert = await request(sales.jar, 'POST', `/api/crm/quotations/${salesQuote.body.quotation?.id}/convert`, { items: [{ quotationItemId: salesQuoteLine.rows[0]?.id, inventoryItemIds: [holdUnit.rows[0].id] }] });
+  must('Released stock can be sold', freedConvert.status === 201);
+  const secondSaleId = freedConvert.body.sale?.id;
+  const secondInvoice = await request(sales.jar, 'POST', `/api/crm/sales/${secondSaleId}/invoice`);
+  const secondInvoiceRow = await pool.query('SELECT id, due_at, total FROM invoices WHERE sale_id = $1', [secondSaleId]);
+  must('New invoices get a due date from the payment terms', secondInvoice.status === 201 && secondInvoiceRow.rows[0]?.due_at !== null && Number(secondInvoiceRow.rows[0]?.total) === 100);
+  const secondSaleItem = await pool.query('SELECT id FROM sale_items WHERE sale_id = $1', [secondSaleId]);
+  const creditReturn = await request(sales.jar, 'POST', `/api/crm/sales/${secondSaleId}/returns`, { reason: 'UAT credit note return', refundAmount: 0, items: [{ saleItemId: secondSaleItem.rows[0]?.id, condition: 'Good' }] });
+  const creditedInvoice = await pool.query('SELECT status, total FROM invoices WHERE id = $1', [secondInvoiceRow.rows[0]?.id]);
+  const creditedReturn = await pool.query('SELECT id, credit_note_number FROM returns WHERE sale_id = $1', [secondSaleId]);
+  must('A full return voids the unpaid invoice and issues a credit note', creditReturn.status === 201 && creditedInvoice.rows[0]?.status === 'Void' && Number(creditedInvoice.rows[0]?.total) === 0 && /^CN-/.test(creditedReturn.rows[0]?.credit_note_number || ''));
+  const creditPdf = await request(sales.jar, 'GET', `/api/crm/returns/${creditedReturn.rows[0]?.id}/credit-note/pdf`);
+  must('The credit note PDF can be downloaded', creditPdf.status === 200 && (creditPdf.headers.get('content-type') || '').includes('application/pdf'));
+
+
+  await pool.query(`UPDATE commission_entries SET status = 'Paid' WHERE id = $1`, [entry.rows[0].id]);
+  const recommission = await request(financeSecond.jar, 'POST', `/api/crm/sales/${saleId}/commission`, { rate: 50 });
+  must('Recording commission again does not reopen a Paid entry', recommission.status === 409);
+  const finalReturn = await request(sales.jar, 'POST', `/api/crm/sales/${saleId}/returns`, { reason: 'UAT final return', refundAmount: 0, items: [{ saleItemId: saleItems.rows[1].id, condition: 'Good' }] });
+  const paidEntry = await pool.query('SELECT status, amount, clawback_amount FROM commission_entries WHERE id = $1', [entry.rows[0].id]);
+  must('A return after payout records a clawback and leaves the paid amount untouched', finalReturn.status === 201 && paidEntry.rows[0]?.status === 'Paid' && Number(paidEntry.rows[0]?.amount) === 10 && Number(paidEntry.rows[0]?.clawback_amount) === 10);
+
+  const takeover = await request(manager.jar, 'PATCH', `/api/hr/employees/${data.users.ceo.id}`, { email: `takeover.${runToken}@example.test` });
+  must('A manager cannot edit a CEO account', takeover.status === 403);
+  const leaverId = randomUUID();
+  await pool.query(`INSERT INTO users (id, organization_id, email, full_name, password_hash, role) VALUES ($1, $2, $3, 'Luna UAT Leaver', 'not-a-real-hash', 'sales_consultant')`, [leaverId, orgAId, `leaver.${runToken}@example.test`]);
+  await pool.query(`INSERT INTO opportunities (organization_id, name, client_id, owner_id) VALUES ($1, 'UAT leaver opportunity', $2, $3)`, [orgAId, createdClientId, leaverId]);
+  await pool.query(`INSERT INTO quotations (organization_id, number, client_id, total, created_by) VALUES ($1, $2, $3, 0, $4)`, [orgAId, `QUO-LEAVER-${runToken}`, createdClientId, leaverId]);
+  const offboard = await request(manager.jar, 'POST', `/api/hr/employees/${leaverId}/offboard`, { reassignToUserId: data.users.sales.id });
+  const handover = await pool.query(`SELECT (SELECT owner_id FROM opportunities WHERE organization_id = $1 AND name = 'UAT leaver opportunity') AS opportunity_owner, (SELECT created_by FROM quotations WHERE number = $2) AS quote_owner, (SELECT is_active FROM users WHERE id = $3) AS active`, [orgAId, `QUO-LEAVER-${runToken}`, leaverId]);
+  must('Offboarding hands the leaver\'s open opportunities and quotes to the chosen colleague', offboard.status === 200 && handover.rows[0]?.opportunity_owner === data.users.sales.id && handover.rows[0]?.quote_owner === data.users.sales.id && handover.rows[0]?.active === false);
+
+  const consultantToken = `luna-sales-invite-${runToken}-${randomUUID()}`;
+  await pool.query(`INSERT INTO user_invitations (organization_id, email, full_name, role, token_hash, expires_at, created_by) VALUES ($1, $2, 'Luna UAT New Consultant', 'sales_consultant', $3, now() + interval '1 hour', $4)`, [orgAId, `new.consultant.${runToken}@example.test`, createHash('sha256').update(consultantToken).digest('hex'), data.users.manager.id]);
+  const consultantAccept = await request(new CookieJar(), 'POST', `/api/auth/invitations/${consultantToken}`, { password: `Consultant-${runToken}-Password!` });
+  const consultantTasks = await pool.query(`SELECT COUNT(*)::int AS count FROM onboarding_tasks t JOIN users u ON u.id = t.user_id WHERE u.email = $1`, [`new.consultant.${runToken}@example.test`]);
+  must('Accepting a sales-consultant invitation creates the default onboarding checklist', consultantAccept.status === 200 && consultantTasks.rows[0]?.count === 4);
+
+  // ---- Global search and quotation reservations ----
+  const searchSales = await request(sales.jar, 'GET', '/api/search?q=UAT');
+  must('Search for a consultant never returns finance or procurement results', searchSales.status === 200 && searchSales.body.results.length > 0 && searchSales.body.results.every(hit => !['Invoice', 'Purchase order'].includes(hit.type)));
+  const searchPo = await request(manager.jar, 'GET', `/api/search?q=${encodeURIComponent(purchaseOrder.body.purchaseOrder?.number)}`);
+  must('A manager can find a purchase order by number', searchPo.status === 200 && searchPo.body.results.some(hit => hit.type === 'Purchase order'));
+  const searchWildcard = await request(manager.jar, 'GET', '/api/search?q=%25%25');
+  must('LIKE wildcards in search input are matched literally', searchWildcard.status === 200 && searchWildcard.body.results.length === 0);
+  const searchAnonymous = await request(new CookieJar(), 'GET', '/api/search?q=UAT');
+  must('Search requires a session', searchAnonymous.status === 401);
+
+  const intakeUnit = await pool.query('SELECT id FROM inventory_items WHERE serial_number = $1', [`UAT-INTAKE-1-${runToken}`]);
+  const reserveQuote = await request(sales.jar, 'POST', '/api/crm/quotations', { clientId: createdClientId, items: [{ sku: 'UAT-LINE-1', quantity: 1 }] });
+  const reserveQuoteId = reserveQuote.body.quotation?.id;
+  const reserveOk = await request(sales.jar, 'POST', `/api/crm/quotations/${reserveQuoteId}/reserve`, { inventoryItemIds: [intakeUnit.rows[0]?.id] });
+  must('A consultant can reserve stock for their own quotation', reserveOk.status === 201 && reserveOk.body.reserved === 1);
+  const reserveExtra = await request(sales.jar, 'POST', `/api/crm/quotations/${reserveQuoteId}/reserve`, { inventoryItemIds: [holdUnit.rows[0].id] });
+  must('Stock that is not available cannot be reserved', reserveExtra.status === 409);
+  const reserveHeld = await request(sales.jar, 'GET', `/api/crm/quotations/${reserveQuoteId}/reserve`);
+  must('Held units for the quotation can be listed', reserveHeld.status === 200 && reserveHeld.body.reserved?.length === 1);
+  const reserveRelease = await request(sales.jar, 'DELETE', `/api/crm/quotations/${reserveQuoteId}/reserve`);
+  const reserveAfter = await request(sales.jar, 'GET', `/api/crm/quotations/${reserveQuoteId}/reserve`);
+  const unitAfter = await pool.query('SELECT status FROM inventory_items WHERE id = $1', [intakeUnit.rows[0]?.id]);
+  must('Releasing a quotation reservation frees the unit', reserveRelease.status === 200 && reserveAfter.body.reserved?.length === 0 && unitAfter.rows[0]?.status === 'Available');
+
   await pool.query('DELETE FROM organizations WHERE id = $1', [orgBId]);
   const cascadeState = await pool.query(`SELECT
     (SELECT COUNT(*)::int FROM organizations WHERE id = $1) AS organizations,
@@ -423,9 +526,50 @@ async function runAssertions(data) {
   must('Organization cascade delete completes without audit FK blocking', cascadeState.rows[0]?.organizations === 0 && cascadeState.rows[0]?.clients === 0 && cascadeState.rows[0]?.audit_logs === 0);
 }
 
+// Workflow rows (sales, returns, invoices, ...) reference each other without ON DELETE CASCADE, so deleting an
+// organization directly fails. Delete the integration organizations' rows table by table, children before parents,
+// using the live foreign-key graph. Tables without an organization_id are removed by cascade from their parent.
+async function deleteIntegrationOrganizations(ids) {
+  const tables = (await pool.query("SELECT DISTINCT table_name FROM information_schema.columns WHERE table_schema = 'public' AND column_name = 'organization_id' AND table_name <> 'organizations'")).rows.map(row => row.table_name);
+  const known = new Set(tables);
+  const foreignKeys = (await pool.query("SELECT conrelid::regclass::text AS child, confrelid::regclass::text AS parent, confdeltype AS action FROM pg_constraint WHERE contype = 'f'")).rows;
+  // deleteBefore.get(x) = tables that must be emptied before x can be.
+  const deleteBefore = new Map(tables.map(table => [table, new Set()]));
+  const parentsByChild = new Map();
+  for (const key of foreignKeys) {
+    if (known.has(key.child) && known.has(key.parent) && key.child !== key.parent) deleteBefore.get(key.parent).add(key.child);
+    if (!parentsByChild.has(key.child)) parentsByChild.set(key.child, []);
+    parentsByChild.get(key.child).push(key);
+  }
+  // A table without organization_id is deleted by cascade from one parent while still referencing others.
+  for (const [child, keys] of parentsByChild) {
+    if (known.has(child)) continue;
+    const cascading = keys.filter(key => key.action === 'c' && known.has(key.parent));
+    const blocking = keys.filter(key => key.action !== 'c' && known.has(key.parent));
+    for (const owner of cascading) for (const blocker of blocking) if (owner.parent !== blocker.parent) deleteBefore.get(blocker.parent).add(owner.parent);
+  }
+  // A table that references an organization-less table (e.g. inventory_items -> purchase_order_items) must be emptied
+  // before the organization table that cascades into that organization-less table.
+  const owners = table => {
+    if (known.has(table)) return [table];
+    return (parentsByChild.get(table) || []).filter(key => key.action === 'c').flatMap(key => owners(key.parent));
+  };
+  for (const key of foreignKeys) {
+    if (!known.has(key.child) || known.has(key.parent)) continue;
+    for (const owner of owners(key.parent)) if (owner !== key.child) deleteBefore.get(owner).add(key.child);
+  }
+  const remaining = new Set(tables);
+  while (remaining.size) {
+    const next = [...remaining].find(table => ![...deleteBefore.get(table)].some(other => remaining.has(other))) || [...remaining][0];
+    await pool.query(`DELETE FROM "${next}" WHERE organization_id = ANY($1::uuid[])`, [ids]);
+    remaining.delete(next);
+  }
+  await pool.query('DELETE FROM organizations WHERE id = ANY($1::uuid[])', [ids]);
+}
+
 async function cleanup() {
   await stopServer();
-  await pool.query('DELETE FROM organizations WHERE id = ANY($1::uuid[])', [[orgAId, orgBId]]);
+  await deleteIntegrationOrganizations([orgAId, orgBId]);
   await pool.end();
 }
 
