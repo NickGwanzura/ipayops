@@ -62,6 +62,7 @@ const moduleNav: Array<{ label: OpsModule; icon: React.ElementType }> = [
 type User = { fullName: string; role: string };
 type DashboardData = {
   summary: { revenue: string | number; confirmed_sales: number; units_in_stock: number; open_dispatches: number };
+  dispatchOversight: { total_dispatches: number; in_transit: number; pending_payments: number; pending_driver_fees: string | number; delivered_this_month: number; recent_dispatches: Array<{ number: string; destination_town: string; driver_name: string; status: string; payment_status: string; driver_fee: string | number; dispatched_at: string; item_count: number }> };
   performance: { day: string; sales: string | number; stock: number }[];
   activity: { event: string; detail: string; status: string; occurred_at: string }[];
   stockByCategory: { name: string; value: number }[];
@@ -76,6 +77,7 @@ type DashboardData = {
 
 const emptyDashboard: DashboardData = {
   summary: { revenue: 0, confirmed_sales: 0, units_in_stock: 0, open_dispatches: 0 },
+  dispatchOversight: { total_dispatches: 0, in_transit: 0, pending_payments: 0, pending_driver_fees: 0, delivered_this_month: 0, recent_dispatches: [] },
   performance: [],
   activity: [],
   stockByCategory: [],
@@ -368,6 +370,7 @@ export default function Home() {
                   help="Devices sent to other towns that are Prepared or In transit."
                 />
               </div>
+              <CeoDispatchOversight data={dashboard.dispatchOversight} settings={settings} onOpen={() => openWorkspace('Dispatch')} />
               <CeoProfitabilityOversight
                 settings={settings}
                 onOpenSku={(sku) => openWorkspace('Inventory', { q: sku })}
@@ -758,6 +761,12 @@ function CeoPeopleOversight({ onOpen }: { onOpen: () => void }) {
     </section>
   );
 }
+
+function CeoDispatchOversight({ data, settings, onOpen }: { data: DashboardData['dispatchOversight']; settings: ReturnType<typeof useOrganizationSettings>; onOpen: () => void }) {
+  return <section className="panel dispatch-oversight"><div className="panel-header"><div><h2>Inter-town dispatch oversight</h2><p>Live visibility into devices travelling between towns and driver payments.</p></div><button className="text-btn" onClick={onOpen}>Open dispatch register <ArrowUpRight size={14}/></button></div><div className="role-summary-grid"><div><strong>{data.total_dispatches}</strong><span>Total dispatches</span></div><div><strong>{data.in_transit}</strong><span>Prepared / in transit</span></div><div><strong>{data.pending_payments}</strong><span>Pending driver payments</span></div><div><strong>{formatCurrency(data.pending_driver_fees, settings.currency)}</strong><span>Fees still outstanding</span></div></div><div className="data-table labelled-cards"><div className="table-head"><span>Dispatch</span><span>Destination</span><span>Driver</span><span>Delivery</span><span>Payment</span></div>{data.recent_dispatches.map(dispatch => <div className="data-row" key={dispatch.number}><div data-label="Dispatch"><strong>{dispatch.number}</strong><small>{dispatch.item_count} device{dispatch.item_count === 1 ? '' : 's'}</small></div><span data-label="Destination">{dispatch.destination_town}</span><span data-label="Driver"><strong>{dispatch.driver_name}</strong><small>{formatOrganizationDate(dispatch.dispatched_at, settings)}</small></span><span data-label="Delivery"><DispatchStatusPill value={dispatch.status}/></span><span data-label="Payment"><DispatchStatusPill value={dispatch.payment_status}/><small>{formatCurrency(dispatch.driver_fee, settings.currency)}</small></span></div>)}{!data.recent_dispatches.length && <div className="empty"><Truck size={20}/><strong>No dispatch records yet</strong><span>Inter-town dispatch activity will appear here once a consultant records a driver.</span></div>}</div></section>;
+}
+
+function DispatchStatusPill({ value }: { value: string }) { return <span className={`pill ${value.toLowerCase().replaceAll(' ', '-')}`}>{value}</span>; }
 
 type ProfitabilityData = {
   filters: { from: string; to: string; region: string; product: string };
