@@ -6,6 +6,7 @@ import './dashboard-redesign.css';
 import './sidebar-actions.css';
 import { OrganizationSettingsProvider } from './organization-settings';
 import { ConfirmHost } from '@/components/ui/confirm';
+import { maintenanceEnabled } from '@/lib/site-maintenance';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://ipaytechops.com'),
@@ -53,8 +54,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <link rel="preload" href="/fonts/geist-sans-vf.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
       </head>
       <body>
-        <OrganizationSettingsProvider>{children}</OrganizationSettingsProvider>
-        <ConfirmHost />
+        {maintenanceEnabled ? children : <OrganizationSettingsProvider>{children}</OrganizationSettingsProvider>}
+        {!maintenanceEnabled && <ConfirmHost />}
       </body>
     </html>
   );

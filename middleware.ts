@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
 import { canAccessModule, modulesForRole } from './lib/rbac';
 import { getOrCreateRequestId, REQUEST_ID_HEADER } from './lib/observability';
+import { maintenanceEnabled } from './lib/site-maintenance';
 
 const cookieName = 'ipaytech_session';
 
@@ -24,6 +25,17 @@ function isSameOrigin(request: NextRequest, origin: string) {
 }
 
 export async function middleware(request: NextRequest) {
+  if (maintenanceEnabled) {
+    const headers = { 'Retry-After': '3600', 'Cache-Control': 'no-store' };
+    if (request.nextUrl.pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'The site is under maintenance. Please try again later.' }, { status: 503, headers });
+    }
+    return NextResponse.rewrite(new URL('/maintenance', request.url), { status: 503, headers });
+  }
+  if (request.nextUrl.pathname === '/maintenance') return NextResponse.redirect(new URL('/', request.url));
+  if (/^\/(login|verify|invite|forgot-password|reset-password)(\/|$)/.test(request.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
   const requestId = getOrCreateRequestId(request);
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set(REQUEST_ID_HEADER, requestId);
@@ -76,6 +88,11 @@ export async function middleware(request: NextRequest) {
 export const config = {
   runtime: 'nodejs',
   matcher: [
+    '/login/:path*',
+    '/verify/:path*',
+    '/invite/:path*',
+    '/forgot-password/:path*',
+    '/reset-password/:path*',
     '/api/:path*',
     '/((?!api|login|verify|invite|forgot-password|reset-password|_next/static|_next/image|fonts/|favicon.ico|iPaytechLogo.jpg|pos-login-hero.webp).*)',
   ],

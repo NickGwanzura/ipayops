@@ -1,0 +1,18 @@
+.page { min-height: 100svh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 24px; background: radial-gradient(ellipse at 50% 30%, #e0f2ed, transparent 65%), #f6f8fa; color: #142c35; text-align: center; }
+.card { width: 100%; max-width: 540px; }
+.logo { object-fit: contain; border-radius: 8px; }
+.animation { position: relative; display: grid; place-items: center; width: 132px; height: 132px; margin: 48px auto 32px; color: #16816a; border-radius: 50%; background: #d6eee5; }
+.orbit { position: absolute; inset: -12px; border: 1px dashed #73bba8; border-radius: 50%; animation: spin 24s linear infinite; }
+.tool { position: absolute; right: 0; bottom: 0; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; background: #fff; box-shadow: 0 4px 16px #163a3020; animation: float 3s ease-in-out infinite; }
+.status { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #376d5e; }
+.status span { width: 7px; height: 7px; background: #299571; border-radius: 50%; }
+.card h1 { margin: 18px 0; font-size: clamp(34px, 6vw, 52px); letter-spacing: -1.8px; line-height: 1.1; }
+.card p { margin: 0 auto; max-width: 420px; font-size: 16px; line-height: 1.8; color: #5b6b74; }
+.button { display: inline-block; margin: 30px 0 18px; padding: 13px 25px; background: #176e59; color: #fff; border-radius: 10px; font-size: 14px; font-weight: 600; text-decoration: none; }
+.button:hover { background: #105340; }
+.button:focus-visible { outline: 3px solid #5ca58f; outline-offset: 4px; }
+.card small { display: block; color: #6b7b83; }
+.page footer { margin-top: 64px; font-size: 11px; color: #75858b; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes float { 50% { transform: translateY(-6px) rotate(-8deg); } }
+@media (prefers-reduced-motion: reduce) { .orbit, .tool { animation: none; } }
